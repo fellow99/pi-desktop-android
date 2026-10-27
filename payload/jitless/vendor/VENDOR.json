@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "note": "vendored 纯 JS 图片编解码器（compat 形态用），从 npm tarball 解出，去掉外层 package/ 层；无运行时依赖，未执行 npm install。",
+  "packages": [
+    {
+      "name": "jpeg-js",
+      "version": "0.4.4",
+      "license": "BSD-3-Clause",
+      "tarball": "https://registry.npmjs.org/jpeg-js/-/jpeg-js-0.4.4.tgz",
+      "tarballSha256": "269f988267bc71efe58baf97e8b2da064b5bbbbb8b0eab11e2149049935e1160",
+      "tarballBytes": 21818,
+      "runtimeDependencies": [],
+      "extractedTo": "payload/jitless/vendor/jpeg-js",
+      "fileCount": 8,
+      "bytes": 75587,
+      "excluded": [
+        ".github/workflows/ci.yml"
+      ],
+      "files": [
+        {
+          "path": "CONTRIBUTING.md",
+          "bytes": 1233,
+          "sha256": "bf387c8cf7ba1f15b6b7b66b5f6cde88f6cefac5409371bc0c62cecb3409279f"
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 1448,
+          "sha256": "c0a8512eabe960492fefd4f287523eb3b5ca1518ca37ef0ec83344cd7f089cb8"
+        },
+        {
+          "path": "README.md",
+          "bytes": 8418,
+          "sha256": "2f0703c7c6abe7ccc7ef9982299b2f7a946082ec72e016be835c95a1e6ee64f0"
+        },
+        {
+          "path": "index.d.ts",
+          "bytes": 996,
+          "sha256": "3d9450c6a13228a5264fc4057e374a8128674fae1e8a7ed6813ee9d636751212"
+        },
+        {
+          "path": "index.js",
+          "bytes": 136,
+          "sha256": "404574b5cede8905627bff9b05975c0472d50425feb6906b0a55335e6743c4b4"
+        },
+        {
+          "path": "lib/decoder.js",
+          "bytes": 40593,
+          "sha256": "a3f175fd6f62d142aad94d3bd90f3a30be4e076baf9b6a6fa31c8e84d9d4aa9f"
+        },
+        {
+          "path": "lib/encoder.js",
+          "bytes": 22120,
+          "sha256": "00bde8df2517eca556669ab6fc27b414e9ba3fc52a0a71e1e37ec7c5f19c3d34"
+        },
+        {
+          "path": "package.json",
+          "bytes": 643,
+          "sha256": "8a0418edb81e7bdb69d1d78c4c1aeedeecc839deb58a8eeba6f25ae92ed14e62"
+        }
+      ]
+    },
+    {
+      "name": "pngjs",
+      "version": "7.0.0",
+      "license": "MIT",
+      "tarball": "https://registry.npmjs.org/pngjs/-/pngjs-7.0.0.tgz",
+      "tarballSha256": "c4b71873d48a692dd5eeb1dcb62185c7aafe40f2180c7cc7f30ec71e89a080be",
+      "tarballBytes": 160939,
+      "runtimeDependencies": [],
+      "extractedTo": "payload/jitless/vendor/pngjs",
+      "fileCount": 26,
+      "bytes": 77390,
+      "excluded": [
+        "browser.js"
+      ],
+      "files": [
+        {
+          "path": "CHANGELOG.md",
+          "bytes": 3001,
+          "sha256": "c9ca37f02fb7e978034759113d4ee7500932aaa3a02ff19acbca7bf9694ef7c6"
+        },
+        {
+          "path": "LICENSE",
+          "bytes": 1150,
+          "sha256": "be75ef59c5cf59715588a17a82dff7dd3e83c4dba3c458676bb9311e05fbedc5"
+        },
+        {
+          "path": "README.md",
+          "bytes": 9375,
+          "sha256": "1d90045508b00719a3f9415f8a57cddfba05f9ea51746c48ffed8122ad68bf85"
+        },
+        {
+          "path": "lib/bitmapper.js",
+          "bytes": 6477,
+          "sha256": "3f2f720e3a2b4e41cdc03e9f58bb1794bec26dcd1b22568e41ce0b84ab20aeb5"
+        },
+        {
+          "path": "lib/bitpacker.js",
+          "bytes": 4670,
+          "sha256": "3f7bfabcbc82bedd0cc8551bc210b44dc1fb179fa2ce3b8b1d39fa307d8af204"
+        },
+        {
+          "path": "lib/chunkstream.js",
+          "bytes": 4249,
+          "sha256": "43c5507901554a29c5a29e555aaeb3c3987b84fb3aa8c681c1b30794a477aa85"
+        },
+        {
+          "path": "lib/constants.js",
+          "bytes": 662,
+          "sha256": "9e3b4f994ac93751e9ccb4d453e85e4f25a0b086a9f24ec92c7dcb06995bdf6c"
+        },
+        {
+          "path": "lib/crc.js",
+          "bytes": 853,
+          "sha256": "57e2328cfa361fb54f1f4b3a59e071c1ccc864095e4f3759a957cd15aa2a8b65"
+        },
+        {
+          "path": "lib/filter-pack.js",
+          "bytes": 4279,
+          "sha256": "500c1b3b34702c895e9e689143f44280687cac363447523679ec13d12bd564f6"
+        },
+        {
+          "path": "lib/filter-parse-async.js",
+          "bytes": 558,
+          "sha256": "328b6173f1a2a4d91425220a0fa421699552f254006a57ede9f4018ced50a7ee"
+        },
+        {
+          "path": "lib/filter-parse-sync.js",
+          "bytes": 483,
+          "sha256": "201a08dfab26a2903c0dabcbdfe0406b3fa33d60f59b591878329f590fac48ff"
+        },
+        {
+          "path": "lib/filter-parse.js",
+          "bytes": 4798,
+          "sha256": "b8aad6f29371f5b13b232643781a7c49f7d36d565136ddda1ed7fbaca987ce2c"
+        },
+        {
+          "path": "lib/format-normaliser.js",
+          "bytes": 2366,
+          "sha256": "c73989d85bef5d33ce571095bf0d96927261730d8b0f79c9d48f971fcbdd0be0"
+        },
+        {
+          "path": "lib/interlace.js",
+          "bytes": 2004,
+          "sha256": "3bb5d57153078ff586667e9a9d2c06db993c8ff1638e0521a9883cdeea6e1e3f"
+        },
+        {
+          "path": "lib/packer-async.js",
+          "bytes": 1162,
+          "sha256": "f50df0610749ce7b1a99abbe9e4596df7c16f96efd3848f12dd632b22cb02b45"
+        },
+        {
+          "path": "lib/packer-sync.js",
+          "bytes": 1193,
+          "sha256": "1b516238168a42704e62ba44528406188864a6ddda2ae92d1b91e5e078cdaa2d"
+        },
+        {
+          "path": "lib/packer.js",
+          "bytes": 3723,
+          "sha256": "b5f9956364c80d67c28d615ace639a5fb4d4d79d3acb235237f3050dca220e03"
+        },
+        {
+          "path": "lib/paeth-predictor.js",
+          "bytes": 372,
+          "sha256": "48555b909af708593dade8e8df75d18ecdffdb6577e362eac01eae357ef1e0e9"
+        },
+        {
+          "path": "lib/parser-async.js",
+          "bytes": 4368,
+          "sha256": "a0299cad35220de62b7180b1f984b8f77b4c0f419a580fd3c86ea3b3e971ee30"
+        },
+        {
+          "path": "lib/parser-sync.js",
+          "bytes": 2580,
+          "sha256": "266c9fb230b90075022b3f54f5710a9cacb71ca565f83fce66e7cbd1b7e9b507"
+        },
+        {
+          "path": "lib/parser.js",
+          "bytes": 7720,
+          "sha256": "574e43fea28a28cc6feb7ab62a480a86bb75411ee4bfaba76a7e9d7310b6e94c"
+        },
+        {
+          "path": "lib/png-sync.js",
+          "bytes": 252,
+          "sha256": "867b1a78dcd3e45458eb4f0af01acd48f38d3a31225bd7cb8dd8ee3966ab54be"
+        },
+        {
+          "path": "lib/png.js",
+          "bytes": 4418,
+          "sha256": "e02cecbd36327829758386dc3f0ca4a36a2339ccb5d5e824ca3556e2c3f89726"
+        },
+        {
+          "path": "lib/sync-inflate.js",
+          "bytes": 3751,
+          "sha256": "08cb8afb79a4c0ab58e94601dab22261daf6638382b211d6a7f6bfbc16d27a0b"
+        },
+        {
+          "path": "lib/sync-reader.js",
+          "bytes": 1114,
+          "sha256": "437a99bf1bf739202ae85c3018cd9174d411597cf55e7064c36976de493368f1"
+        },
+        {
+          "path": "package.json",
+          "bytes": 1812,
+          "sha256": "85b17f2f852aece03e71edb4ed4d9fddf6a0a8f0b69ac75d7f00b6592d62d37c"
+        }
+      ]
+    }
+  ]
+}

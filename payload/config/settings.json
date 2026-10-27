@@ -1,0 +1,5 @@
+{
+  "shellPath": "/system/bin/sh",
+  "defaultTools": ["read", "write", "edit", "ls", "find", "grep", "bash"],
+  "defaultProjectTrust": "ask"
+}
