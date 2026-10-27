@@ -104,6 +104,7 @@ class MainActivity : Activity() {
     private fun observeState() {
         ui.post(object : Runnable {
             override fun run() {
+                if (isDestroyed || isFinishing) return; // 评审修复：销毁后停止 UI 轮询（防泄漏/视图越权更新）
                 when (val s = PiDesktopRuntime.state.value) {
                     is ShellState.Loading -> {
                         loadingText.visibility = View.VISIBLE

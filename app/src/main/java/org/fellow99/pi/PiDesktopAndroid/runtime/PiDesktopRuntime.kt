@@ -137,7 +137,7 @@ object PiDesktopRuntime {
         say("等待服务就绪（marker + /api/web-auth）…")
         val port = waitReadyPort(timeoutMs = 150_000)
         say("探活 http://127.0.0.1:$port/api/web-auth …")
-        probeReady(port, timeoutMs = 90_000)
+        awaitHttpReady(port, timeoutMs = 90_000)
         rt.markRunning()
         _state.value = ShellState.Ready(port, "http://127.0.0.1:$port/")
     }
@@ -177,7 +177,7 @@ object PiDesktopRuntime {
     }
 
     /** HTTP 探活 /api/web-auth（400ms 间隔，90s 超时；与 ark 同口径）。 */
-    private fun probeReady(port: Int, timeoutMs: Long) {
+    private fun awaitHttpReady(port: Int, timeoutMs: Long) {
         val deadline = System.currentTimeMillis() + timeoutMs
         var last = "(尚未探测)"
         while (System.currentTimeMillis() < deadline) {
