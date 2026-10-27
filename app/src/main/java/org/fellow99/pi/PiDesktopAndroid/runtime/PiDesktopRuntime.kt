@@ -194,6 +194,6 @@ object PiDesktopRuntime {
             }
             Thread.sleep(400)
         }
-        fail("probe", "就绪探活超时（最后：$last）")
+        fail("ready-check", "就绪探活超时（最后：$last）")
     }
 }
