@@ -33,3 +33,13 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# ── pi-desktop-android 追加 ──────────────────────────────────────────────
+# 载荷（组装脚本产出，gitignored；见 docs/000-工程规划.md §16.1）
+app/src/main/assets/pi-web/
+# 探针期临时素材与产物
+app/src/main/assets/probe/
+probe-work/
+# 运行期敏感/本机文件双保险
+*.pem
+secrets*

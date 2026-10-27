@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 应用名与 pi-desktop / ark 品牌口径一致（规划 §头部表 G10） -->
+    <string name="app_name">Pi Desktop</string>
+</resources>

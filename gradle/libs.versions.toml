@@ -1,0 +1,24 @@
+[versions]
+# AGP 9.2.1（bridge 侧口径）需要 Gradle 9.x；本机工具链是 Gradle 8.12 + 已缓存的
+# AGP 8.10.1（网络实测可达，但优先复用本机缓存以缩短构建）。升级 AGP 时同步升 Gradle。
+agp = "8.10.1"
+kotlin = "2.2.20"
+coroutines = "1.9.0"
+
+compileSdk = "36"
+minSdk = "24"
+targetSdk = "36"
+
+# 运行时两库（docs/000-工程规划.md §12 的锁定版本；升级须先改规划再改这里）
+nodeBridge = "0.2.0"
+nodeRuntime = "24.2.0"
+
+[libraries]
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+node-bridge = { module = "io.github.fellow99:node-bridge", version.ref = "nodeBridge" }
+node-runtime = { module = "io.github.fellow99:node-runtime", version.ref = "nodeRuntime" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
