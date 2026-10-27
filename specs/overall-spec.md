@@ -38,10 +38,10 @@
 | # | 需求 | 验收 | as-built |
 |---|---|---|---|
 | S4-1 | 载荷组装 | `node scripts/assemble-payload.mjs --apply` 产出 assets tar.gz+version；6 条补丁标记进编译产物；pi-web 收尾 pristine | ✅（本轮构建） |
-| S4-2 | Kotlin 壳 | 装机启动 → 加载页阶段文本 → WebView 渲染 Pi Web UI 首屏 | ✅（模拟器截图+`/api/web-auth` 200） |
+| S4-2 | Kotlin 壳 | 装机启动 → 加载页阶段文本 → WebView 渲染 Pi Web UI 首屏 | ⚠️ 加载页/解包/编排/宿主桥 ✅（模拟器实测）；WebView 首屏被模拟器翻译层 SIGSEGV 阻塞（docs/002 E2E，真机交接已备） |
 | S4-3 | 就绪判定 | marker 端口 + web-auth 200 才 Ready | ✅（PiDesktopRuntime 实现） |
-| S4-4 | 基础功能 | 配 DeepSeek Key（deepseek-flash）+ 建工作区 + 一轮对话 + 一次看图分析 | ✅（E2E 见 `docs/002` §E2E） |
-| S4-5 | 会话持久化 | 重启应用后会话仍在 | ✅（E2E 重启核对） |
+| S4-4 | 基础功能 | 配 DeepSeek Key（deepseek-flash）+ 建工作区 + 一轮对话 + 一次看图分析 | ⬜ 随 S4-2 阻塞（deepseek-flash 已确认在模型注册表；DeepSeek TCP 出网模拟器实测可达） |
+| S4-5 | 会话持久化 | 重启应用后会话仍在 | ⬜ 随 S4-2 阻塞 |
 
 ## S5 纪律
 

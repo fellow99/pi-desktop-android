@@ -8,14 +8,14 @@
 |---|---|---|
 | README.md | ✅ | 文档索引与导读 |
 | SPECS_CHECKLIST.md | ✅ | 本文件 |
-| STRUCTURE.md | ⬜ | 随 as-built 生成（E2E 后核对目录） |
+| STRUCTURE.md | ✅ | 脚本生成 + 关键文件抽查一致（2026-10-28） |
 | TECH.md | ✅ | 技术选型与锁定版本 |
 | ARCHITECTURE.md | ✅ | 架构/时序/分界/环境契约 |
 | constitution.md | ✅ | C1–C10 |
-| overall-spec.md | 🚧 | 整体规格（E2E 后回填 as-built 列） |
-| overall-plan.md | 🚧 | 整体技术方案（分阶段） |
-| overall-data-model.md | 🚧 | 数据模型 |
-| overall-test-cases.md | 🚧 | 测试用例索引（Phase 0 已有判据，E2E 后补全） |
+| overall-spec.md | ✅ | 整体规格（S1–S5 判据含 as-built；E2E 项标注环境阻塞） |
+| overall-plan.md | ✅ | 整体技术方案（含 R11/R12 风险登记） |
+| overall-data-model.md | ✅ | 数据模型（沙箱落点/归档契约） |
+| overall-test-cases.md | ✅ | 测试用例索引（T0 全绿；T1 部分被模拟器翻译层缺陷阻塞，真机交接命令已备） |
 
 ## 功能模块
 
@@ -34,7 +34,7 @@
 | 阶段 | 状态 | 出口证据 |
 |---|---|---|
 | Phase 0 消费方探针 | ✅ | `docs/002-真机验证记录.md`（O1/O2/O3/O4/O5/O7） |
-| Phase 1 端到端链路 | 🚧 | 载荷组装 + 壳已完成；E2E（装机会话/流式/持久化）进行中 |
+| Phase 1 端到端链路 | ⚠️ | 载荷组装+壳+启动链路（解包/编排/宿主桥）✅；WebView 渲染被模拟器 berberis 翻译层 SIGSEGV 阻塞（docs/002 E2E 节，真机交接命令已备） |
 | Phase 2 宿主能力补齐 | ⬜ | SAF 桥/perm 流（本期仅桩） |
 | Phase 3 git/pnpm + 合规发布 | ⬜ | — |
 | Phase 4 加固演进 | ⬜ | — |

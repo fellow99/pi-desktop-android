@@ -116,9 +116,15 @@ object PiDesktopRuntime {
         say("启动进程内 Node…")
         val appEntryAbs = File(payloadRoot, "pi-web/pi-web-launch.js")
         check(appEntryAbs.isFile) { "载荷缺入口：$appEntryAbs（组装产物不完整？）" }
+        // jitless 策略：翻译环境（x86_64 宿主跑 arm64 引擎）下 V8 JIT 触发 berberis memcpy SEGV
+        // （tombstone：memmove_generic ← libproxy_arm64_to_x86_64，01:47 crash）⇒ 翻译环境强制
+        // 解释器模式；真机 arm64 无翻译 ⇒ 原生 JIT（O1 实测可用）。
+        val jitless = android.os.Build.SUPPORTED_ABIS.any { it.contains("x86") }
+        say(if (jitless) "翻译环境：解释器模式（jitless）…" else "JIT 模式…")
         val result = rt.start(
             NodeRuntimeOptions(
                 entry = "bootstrap.js",
+                jitless = jitless,
                 appEntry = appEntryAbs.absolutePath,
                 cwd = File(payloadRoot, "pi-web").absolutePath,
                 env = env,
