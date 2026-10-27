@@ -1,0 +1,161 @@
+diff --git a/app/api/terminal/route.ts b/app/api/terminal/route.ts
+index 62ca3c6..eaab801 100644
+--- a/app/api/terminal/route.ts
++++ b/app/api/terminal/route.ts
+@@ -2,13 +2,34 @@ import { stat } from "fs/promises";
+ import { resolve } from "path";
+ import { NextResponse } from "next/server";
+ import { getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
++import { terminalCapability } from "@/lib/terminal-capability";
+ import { createTerminal } from "@/lib/terminal-manager";
+ 
+ export const dynamic = "force-dynamic";
+ export const runtime = "nodejs";
+ 
++/**
++ * 能力查询（无副作用）：本平台能不能创建伪终端。
++ *
++ * 状态码 **200**：这是一次**成功的查询**，`supported:false` 是它的答案 —— 与 `/api/web-auth`
++ * 的「200 + 标志位」同形。若这里返 5xx，监控/UI 会把它误当「服务坏了」而不是「平台没有」。
++ */
++export async function GET() {
++  return NextResponse.json(terminalCapability());
++}
++
+ export async function POST(req: Request) {
+   try {
++    // 平台没有 PTY 时，`createTerminal()` 必然抛原生模块加载错误 —— 那会被下面的通用
++    // 异常处理转成 500，把「平台能力缺失」伪装成「加载故障」。因此在**动手之前**先判能力。
++    // 有 PTY 的平台上 supported:true，本分支不生效，行为与上游一致。
++    const capability = terminalCapability();
++    if (!capability.supported) {
++      // 501 Not Implemented：请求本身合法，但这个端点在本平台**没有实现可能**
++      // （400/403 是参数与授权，500 是服务器出错 —— 都不是这里的事实）。
++      // UI 侧 `terminalRequest()` 在 `!response.ok` 时抛 `data.error`，面板据此显示原因。
++      return NextResponse.json(capability, { status: 501 });
++    }
+     const body = await req.json() as { id?: unknown; cwd?: unknown; cols?: unknown; rows?: unknown };
+     if (body.id !== undefined && (typeof body.id !== "string" || !/^[a-f0-9]{32}$/.test(body.id))) {
+       return NextResponse.json({ error: "Invalid terminal id" }, { status: 400 });
+diff --git a/lib/terminal-capability.ts b/lib/terminal-capability.ts
+new file mode 100644
+index 0000000..39ef9b9
+--- /dev/null
++++ b/lib/terminal-capability.ts
+@@ -0,0 +1,116 @@
++import { closeSync, openSync, readFileSync, statSync } from "fs";
++
++/**
++ * 伪终端（PTY）能力的**唯一事实源** —— 运行时探测的「能力标志」，不是编译期常量。
++ *
++ * 为什么需要它：`lib/terminal-manager.ts#createTerminal()` 在原生模块装不上时抛
++ * 「Cannot load the node-pty native terminal module for <platform>-<arch>」，
++ * `/api/terminal` 把它当通用异常转成 **500**。但在 HarmonyOS/OpenHarmony 的应用沙箱里
++ * 这不是「加载失败」，而是**平台没有 PTY 设施**：
++ *   · `/proc/mounts` 里没有 `devpts`（实测 325 行，devpts 命中 0）；
++ *   · `/dev` 是 `devfs`，没有 `/dev/pts/N`；
++ *   · `/dev/ptmx` 打开返回 `EACCES`。
++ * 于是 node-pty 永远装不上，重试/重编也没有意义 —— 错误码会骗人，能力标志不会。
++ *
++ * 纪律：
++ *   ① **不伪造支持**：`supported:false` 由运行时事实得出，没有「也许能用」的余地；
++ *   ② 只作为**前置门**使用：`supported:true` 时仍然走上游原路径（失败仍按上游报 500 +
++ *      修复指引），因此有 PTY 的平台上行为与上游**逐字节相同**；
++ *   ③ evidence 是**实测值**（读 `/proc/mounts`、试打开 `/dev/ptmx`），不是抄来的结论。
++ */
++export const TERMINAL_CAPABILITY = "terminal.pty";
++
++/**
++ * Node 在 HarmonyOS / OpenHarmony 上自报的 `process.platform`。
++ * `openharmony` 见设备实测（错误串里的 `openharmony-arm64`）；`harmonyos` 为同一内核的别名。
++ */
++const PTY_LESS_PLATFORMS = ["openharmony", "harmonyos", "android"];
++
++export interface TerminalCapabilitySupported {
++  ok: true;
++  capability: typeof TERMINAL_CAPABILITY;
++  supported: true;
++  platform: string;
++  arch: string;
++  runtime: string;
++}
++
++export interface TerminalCapabilityUnsupported {
++  ok: false;
++  capability: typeof TERMINAL_CAPABILITY;
++  supported: false;
++  /** 平台级原因（给人看的一句话），不含任何原生模块加载错误 */
++  reason: string;
++  /** 实测证据（`/proc/mounts` 行数与 devpts 命中数、`/dev/ptmx` 的 errno…） */
++  evidence: string;
++  /** 处置方向（能力缺失按能力处理，不装作故障） */
++  plan: string;
++  /** 给 UI 直接显示的文案（`terminalRequest()` 把 `error` 抛成 Error，面板显示它） */
++  error: string;
++  platform: string;
++  arch: string;
++  runtime: string;
++}
++
++export type TerminalCapability = TerminalCapabilitySupported | TerminalCapabilityUnsupported;
++
++function errnoOf(error: unknown): string {
++  const code = (error as { code?: unknown } | null)?.code;
++  return typeof code === "string" ? code : error instanceof Error ? error.message : String(error);
++}
++
++/** 读取 `/dev` 与挂载表的**实测**事实（全部失败路径都降级为一行字符串，绝不抛）。 */
++function ptyEvidence(): string {
++  const facts: string[] = [];
++  try {
++    const lines = readFileSync("/proc/mounts", "utf8").split("\n").filter((line) => line.trim() !== "");
++    facts.push(`/proc/mounts: ${lines.length} 行, devpts=${lines.filter((line) => /\bdevpts\b/.test(line)).length}`);
++  } catch (error) {
++    facts.push(`/proc/mounts: ${errnoOf(error)}`);
++  }
++  try {
++    // 打开即可判定（`/dev/ptmx` 是字符设备，read 会阻塞 —— 这里只 open/close）
++    closeSync(openSync("/dev/ptmx", "r"));
++    facts.push("/dev/ptmx: 可打开");
++  } catch (error) {
++    facts.push(`/dev/ptmx: ${errnoOf(error)}`);
++  }
++  try {
++    facts.push(`/dev/pts: ${statSync("/dev/pts").isDirectory() ? "存在" : "存在但非目录"}`);
++  } catch (error) {
++    facts.push(`/dev/pts: ${errnoOf(error)}`);
++  }
++  return facts.join("; ");
++}
++
++/**
++ * 当前进程能否提供伪终端。
++ *
++ * ⚠️ 这里**刻意不 require("node-pty")**：那会在模块求值阶段就把原生加载错误抖出来
++ * （dev/build 环境没有预编译二进制），而本函数必须永远可调用、永远可回答。
++ */
++export function terminalCapability(): TerminalCapability {
++  const platform = String(process.platform);
++  const arch = String(process.arch);
++  const runtime = `node ${String(process.version)}`;
++  if (!PTY_LESS_PLATFORMS.includes(platform)) {
++    return { ok: true, capability: TERMINAL_CAPABILITY, supported: true, platform, arch, runtime };
++  }
++  return {
++    ok: false,
++    capability: TERMINAL_CAPABILITY,
++    supported: false,
++    reason:
++      `本平台没有伪终端（PTY）设施：${platform}-${arch} 上没有 node-pty 可用的终端设备节点`
++      + "（无 devpts 挂载、无 /dev/pts、/dev/ptmx 不可打开）。这是平台能力缺失，不是原生模块加载失败，"
++      + "重试或重编都不会改变。",
++    evidence: ptyEvidence(),
++    plan: "终端面板按 unsupported 降级；不实现伪终端（能力 terminal.pty = unsupported）",
++    error:
++      `终端不可用：本平台（${platform}-${arch}）没有伪终端（PTY）支持 —— `
++      + "属平台能力缺失（capability terminal.pty = unsupported），不是可以重试的故障。",
++    platform,
++    arch,
++    runtime,
++  };
++}

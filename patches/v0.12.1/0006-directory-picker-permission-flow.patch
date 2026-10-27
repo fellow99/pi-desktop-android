@@ -1,0 +1,366 @@
+diff --git a/app/api/cwd/browse/route.ts b/app/api/cwd/browse/route.ts
+index 41b2493..02c8b6f 100644
+--- a/app/api/cwd/browse/route.ts
++++ b/app/api/cwd/browse/route.ts
+@@ -41,6 +41,35 @@ function pickerContract() {
+  * `haps/<module>`，必然 404）的那条路。未知 id 必须报错而不是回退到别的根 —— 静默
+  * 换成另一个目录会让「选中的是哪里」无从判断。
+  */
++/**
++ * 主目录 → 需要的 OS 权限（本版只声明 normal 级的两个用户目录权限）。
++ *
++ * 由**服务端**给出权限名：前端只认 `permission` 字段，不硬编码任何
++ * `ohos.permission.*` 字面量（与「前端零路径硬编码」同一条纪律）。
++ */
++function permissionForRoot(rootId: string): string | null {
++  if (rootId === "documents") return "ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY";
++  if (rootId === "download") return "ohos.permission.READ_WRITE_DOWNLOAD_DIRECTORY";
++  return null;
++}
++
++/** 无权限时回 403：带 `permission` + `canRequest`，前端据此显示「请求权限 / 刷新」。 */
++function permissionDenied(rootId: string, rootPath: string): NextResponse {
++  const permission = permissionForRoot(rootId);
++  return NextResponse.json(
++    {
++      error: "Permission denied",
++      code: "EACCES",
++      rootId,
++      rootPath,
++      permission,
++      canRequest: permission !== null,
++      ...pickerContract(),
++    },
++    { status: 403 },
++  );
++}
++
+ async function browseDeclaredRoot(rootId: string): Promise<NextResponse> {
+   const root = findWorkspaceRoot(rootId);
+   if (!root) {
+@@ -57,7 +86,12 @@ async function browseDeclaredRoot(rootId: string): Promise<NextResponse> {
+   let resolved: string;
+   try {
+     resolved = await resolveDirectory(root.path);
+-  } catch {
++  } catch (error) {
++    // 无权限（未授予 user_grant）与「真的不存在」必须分开：前者回 403 + permission。
++    const code = (error as NodeJS.ErrnoException)?.code ?? "";
++    if (code === "EACCES" || code === "EPERM") {
++      return permissionDenied(root.id, root.path);
++    }
+     // 已声明但不存在：把「是谁声明的、声明成什么」一起回给调用方（宿主应建它）。
+     // Tab 清单照旧带回 —— 否则某个根（如尚未授权的「桌面」）一 404，整行 Tab 就没了。
+     return NextResponse.json(
+@@ -78,7 +112,17 @@ async function browseDeclaredRoot(rootId: string): Promise<NextResponse> {
+       { status: 400 },
+     );
+   }
+-  const listing = await listDirectoriesLimited(resolved);
++  // 目录存在但「不可列举」同样按无权限处理（真机上 documents/download 正是这种形态）。
++  let listing: Awaited<ReturnType<typeof listDirectoriesLimited>>;
++  try {
++    listing = await listDirectoriesLimited(resolved);
++  } catch (error) {
++    const code = (error as NodeJS.ErrnoException)?.code ?? "";
++    if (code === "EACCES" || code === "EPERM") {
++      return permissionDenied(root.id, root.path);
++    }
++    throw error;
++  }
+   return NextResponse.json({
+     rootId: root.id,
+     rootPath: resolved,
+diff --git a/app/api/host/perm/route.ts b/app/api/host/perm/route.ts
+new file mode 100644
+index 0000000..81dbe05
+--- /dev/null
++++ b/app/api/host/perm/route.ts
+@@ -0,0 +1,104 @@
++import { NextResponse } from "next/server";
++import { join } from "path";
++import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
++
++/**
++ * POST /api/host/perm — 让**页面**触发一次 OS 授权窗（FR-203-017）。
++ *
++ * 为什么需要这条路由：授权窗只能由 ArkTS 侧 `abilityAccessCtrl.requestPermissionsFromUser`
++ * 弹出，而"用户点了『请求权限』按钮"这件事发生在浏览器里。两侧的唯一通道是库的**文件信箱**
++ * （`host.js` 的 `invoke`，E18），它由 Node 起（与 Next 同一个进程），因此这条路由只做
++ * 「转发 + 只允许用户目录权限」两件事，不引入任何新的传输实现。
++ *
++ * 允许清单是**白名单**：只放两个 normal 级的用户目录权限。任何人都不能借这条路由去请求
++ * 别的（例如 system_basic）权限 —— 那会变成"随便给任意权限弹窗"的后门。
++ */
++export const dynamic = "force-dynamic";
++
++/** 产物标记：`assemble-payload` 用它判断载荷里的 .next 是否已包含本补丁。 */
++const PERM_FLOW_MARKER = "pi-hos-perm-manual";
++
++const ALLOWED_PERMISSIONS = new Set([
++  "ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY",
++  "ohos.permission.READ_WRITE_DOWNLOAD_DIRECTORY",
++]);
++
++type PermRequestResult = {
++  requested?: number;
++  granted?: number;
++  denied?: number;
++  results?: Array<{ permission?: string; authResult?: number; granted?: boolean }>;
++};
++
++export async function POST(request: Request) {
++  if (!isApiRequestAllowed(request) || !hasJsonContentType(request)) {
++    return NextResponse.json({ error: "Permission request is not allowed" }, { status: 403 });
++  }
++
++  let permission = "";
++  try {
++    const body = (await request.json()) as { permission?: unknown };
++    permission = typeof body.permission === "string" ? body.permission : "";
++  } catch {
++    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
++  }
++  if (!ALLOWED_PERMISSIONS.has(permission)) {
++    return NextResponse.json({ error: "Unsupported permission", permission }, { status: 400 });
++  }
++
++  // 宿主垫片：与 pi-web 同目录（`<payload>/pi-web/host.js`）。用 eval("require") 让打包器
++  // 不要静态分析这个路径（它是运行期才存在的文件）。
++  type HostShim = {
++    invoke: (name: string, payload?: unknown, opts?: { timeoutMs?: number }) => Promise<unknown>;
++    useFileMailbox?: (dir: string) => { ok?: boolean; error?: string; detail?: string };
++  };
++  let host: HostShim;
++  try {
++    // eslint-disable-next-line no-eval
++    const nodeRequire = eval("require") as NodeRequire;
++    host = nodeRequire(join(process.cwd(), "host.js")) as HostShim;
++    /*
++     * ⚠️ 必须**就地接线信箱**：pi-web-launch 装的是 `<resfile>/pi-web/host.js` 那一份，
++     * 而这条路由 require 的是 `<payload>/pi-web/host.js` —— 两份是**不同的模块实例**，
++     * 上面那份的 mailbox 状态不会共享过来（实测症状：`transport-unavailable name=perm.request`）。
++     * `useFileMailbox` 对已存在目录是幂等的，这里按环境变量再接线一次即可。
++     */
++    const mailboxDir = process.env.PI_HOST_MAILBOX ?? "";
++    if (mailboxDir.length > 0 && typeof host.useFileMailbox === "function") {
++      const wired = host.useFileMailbox(mailboxDir);
++      if (wired?.ok !== true) {
++        return NextResponse.json(
++          { error: "mailbox-unavailable", detail: wired?.detail ?? wired?.error ?? "unknown" },
++          { status: 503 },
++        );
++      }
++    }
++  } catch (error) {
++    return NextResponse.json(
++      { error: "host bridge unavailable", detail: String((error as Error)?.message ?? error) },
++      { status: 503 },
++    );
++  }
++
++  try {
++    // 用户在系统弹窗上点按的时间不可控 ⇒ 超时给足（库侧默认远小于此）。
++    const result = (await host.invoke(
++      "perm.request",
++      { permissions: [permission] },
++      { timeoutMs: 120000 },
++    )) as PermRequestResult;
++    const granted = typeof result?.granted === "number" ? result.granted : 0;
++    return NextResponse.json({ ok: true, marker: PERM_FLOW_MARKER, permission, granted: granted > 0, result });
++  } catch (error) {
++    const err = error as { error?: string; detail?: string; message?: string };
++    return NextResponse.json(
++      {
++        ok: false,
++        permission,
++        error: err?.error ?? "perm-request-failed",
++        detail: err?.detail ?? err?.message ?? String(error),
++      },
++      { status: 502 },
++    );
++  }
++}
+diff --git a/components/DirectoryPicker.tsx b/components/DirectoryPicker.tsx
+index eca0474..c2a1efc 100644
+--- a/components/DirectoryPicker.tsx
++++ b/components/DirectoryPicker.tsx
+@@ -29,6 +29,11 @@ interface BrowseResponse {
+   entryLimit?: number;
+   total?: number;
+   error?: string;
++  /** 403 时服务端给出的 OS 权限名（`ohos.permission.*`）；前端不硬编码。 */
++  permission?: string | null;
++  /** 403 且该权限可由用户点按授予（user_grant）时为 true。 */
++  canRequest?: boolean;
++  code?: string;
+ }
+ 
+ interface CreateDirectoryResponse {
+@@ -89,10 +94,51 @@ async function loadDirectories(directory?: string, rootId?: string): Promise<Bro
+   const query = params.toString();
+   const response = await fetch(`/api/cwd/browse${query ? `?${query}` : ""}`);
+   const data = await response.json() as BrowseResponse;
+-  if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
++  if (!response.ok || data.error) {
++    throw new BrowseError(
++      data.error ?? `HTTP ${response.status}`,
++      data.code ?? null,
++      data.permission ?? null,
++      data.canRequest === true,
++    );
++  }
+   return data;
+ }
+ 
++/**
++ * 浏览失败。带 `permission`/`canRequest` 的 403 表示"目录本身存在、只是还没授权"，
++ * 调用方据此显示「请求权限 / 刷新」两个按钮 —— 与"目录真的不存在"（404/ENOENT）必须分开。
++ */
++class BrowseError extends Error {
++  readonly code: string | null;
++  readonly permission: string | null;
++  readonly canRequest: boolean;
++
++  constructor(message: string, code: string | null, permission: string | null, canRequest: boolean) {
++    super(message);
++    this.name = "BrowseError";
++    this.code = code;
++    this.permission = permission;
++    this.canRequest = canRequest;
++  }
++}
++
++/** 触发一次 OS 授权窗（经 `/api/host/perm` → 文件信箱 → ArkTS `perm.request`）。 */
++async function requestHostPermission(permission: string): Promise<boolean> {
++  try {
++    const response = await fetch("/api/host/perm", {
++      method: "POST",
++      headers: { "Content-Type": "application/json" },
++      body: JSON.stringify({ permission }),
++    });
++    if (!response.ok) return false;
++    const data = await response.json() as { ok?: boolean; granted?: boolean };
++    return data.ok === true && data.granted === true;
++  } catch {
++    return false;
++  }
++}
++
+ /** 主目录 Tab 的持久化 key：只存根 **id**（FR-203-018）—— 路径由宿主每次启动重算。 */
+ const ROOT_STORAGE_KEY = "pi-hos-picker-root";
+ 
+@@ -173,12 +219,14 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+   const [creating, setCreating] = useState(false);
+   const [roots, setRoots] = useState<DirectoryRoot[]>([]);
+   const [activeRootId, setActiveRootId] = useState<string | null>(null);
++  const [permissionPrompt, setPermissionPrompt] = useState<{ permission: string; directory?: string; rootId?: string } | null>(null);
+   const [truncated, setTruncated] = useState(false);
+   const [entryLimit, setEntryLimit] = useState<number | null>(null);
+ 
+   const navigateTo = useCallback(async (directory?: string, rootId?: string): Promise<boolean> => {
+     setLoading(true);
+     setLoadError(null);
++    setPermissionPrompt(null);
+     try {
+       const data = await loadDirectories(directory, rootId);
+       const nextPath = data.path ?? directory ?? "/";
+@@ -193,6 +241,16 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+       setTruncated(data.truncated === true);
+       return true;
+     } catch (cause) {
++      /*
++       * FR-203-017（手动形态）：点「文档 / 下载」时**不自动申请权限**，只记下"这个根需要哪条权限"，
++       * 由界面上的「请求权限 / 刷新」两个按钮决定下一步。沙箱根永不走这条路（`permission` 为 null）。
++       */
++      if (cause instanceof BrowseError && cause.canRequest && cause.permission) {
++        setPermissionPrompt({ permission: cause.permission, directory, rootId });
++        setDirectories([]);
++        setDrives(null);
++        return false;
++      }
+       setLoadError(cause instanceof Error ? cause.message : String(cause));
+       return false;
+     } finally {
+@@ -375,6 +433,39 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+                 <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 11 }}>{t("directoryPicker.noDrives")}</div>
+               )}
+             </>
++          ) : permissionPrompt ? (
++            <div style={{ padding: "10px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
++              <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{t("directoryPicker.permissionNeededTitle")}</div>
++              <div style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>
++                {permissionPrompt.permission}
++              </div>
++              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
++                <button
++                  type="button"
++                  onClick={async () => {
++                    const target = permissionPrompt;
++                    const granted = await requestHostPermission(target.permission);
++                    if (!granted) return;
++                    setPermissionPrompt(null);
++                    void navigateTo(target.directory, target.rootId);
++                  }}
++                  style={{ padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-hover)", color: "var(--text)", cursor: "pointer", fontSize: 12 }}
++                >
++                  {t("directoryPicker.requestPermission")}
++                </button>
++                <button
++                  type="button"
++                  onClick={() => {
++                    const target = permissionPrompt;
++                    setPermissionPrompt(null);
++                    void navigateTo(target.directory, target.rootId);
++                  }}
++                  style={{ padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 6, background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
++                >
++                  {t("directoryPicker.refreshList")}
++                </button>
++              </div>
++            </div>
+           ) : directories.length > 0 ? (
+             directories.map((entry) => (
+               <button
+diff --git a/lib/i18n/messages/en.ts b/lib/i18n/messages/en.ts
+index c48e8e2..4eb8ad4 100644
+--- a/lib/i18n/messages/en.ts
++++ b/lib/i18n/messages/en.ts
+@@ -292,6 +292,9 @@ export const enLocale: LocalePlugin = {
+     "directoryPicker.go": "Go",
+     "directoryPicker.loadingDirectories": "Loading directories…",
+     "directoryPicker.noSubdirectories": "No subdirectories",
++    "directoryPicker.permissionNeededTitle": "This folder needs permission before its contents can be shown:",
++    "directoryPicker.requestPermission": "Request permission",
++    "directoryPicker.refreshList": "Refresh",
+     "directoryPicker.openBeforeSelecting": "Open this path before selecting it",
+     "directoryPicker.selectCurrentDirectory": "Select current directory",
+     "directoryPicker.selectThisFolder": "Select this folder",
+diff --git a/lib/i18n/messages/zh-CN.ts b/lib/i18n/messages/zh-CN.ts
+index 168474e..022cd7c 100644
+--- a/lib/i18n/messages/zh-CN.ts
++++ b/lib/i18n/messages/zh-CN.ts
+@@ -292,6 +292,9 @@ export const zhCNLocale: LocalePlugin = {
+     "directoryPicker.go": "转到",
+     "directoryPicker.loadingDirectories": "正在加载目录…",
+     "directoryPicker.noSubdirectories": "没有子目录",
++    "directoryPicker.permissionNeededTitle": "该目录需要授权后才能显示内容：",
++    "directoryPicker.requestPermission": "请求权限",
++    "directoryPicker.refreshList": "刷新",
+     "directoryPicker.openBeforeSelecting": "选择前请先打开此路径",
+     "directoryPicker.selectCurrentDirectory": "选择当前目录",
+     "directoryPicker.selectThisFolder": "选择此文件夹",
+diff --git a/lib/i18n/messages/zh-TW.ts b/lib/i18n/messages/zh-TW.ts
+index f1b37b6..9733697 100644
+--- a/lib/i18n/messages/zh-TW.ts
++++ b/lib/i18n/messages/zh-TW.ts
+@@ -292,6 +292,9 @@ export const zhTWLocale: LocalePlugin = {
+     "directoryPicker.go": "前往",
+     "directoryPicker.loadingDirectories": "正在載入目錄…",
+     "directoryPicker.noSubdirectories": "沒有子目錄",
++    "directoryPicker.permissionNeededTitle": "該目錄需要授權後才能顯示內容：",
++    "directoryPicker.requestPermission": "請求權限",
++    "directoryPicker.refreshList": "重新整理",
+     "directoryPicker.openBeforeSelecting": "選擇前請先開啟此路徑",
+     "directoryPicker.selectCurrentDirectory": "選擇目前目錄",
+     "directoryPicker.selectThisFolder": "選擇此資料夾",

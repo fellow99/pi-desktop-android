@@ -1,0 +1,210 @@
+diff --git a/app/api/agent/new/route.ts b/app/api/agent/new/route.ts
+index 0a9184a..627b660 100644
+--- a/app/api/agent/new/route.ts
++++ b/app/api/agent/new/route.ts
+@@ -3,6 +3,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
+ import { existsSync } from "fs";
+ import { randomUUID } from "crypto";
+ import { allowFileRoot } from "@/lib/file-access";
++import { describePathForms, normalizeAndroidSandboxPath } from "@/lib/android-sandbox-path";
+ import { invalidateSessionListCache } from "@/lib/session-reader";
+ import { startRpcSession } from "@/lib/rpc-manager";
+ 
+@@ -24,10 +25,14 @@ export async function POST(req: Request) {
+   let promptAccepted = false;
+   try {
+     const body = await req.json() as { cwd?: string; [key: string]: unknown };
+-    const { cwd, ...command } = body;
++    const { cwd: rawCwd, ...command } = body;
++    // 沙箱路径的 hdc 写法（/data/app/el2/<uid>/…）换成 el2 别名（幂等，见 lib/hos-sandbox-path.ts）；
++    // 后面的存在性判定、会话目录、文件根缓存都只认这一个值。
++    const requestedCwd: string = typeof rawCwd === "string" ? rawCwd : "";
++    const cwd: string = normalizeAndroidSandboxPath(requestedCwd);
+     commandType = typeof command.type === "string" ? command.type : undefined;
+ 
+-    if (!cwd || typeof cwd !== "string") {
++    if (cwd.length === 0) {
+       return NextResponse.json({
+         error: "cwd is required",
+         ...(commandType === "prompt"
+@@ -38,6 +43,7 @@ export async function POST(req: Request) {
+     if (!existsSync(cwd)) {
+       return NextResponse.json({
+         error: `Directory does not exist: ${cwd}`,
++        hint: describePathForms(requestedCwd, cwd),
+         ...(commandType === "prompt"
+           ? { code: "prompt_rejected", accepted: false }
+           : {}),
+diff --git a/app/api/cwd/browse/route.ts b/app/api/cwd/browse/route.ts
+index f4bba4c..dea1362 100644
+--- a/app/api/cwd/browse/route.ts
++++ b/app/api/cwd/browse/route.ts
+@@ -1,6 +1,7 @@
+ import { NextRequest, NextResponse } from "next/server";
+ import { stat } from "fs/promises";
+ import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
++import { describePathForms, normalizeAndroidSandboxPath } from "@/lib/android-sandbox-path";
+ import {
+   createDirectory,
+   findWorkspaceRoot,
+@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
+     if (requestedRoot) {
+       return await browseDeclaredRoot(requestedRoot);
+     }
+-    const requested = request.nextUrl.searchParams.get("path")?.trim();
++    const requested = normalizeAndroidSandboxPath(request.nextUrl.searchParams.get("path")?.trim() ?? "");
+ 
+     if (shouldShowWindowsDrivePicker(requested)) {
+       return NextResponse.json({
+@@ -78,7 +79,10 @@ export async function GET(request: NextRequest) {
+     try {
+       resolved = await resolveDirectory(candidate);
+     } catch {
+-      return NextResponse.json({ error: "Directory does not exist" }, { status: 404 });
++      return NextResponse.json(
++        { error: "Directory does not exist", hint: describePathForms(requested, candidate) },
++        { status: 404 },
++      );
+     }
+ 
+     const directoryStat = await stat(resolved);
+@@ -110,7 +114,9 @@ export async function POST(request: Request) {
+ 
+   try {
+     const body = await request.json() as { path?: unknown; name?: unknown };
+-    const parentPath = typeof body.path === "string" ? body.path.trim() : "";
++    const declaredParent = typeof body.path === "string" ? body.path.trim() : "";
++    // 建目录的父路径同样接受 hdc 写法（幂等改写；见 lib/hos-sandbox-path.ts）。
++    const parentPath = normalizeAndroidSandboxPath(declaredParent);
+     const name = typeof body.name === "string" ? body.name.trim() : "";
+ 
+     if (!parentPath) {
+diff --git a/app/api/cwd/validate/route.ts b/app/api/cwd/validate/route.ts
+index 5d514f5..0403f0d 100644
+--- a/app/api/cwd/validate/route.ts
++++ b/app/api/cwd/validate/route.ts
+@@ -3,6 +3,7 @@ import { statSync, type Stats } from "fs";
+ import { homedir } from "os";
+ import { isAbsolute, resolve } from "path";
+ import { allowFileRoot } from "@/lib/file-access";
++import { describePathForms, normalizeAndroidSandboxPath } from "@/lib/android-sandbox-path";
+ import { projectIdentityKey } from "@/lib/project-identity";
+ import { resolveProject } from "@/lib/worktree";
+ 
+@@ -17,22 +18,30 @@ function normalizeCwd(cwd: string): string {
+ export async function POST(req: Request) {
+   try {
+     const body = await req.json() as { cwd?: unknown };
+-    const cwd = typeof body.cwd === "string" ? body.cwd.trim() : "";
++    const requested = typeof body.cwd === "string" ? body.cwd.trim() : "";
+ 
+-    if (!cwd) {
++    if (!requested) {
+       return NextResponse.json({ error: "Path is required" }, { status: 400 });
+     }
+ 
++    // 沙箱路径的 hdc 写法（/data/app/el2/<uid>/…）先换成 el2 别名再落盘判定（幂等）。
++    const cwd = normalizeAndroidSandboxPath(requested);
+     const normalizedCwd = normalizeCwd(cwd);
+     let stat: Stats;
+     try {
+       stat = statSync(normalizedCwd);
+     } catch {
+-      return NextResponse.json({ error: `Directory does not exist: ${cwd}` }, { status: 400 });
++      return NextResponse.json(
++        { error: `Directory does not exist: ${cwd}`, hint: describePathForms(requested, cwd) },
++        { status: 400 },
++      );
+     }
+ 
+     if (!stat.isDirectory()) {
+-      return NextResponse.json({ error: `Path is not a directory: ${cwd}` }, { status: 400 });
++      return NextResponse.json(
++        { error: `Path is not a directory: ${cwd}`, hint: describePathForms(requested, cwd) },
++        { status: 400 },
++      );
+     }
+ 
+     allowFileRoot(normalizedCwd);
+diff --git a/lib/android-sandbox-path.ts b/lib/android-sandbox-path.ts
+new file mode 100644
+index 0000000..8eb63ce
+--- /dev/null
++++ b/lib/android-sandbox-path.ts
+@@ -0,0 +1,76 @@
++/**
++ * pi-desktop-android（宿主应用）沙箱路径的**别名归一**（对应 ark 的 `lib/hos-sandbox-path.ts`）。
++ *
++ * Android 上指向同一目录的常见写法：
++ *   ① 应用域（`context.filesDir`，也是 HOME 的形态）
++ *        `/data/user/0/<pkg>/files[/…]`
++ *   ② 历史别名（旧文档/部分工具链视角）
++ *        `/data/data/<pkg>/files[/…]`
++ *   ③ 外存别名（adb shell 与文件管理器常用）
++ *        `/sdcard/…` ≡ `/storage/emulated/0/…`
++ *
++ * ②→① 以 HOME 为锚（HOME 由库注入，形如 ①），不硬编码包名；
++ * ③→① 是固定映射（FUSE 布局，幂等：②③形态归一后不再匹配）。
++ *
++ * 三条性质（与 ark 同口径）：
++ *   · **幂等**：归一后的形态不再匹配任何别名规则，重复调用逐字节不变；
++ *   · **可逆**：只重写请求里的路径，不写盘、不缓存；
++ *   · **不猜测**：HOME 不是 ① 形态时 ② 不生效；非 `/sdcard` 前缀时 ③ 不生效，一律原样返回。
++ *
++ * 为什么需要它：`adb shell` 视角的路径（②③）交给 `statSync`/`existsSync` 会 400
++ * `Directory does not exist`，把「合法写法」报成「目录不存在」会误导排查。
++ */
++
++import { homedir } from "os";
++
++/** 编译产物里的稳定标记（`assemble-payload.mjs` 用它断言补丁真的进了载荷）。 */
++export const ANDROID_PATH_ALIAS_MARKER = "pi-android-sandbox-alias";
++
++/** ① 应用域 HOME 形态（HOME 必须正好是这个形态，② 才谈得上映射）。 */
++const ANDROID_DATA_HOME = /^\/data\/user\/0\/([^/]+)\/files\/?$/;
++
++/** ③ `/sdcard` 前缀（外存别名）。 */
++const SDCARD_PREFIX = /^\/sdcard(?=\/|$)/;
++
++function escapeRegExp(text: string): string {
++  return text.replace(/[.*+?^${}()|[\]]/g, "\\$&");
++}
++
++/**
++ * 把 Android 沙箱/外存路径的别名写法归一为应用域形态。
++ *
++ * @param input 调用方给的路径（可能是 ①②③ 或普通路径）
++ * @param home 应用沙箱根（默认 `homedir()`；单测可显式传入）
++ * @returns 改写后的路径；不需要/不能改写时返回**原值**
++ */
++export function normalizeAndroidSandboxPath(input: string, home: string = homedir()): string {
++  if (!input) return input;
++  let out = input;
++
++  // ③ /sdcard/… → /storage/emulated/0/…（幂等：归一后不再匹配）
++  if (SDCARD_PREFIX.test(out)) {
++    out = out.replace(SDCARD_PREFIX, "/storage/emulated/0");
++  }
++
++  // ② /data/data/<pkg>/files → HOME（/data/user/0/<pkg>/files 的历史别名；以 HOME 为锚）
++  const aliasHome = home.replace(/\/+$/, "");
++  const match = ANDROID_DATA_HOME.exec(aliasHome);
++  if (match) {
++    const legacy = new RegExp("^/data/data/" + escapeRegExp(match[1]) + "/files(?=/|$)");
++    if (legacy.test(out)) {
++      out = out.replace(legacy, aliasHome);
++    }
++  }
++  return out;
++}
++
++/**
++ * 给「路径仍然不存在」的 400 加一句**可诊断**的提示：期望形态、收到的形态、
++ * 以及是否做过改写。纯信息，不参与判定。
++ */
++export function describePathForms(received: string, normalized: string): string {
++  const forms = [`received=${received}`, `expected=${normalized}`];
++  if (normalized !== received) forms.push("normalized=android-alias");
++  forms.push(ANDROID_PATH_ALIAS_MARKER);
++  return forms.join(" ");
++}

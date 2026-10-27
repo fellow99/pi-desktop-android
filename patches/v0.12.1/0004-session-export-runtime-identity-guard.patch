@@ -1,0 +1,37 @@
+diff --git a/app/api/sessions/[id]/export/route.ts b/app/api/sessions/[id]/export/route.ts
+index bda67e9..c4c226f 100644
+--- a/app/api/sessions/[id]/export/route.ts
++++ b/app/api/sessions/[id]/export/route.ts
+@@ -216,7 +216,14 @@ function patchExportHtml(html: string): string {
+ 
+ async function exportSession(filePath: string, outputPath: string): Promise<void> {
+   const cliPath = await getPiCliPath();
+-  if (cliPath) {
++  // pi-hos-export-runtime-guard：判据是「当前进程是不是可用的 node/electron 运行时」，
++  // 而不是「process.execPath 指向的文件存不存在」。鸿蒙端 process.execPath = /system/bin/appspawn：
++  // 该文件**存在**但 execve 被拒（spawn /system/bin/appspawn EACCES），拿"存在性"当判据会让整条
++  // 导出直接 500，且永远不会走到下面的进程内导出。
++  const runtimeBasename = basename(process.execPath || "").replace(/\.exe$/i, "").toLowerCase();
++  const runtimeIsSpawnable =
++    (runtimeBasename === "node" || runtimeBasename === "electron") && existsSync(process.execPath);
++  if (cliPath && runtimeIsSpawnable) {
+     await execFileAsync(process.execPath, [cliPath, "--export", filePath, outputPath], {
+       cwd: process.cwd(),
+       timeout: 30_000,
+@@ -234,7 +241,15 @@ async function exportSession(filePath: string, outputPath: string): Promise<void
+   if (!packageDir) throw new Error("pi CLI not found");
+ 
+   const exporterUrl = pathToFileURL(join(packageDir, "dist", "core", "export-html", "index.js")).href;
+-  const { exportFromFile } = (await import(exporterUrl)) as ExportHtmlModule;
++  if (cliPath) {
++    console.warn(
++      `[export] pi-hos-export-runtime-guard: 当前运行时不可用于 spawn CLI（execPath=${process.execPath}），改走进程内导出`
++    );
++  }
++  // `webpackIgnore` 不可省：这个 import 的实参是运行时算出来的 file:// URL，打包器默认会把它
++  // 改写成自己的模块查找（产物成了 c(79405)(f) → "Cannot find module 'file:///…'"），
++  // 只有保留成原生动态 import，才能加载设备上 pi 载荷里的那个 ESM 模块。
++  const { exportFromFile } = (await import(/* webpackIgnore: true */ exporterUrl)) as ExportHtmlModule;
+   await exportFromFile(filePath, outputPath);
+ }
+ 
