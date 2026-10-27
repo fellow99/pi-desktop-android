@@ -25,14 +25,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <!-- 探针宿主（Phase 0 专用；探针清理时整个 probe 包与该声明一并移除） -->
-        <activity
-            android:name=".probe.ProbeHostActivity"
-            android:exported="true"
-            android:launchMode="singleTask"
-            android:configChanges="orientation|screenSize|keyboardHidden">
-        </activity>
     </application>
 
 </manifest>
