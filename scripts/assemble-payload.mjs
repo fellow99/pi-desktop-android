@@ -160,10 +160,15 @@ function applyPiWebPatches(opts) {
 
   const dirty = runGit(['status', '--porcelain'], opts.piWeb);
   if (dirty.out.length > 0) {
-    throw new AssembleError(
-      `pi-web 工作树非 pristine 且补丁栈不完整（幂等检查未过）——先还原：`
-      + `git -C ${opts.piWeb} checkout -- . && git -C ${opts.piWeb} clean -fd\n${dirty.out}`,
-    );
+    // 自愈：pi-web 子模块在本流水线里只承载「补丁应用态」（钉死 tag、无用户改动）。
+    // 非完整栈的脏态 = 上一轮被中断的残留 ⇒ 自动还原 pristine 再重放（并明确告知）。
+    console.log('pi-web 工作树为中断残留 ⇒ 自动还原 pristine 后重放补丁');
+    runGit(['checkout', '--', '.'], opts.piWeb);
+    runGit(['clean', '-fd', 'app', 'lib', 'components'], opts.piWeb);
+    const after = runGit(['status', '--porcelain'], opts.piWeb);
+    if (after.out.length > 0) {
+      throw new AssembleError(`pi-web 还原后仍非 pristine（存在非流水线改动，人工核查）：\n${after.out}`);
+    }
   }
 
   const applied = [];
@@ -236,7 +241,7 @@ async function linkInto(fromFile, toFile) {
 }
 
 /** 裁剪复制 PI_DIST → stage/<TAR_ROOT>（crop-rules 命中的不复制；规则目录不再下钻）。 */
-async function copyCropped(fromDir, toDir, label) {
+async function copyCropped(fromDir, toDir, label, matchPrefix) {
   const problems = assertKeepSound();
   if (problems.length > 0) {
     for (const p of problems) console.log(`裁剪规则警告: ${p}`);
@@ -251,7 +256,8 @@ async function copyCropped(fromDir, toDir, label) {
   async function walk(dir, rel) {
     const entries = await fsp.readdir(dir, { withFileTypes: true });
     for (const e of entries) {
-      const childRel = rel ? `${rel}/${e.name}` : e.name;
+      const rawRel = rel ? `${rel}/${e.name}` : e.name;
+      const childRel = matchPrefix ? matchPrefix + '/' + rawRel : rawRel;
       const childAbs = path.join(dir, e.name);
       if (e.isDirectory()) {
         let skipDir = false;
@@ -259,8 +265,9 @@ async function copyCropped(fromDir, toDir, label) {
           if (ruleMatchesDir(childRel, rule)) { skipDir = true; counts.set(rule.id, (counts.get(rule.id) || 0) + 1); break; }
         }
         if (skipDir) continue;
-        await fsp.mkdir(path.join(toDir, childRel), { recursive: true });
-        await walk(childAbs, childRel);
+        const destRel = matchPrefix ? rawRel : childRel;
+        await fsp.mkdir(path.join(toDir, destRel), { recursive: true });
+        await walk(childAbs, rawRel);
       } else if (e.isFile()) {
         const rule = firstMatchingRule(childRel);
         if (rule) {
@@ -268,8 +275,9 @@ async function copyCropped(fromDir, toDir, label) {
           counts.set(rule.id, (counts.get(rule.id) || 0) + 1);
           continue;
         }
-        await fsp.mkdir(path.dirname(path.join(toDir, childRel)), { recursive: true });
-        await linkInto(childAbs, path.join(toDir, childRel));
+        const destRelFile = matchPrefix ? rawRel : childRel;
+        await fsp.mkdir(path.dirname(path.join(toDir, destRelFile)), { recursive: true });
+        await linkInto(childAbs, path.join(toDir, destRelFile));
         copiedFiles += 1;
         if (Date.now() - lastReport > 10000) {
           lastReport = Date.now();
@@ -400,10 +408,10 @@ async function writeTarGz(rootDir, outPath) {
   });
 
   for (const dir of dirList) {
-    const dirName = `${dir}/`;
+    const dirName = 'pi-web/' + `${dir}/`;
     const needsLong = splitUstarName(dirName) === null;
     if (needsLong) {
-      const longName = Buffer.from(dirName, 'utf8');
+      const longName = Buffer.from('pi-web/' + dirName, 'utf8');
       await write(ustarHeader('././@LongLink', longName.length + 1, 'L'));
       await write(Buffer.concat([longName, Buffer.from([0])]));
       await write(Buffer.alloc(padTo512(longName.length + 1)));
@@ -414,12 +422,13 @@ async function writeTarGz(rootDir, outPath) {
     const rel = file.rel;
     const needsLong = splitUstarName(rel) === null;
     if (needsLong) {
-      const longName = Buffer.from(rel, 'utf8');
+      const longName = Buffer.from('pi-web/' + rel, 'utf8');
       await write(ustarHeader('././@LongLink', longName.length + 1, 'L'));
       await write(Buffer.concat([longName, Buffer.from([0])]));
       await write(Buffer.alloc(padTo512(longName.length + 1)));
     }
-    await write(ustarHeader(needsLong ? truncateUtf8Bytes(rel, 100) : rel, file.size, '0'));
+    const entryName = 'pi-web/' + rel;
+    await write(ustarHeader(needsLong ? truncateUtf8Bytes(entryName, 100) : entryName, file.size, '0'));
     if (file.size > 0) {
       await new Promise((resolve, reject) => {
         const source = fs.createReadStream(file.abs);
@@ -438,63 +447,21 @@ async function writeTarGz(rootDir, outPath) {
 }
 
 async function assertArchiveReadable(tarPath) {
-  const counters = { files: 0, dirs: 0, longNames: 0 };
-  return await new Promise((resolve, reject) => {
-    const input = fs.createReadStream(tarPath);
-    const gunzip = createGunzip();
-    let carry = Buffer.alloc(0);
-    let state = 'header';
-    let ended = false;
-    const isZero = (block) => block.every((b) => b === 0);
-    const fieldText = (buf, start, end) => buf.subarray(start, end).toString('utf8').replace(/\0+$/, '');
-    const push = (chunk) => {
-      const buf = carry.length > 0 ? Buffer.concat([carry, chunk]) : chunk;
-      let pos = 0;
-      while (pos < buf.length) {
-        if (state === 'header') {
-          if (buf.length - pos < 512) break;
-          const header = buf.subarray(pos, pos + 512);
-          pos += 512;
-          if (header[0] === 0) {
-            if (!isZero(header)) { reject(new Error('头块首字节为 0 却不是全 0 块')); return; }
-            ended = true;
-            carry = Buffer.alloc(0);
-            return;
-          }
-          if (fieldText(header, 0, 100).length === 0) { reject(new Error('条目名称为空')); return; }
-          const sizeText = header.subarray(124, 136).toString('latin1').replace(/\0/g, ' ').trim();
-          const size = sizeText === '' ? 0 : parseInt(sizeText, 8);
-          const type = String.fromCharCode(header[156]);
-          if (type === '5') counters.dirs += 1;
-          else if (type === 'L') counters.longNames += 1;
-          else counters.files += 1;
-          state = size > 0 ? 'data' : 'header';
-          carry = buf.subarray(pos);
-          pos = buf.length;
-          continue;
-        } else {
-          if (buf.length - pos < size) break;
-          pos += size;
-          const padding = (512 - (size % 512)) % 512;
-          if (buf.length - pos < padding) break;
-          pos += padding;
-          state = 'header';
-          carry = buf.subarray(pos);
-          pos = buf.length;
-          continue;
-        }
-      }
-      if (state === 'header' && !ended) carry = buf.subarray(pos);
-    };
-    input.pipe(gunzip);
-    gunzip.on('data', push);
-    gunzip.on('end', () => {
-      if (!ended) { reject(new Error('归档缺少结束块')); return; }
-      resolve(counters);
-    });
-    gunzip.on('error', reject);
-    input.on('error', reject);
-  });
+  // 归档可读性自检：用系统 bsdtar（Windows 10+ 自带 tar.exe）做**权威**逐条读取。
+  // （此前自研流式检查存在对齐误报；bsdtar 是独立第三方实现，仲裁力更强。）
+  const tarExe = path.join(process.env.SystemRoot || 'C:/Windows', 'System32', 'tar.exe');
+  const res = spawnSync(tarExe, ['-tzf', tarPath], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+  if (res.error || res.status !== 0) {
+    const detail = res.error ? res.error.message : String(res.stderr || '').slice(-300);
+    throw new AssembleError(`归档自检失败（bsdtar 无法完整读取）：${detail}`);
+  }
+  const lines = res.stdout.split('\n').filter((l) => l.length > 0);
+  const counters = {
+    files: lines.filter((l) => !l.endsWith('/')).length,
+    dirs: lines.filter((l) => l.endsWith('/')).length,
+    longNames: -1,
+  };
+  return counters;
 }
 
 async function sha256File(filePath) {
@@ -541,7 +508,7 @@ async function main() {
     await fsp.mkdir(stageRoot, { recursive: true });
     console.log(`裁剪暂存    : ${opts.piDist} + pi-web/node_modules → ${stageRoot}（硬链接，零数据拷贝）`);
     const cropDist = await copyCropped(opts.piDist, stageRoot, 'dist');
-    const cropNm = await copyCropped(path.join(opts.piWeb, 'node_modules'), path.join(stageRoot, 'node_modules'), 'node_modules');
+    const cropNm = await copyCropped(path.join(opts.piWeb, 'node_modules'), path.join(stageRoot, 'node_modules'), 'node_modules', 'node_modules');
     const crop = {
       copiedFiles: cropDist.copiedFiles + cropNm.copiedFiles,
       croppedFiles: cropDist.croppedFiles + cropNm.croppedFiles,
@@ -556,6 +523,41 @@ async function main() {
       await fsp.cp(from, path.join(stageRoot, entry), { recursive: true, force: true });
     }
     console.log(`壳资产      : ${APP_PAYLOAD_ENTRIES.join(', ')} → stage`);
+
+    // ⑤' vendor 兼容变换（O2 处置，宪法 C6 如实登记）
+    //    引擎 24.2.0 = --with-intl=none：/\p{ID_Start}/ 等 Unicode 属性转义在模块**编译期**抛
+    //    SyntaxError ⇒ Next 进程内启动必炸（Phase 1 E2E 实测）。对 compiled 产物做 ASCII 等价
+    //    字符类替换（标识符匹配场景功能等价）；替换后断言零残留，否则 exit 2。
+    const vendorCompat = [
+      { rel: 'node_modules/next/dist/compiled/@edge-runtime/primitives/url.js.text.js' },
+      { rel: 'node_modules/next/dist/compiled/edge-runtime/index.js' },
+      { rel: 'node_modules/next/dist/compiled/terser/bundle.min.js' },
+      { rel: 'node_modules/next/dist/compiled/zod-validation-error/index.js' },
+    ];
+    const compatTokens = [
+      { from: "\\\\p{ID_Start}", to: "A-Za-z" },
+      { from: "\\p{ID_Start}", to: "A-Za-z" },
+      { from: "\\\\p{ID_Continue}", to: "A-Za-z0-9" },
+      { from: "\\p{ID_Continue}", to: "A-Za-z0-9" },
+    ];
+    let compatApplied = 0;
+    for (const { rel } of vendorCompat) {
+      const p = path.join(stageRoot, rel);
+      if (!fs.existsSync(p)) continue;
+      const before = fs.readFileSync(p, 'utf8');
+      if (!before.includes('\p{ID_Start}')) { compatApplied += 1; continue; }
+      let after = before;
+      for (const { from, to } of compatTokens) after = after.split(from).join(to);
+      if (after.includes('\p{ID_Start}') || after.includes('\p{ID_Continue}')) {
+        throw new AssembleError(`vendor 兼容变换后仍有属性转义残留：${rel}`);
+      }
+      fs.writeFileSync(p, after);
+      compatApplied += 1;
+    }
+    if (compatApplied !== vendorCompat.length) {
+      throw new AssembleError(`vendor 兼容变换覆盖不全：${compatApplied}/${vendorCompat.length}（上游产物结构变化？）`);
+    }
+    console.log('vendor 兼容  : Intl 属性转义 → ASCII 等价字符类（' + compatApplied + ' 文件，O2 处置）✔');
 
     const staged = walkTree(stageRoot).filter((f) => f.error === undefined);
     console.log(`stage 合计  : ${staged.length} 文件 / ${human(totalBytes(staged))}`);

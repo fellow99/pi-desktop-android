@@ -4,6 +4,7 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.PushbackInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.security.MessageDigest
@@ -83,7 +84,16 @@ object PayloadArchive {
         var bytesWritten = 0L
         val rootCanonical = payloadRoot.canonicalPath
 
-        GZIPInputStream(BufferedInputStream(FileInputStream(archive), 256 * 1024)).use { gunzip ->
+        val buffered = PushbackInputStream(BufferedInputStream(FileInputStream(archive), 256 * 1024), 2)
+        buffered.use { pushed ->
+            // AGP 打包时会把 noCompress 的 .gz 资产「去壳」为原始 tar（改名 .tar）⇒ 按魔数自适应；
+            // 探测后必须回退字节（否则 raw tar 解析错位——实测：首条目 pi-web/ 变 -web/）
+            val magic = ByteArray(2)
+            pushed.read(magic)
+            pushed.unread(magic)
+            val isGzip = magic[0] == 0x1f.toByte() && magic[1] == 0x8b.toByte()
+            val stream: InputStream = if (isGzip) GZIPInputStream(pushed) else pushed
+            stream.use { gunzip ->
             var pendingLongName: String? = null
             while (true) {
                 val header = ByteArray(BLOCK)
@@ -128,6 +138,7 @@ object PayloadArchive {
                     }
                 }
                 skipPadding(gunzip, size)
+            }
             }
         }
 

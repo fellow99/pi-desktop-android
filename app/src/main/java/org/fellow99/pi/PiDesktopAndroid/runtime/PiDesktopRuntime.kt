@@ -142,7 +142,10 @@ object PiDesktopRuntime {
         incoming.mkdirs()
         val out = File(incoming, "pi-web.tar.gz")
         if (!out.isFile || out.length() == 0L) {
-            appContext.assets.open("pi-web/pi-web.tar.gz").use { input ->
+            // AGP 会把 noCompress 的 .gz 资产「去壳」改名 .tar ⇒ 两个名字都兼容
+            val hasGzName = appContext.assets.list("pi-web")?.contains("pi-web.tar.gz") == true
+            val assetPath = if (hasGzName) "pi-web/pi-web.tar.gz" else "pi-web/pi-web.tar"
+            appContext.assets.open(assetPath).use { input ->
                 out.outputStream().use { output -> input.copyTo(output, 256 * 1024) }
             }
         }
