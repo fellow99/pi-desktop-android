@@ -1,0 +1,92 @@
+{
+  "whichSh": true,
+  "simple": {
+    "events": [
+      {
+        "name": "spawn",
+        "atMs": 72
+      },
+      {
+        "name": "stdout:data",
+        "atMs": 85
+      },
+      {
+        "name": "exit",
+        "code": 0,
+        "signal": null,
+        "atMs": 102
+      },
+      {
+        "name": "close",
+        "code": 0,
+        "signal": null,
+        "atMs": 104
+      }
+    ],
+    "stdout": "FROM_SH\n__SH_SENTINEL__",
+    "stderr": "",
+    "elapsedMs": 105,
+    "exitCode": 0,
+    "signal": null
+  },
+  "nested": {
+    "events": [
+      {
+        "name": "spawn",
+        "atMs": 45
+      },
+      {
+        "name": "stdout:data",
+        "atMs": 54
+      },
+      {
+        "name": "exit",
+        "code": 0,
+        "signal": null,
+        "atMs": 58
+      },
+      {
+        "name": "close",
+        "code": 0,
+        "signal": null,
+        "atMs": 58
+      }
+    ],
+    "stdout": "NESTED_OK",
+    "stderr": "",
+    "elapsedMs": 59,
+    "exitCode": 0,
+    "signal": null
+  },
+  "cwdTest": {
+    "events": [
+      {
+        "name": "spawn",
+        "atMs": 43
+      },
+      {
+        "name": "stdout:data",
+        "atMs": 47
+      },
+      {
+        "name": "exit",
+        "code": 0,
+        "signal": null,
+        "atMs": 49
+      },
+      {
+        "name": "close",
+        "code": 0,
+        "signal": null,
+        "atMs": 49
+      }
+    ],
+    "stdout": "/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload\ncwd_done",
+    "stderr": "",
+    "elapsedMs": 50,
+    "exitCode": 0,
+    "signal": null
+  },
+  "sentinelSeen": true,
+  "note": "事件序列是设计依据（不依赖 exit/close 顺序，见规划 §2.3 #6）"
+}

@@ -1,0 +1,7 @@
+{
+  "jitless": false,
+  "wasm": "ok",
+  "hotLoopMs": 115.5517,
+  "hotLoopAcc": 63,
+  "jitVerdict": "likely-jit"
+}

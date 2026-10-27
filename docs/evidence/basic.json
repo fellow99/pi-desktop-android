@@ -1,0 +1,48 @@
+{
+  "at": 1793110967500,
+  "uptimeMs": 41895,
+  "node": "v24.2.0",
+  "platform": "android",
+  "arch": "arm64",
+  "execPath": "/system/bin/arm64/app_process64",
+  "execArgv": [],
+  "pid": 15447,
+  "ppid": 7554,
+  "home": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge",
+  "tmpdir": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/tmp",
+  "versions": {
+    "node": "v24.2.0",
+    "v8": "13.6.233.10-node.17",
+    "modules": "137"
+  },
+  "fs": {
+    "dir": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload",
+    "roundTrip": true,
+    "error": null
+  },
+  "worker": {
+    "available": true,
+    "ran": true,
+    "result": 42
+  },
+  "host": {
+    "ping": {
+      "ok": true,
+      "pong": "pong:1",
+      "type": "string",
+      "keys": "setBridge,invoke,ping"
+    },
+    "echo": {
+      "ok": true,
+      "value": {
+        "ok": true,
+        "echo": {
+          "from": "probe-entry",
+          "at": 1793110968651
+        },
+        "handledBy": "kotlin",
+        "at": 1793110968657
+      }
+    }
+  }
+}

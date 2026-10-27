@@ -1,0 +1,27 @@
+{
+  "typeofIntl": "undefined",
+  "collator": {
+    "ok": false,
+    "error": "Intl is not defined"
+  },
+  "numberFormat": {
+    "ok": false,
+    "error": "Intl is not defined"
+  },
+  "dateTimeFormat": {
+    "ok": false,
+    "error": "Intl is not defined"
+  },
+  "unicodePropertyEscape": {
+    "ok": false,
+    "error": "Invalid regular expression: /\\p{Script=Greek}+/u: Invalid property name"
+  },
+  "normalize": {
+    "ok": true,
+    "value": "1"
+  },
+  "toLocaleLowerCase": {
+    "ok": true,
+    "value": "i"
+  }
+}
