@@ -1,0 +1,92 @@
+[pi-web] 2026-10-27T18:16:35.034Z 启动：node=v24.2.0 pid=28776 cwd=/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web argv=["/system/bin/arm64/app_process64","/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/bootstrap.js"]
+[pi-web] 2026-10-27T18:16:35.051Z 平台事实：platform=android arch=arm64 execPath=/system/bin/arm64/app_process64（execPath 只用于日志，绝不参与任何重启逻辑）
+[pi-web] 2026-10-27T18:16:35.295Z [jitless] node:http 的惰性 getter 已封印：maxHeaderSize(value), globalAgent(agent), WebSocket(empty), CloseEvent(empty), MessageEvent(empty)
+[pi-web] 2026-10-27T18:16:35.303Z [jitless] node:https 上没有任何惰性 getter，跳过
+[pi-web] 2026-10-27T18:16:35.316Z [jitless] 兼容层安装完成：httpLazy=installed（maxHeaderSize, globalAgent, WebSocket, CloseEvent, MessageEvent） fetch=installed globals=Headers:kept, Request:kept, Response:kept, FormData:kept, Blob:kept, File:kept
+[pi-web] 2026-10-27T18:16:35.317Z jitless 兼容层：active=true（WebAssembly=undefined；active=false 表示有 JIT 可用、按现役形态运行）
+[pi-web] 2026-10-27T18:16:35.326Z 载荷根 = /data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web（依据：__dirname（本入口脚本所在目录）；next 入口=true package.json=true）
+[pi-web] WARN 2026-10-27T18:16:35.342Z PI_ANDROID_ROOTS 基座一致性存疑：sandbox=/storage/emulated/0/Android/data/org.fellow99.pi.PiDesktopAndroid/files/workspace（既不在 filesDir=/data/user/0/org.fellow99.pi.PiDesktopAndroid/files 之内，也不在 app-specific 外存之内，请核对宿主装配）
+[pi-web] 2026-10-27T18:16:35.351Z 环境契约（来自 payload/env.js）：
+  PI_CODING_AGENT_DIR = /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent
+  PI_OFFLINE = (未设置 ⇒ 出网可用)
+  PI_ANDROID_ROOTS = [{"id":"sandbox","label":"工作区","path":"\/storage\/emulated\/0\/Android\/data\/org.fellow99.pi.PiDesktopAndroid\/files\/workspace","permType":null}]
+  NO_PROXY = 127.0.0.1,localhost,::1
+  PI_WEB_HOSTNAME = 127.0.0.1｜PI_WEB_PORT = 0
+  PI_WEB_PASSWORD = (未设置 ⇒ 免密)
+  PI_WEB_APP_NAME = Pi Desktop｜PI_WEB_SKIP_VERSION_CHECK = 1
+[pi-web] 2026-10-27T18:16:35.353Z cwd 已切到载荷根：/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web
+[pi-web] WARN 2026-10-27T18:16:35.354Z 预览密钥轮换脚本缺失：/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web/bin/rotate-preview-secrets.js（跳过；请核对载荷是否为上游完整产物）
+[pi-web] 2026-10-27T18:16:35.397Z agent 资源已物化：复制 5 个、跳过 0 个（/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web → /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent）
+[pi-web] 2026-10-27T18:16:35.715Z 服务端口 = 33201（listen(0) 探测得到的空闲端口）
+[pi-web] 2026-10-27T18:16:35.715Z PI_WEB_HOSTNAME = 127.0.0.1｜PI_WEB_PASSWORD = (未设置 ⇒ 免密)
+[pi-web] 2026-10-27T18:16:35.732Z 优雅关停：bridge 0.2.0 的 host.js 无 handle() ⇒ server 生命周期随进程退出（硬约束 ⑥，如实登记）
+[pi-web] 2026-10-27T18:16:35.915Z 宿主桥证据（ping）：{"ok":true,"pong":"pong:1","type":"string","keys":"setBridge,invoke,ping"}
+[pi-web] 2026-10-27T18:29:01.972Z 启动：node=v24.2.0 pid=3431 cwd=/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web argv=["/system/bin/arm64/app_process64","/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/bootstrap.js"]
+[pi-web] 2026-10-27T18:29:01.986Z 平台事实：platform=android arch=arm64 execPath=/system/bin/arm64/app_process64（execPath 只用于日志，绝不参与任何重启逻辑）
+[pi-web] 2026-10-27T18:29:02.237Z [jitless] node:http 的惰性 getter 已封印：maxHeaderSize(value), globalAgent(agent), WebSocket(empty), CloseEvent(empty), MessageEvent(empty)
+[pi-web] 2026-10-27T18:29:02.251Z [jitless] node:https 上没有任何惰性 getter，跳过
+[pi-web] 2026-10-27T18:29:02.261Z [jitless] 兼容层安装完成：httpLazy=installed（maxHeaderSize, globalAgent, WebSocket, CloseEvent, MessageEvent） fetch=installed globals=Headers:kept, Request:kept, Response:kept, FormData:kept, Blob:kept, File:kept
+[pi-web] 2026-10-27T18:29:02.262Z jitless 兼容层：active=true（WebAssembly=undefined；active=false 表示有 JIT 可用、按现役形态运行）
+[pi-web] 2026-10-27T18:29:02.278Z 载荷根 = /data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web（依据：__dirname（本入口脚本所在目录）；next 入口=true package.json=true）
+[pi-web] WARN 2026-10-27T18:29:02.306Z PI_ANDROID_ROOTS 基座一致性存疑：sandbox=/storage/emulated/0/Android/data/org.fellow99.pi.PiDesktopAndroid/files/workspace（既不在 filesDir=/data/user/0/org.fellow99.pi.PiDesktopAndroid/files 之内，也不在 app-specific 外存之内，请核对宿主装配）
+[pi-web] 2026-10-27T18:29:02.324Z 环境契约（来自 payload/env.js）：
+  PI_CODING_AGENT_DIR = /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent
+  PI_OFFLINE = (未设置 ⇒ 出网可用)
+  PI_ANDROID_ROOTS = [{"id":"sandbox","label":"工作区","path":"\/storage\/emulated\/0\/Android\/data\/org.fellow99.pi.PiDesktopAndroid\/files\/workspace","permType":null}]
+  NO_PROXY = 127.0.0.1,localhost,::1
+  PI_WEB_HOSTNAME = 127.0.0.1｜PI_WEB_PORT = 0
+  PI_WEB_PASSWORD = (未设置 ⇒ 免密)
+  PI_WEB_APP_NAME = Pi Desktop｜PI_WEB_SKIP_VERSION_CHECK = 1
+[pi-web] 2026-10-27T18:29:02.325Z cwd 已切到载荷根：/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web
+[pi-web] WARN 2026-10-27T18:29:02.327Z 预览密钥轮换脚本缺失：/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web/bin/rotate-preview-secrets.js（跳过；请核对载荷是否为上游完整产物）
+[pi-web] 2026-10-27T18:29:02.372Z agent 资源已物化：复制 0 个、跳过 5 个（/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web → /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent）
+[pi-web] 2026-10-27T18:29:03.085Z 服务端口 = 40243（listen(0) 探测得到的空闲端口）
+[pi-web] 2026-10-27T18:29:03.087Z PI_WEB_HOSTNAME = 127.0.0.1｜PI_WEB_PASSWORD = (未设置 ⇒ 免密)
+[pi-web] 2026-10-27T18:29:03.101Z 优雅关停：bridge 0.2.0 的 host.js 无 handle() ⇒ server 生命周期随进程退出（硬约束 ⑥，如实登记）
+[pi-web] 2026-10-27T18:29:03.303Z 宿主桥证据（ping）：{"ok":true,"pong":"pong:1","type":"string","keys":"setBridge,invoke,ping"}
+[pi-web] 2026-10-27T18:54:21.511Z 启动：node=v24.2.0 pid=3453 cwd=/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web argv=["/system/bin/arm64/app_process64","/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/bootstrap.js"]
+[pi-web] 2026-10-27T18:54:21.522Z 平台事实：platform=android arch=arm64 execPath=/system/bin/arm64/app_process64（execPath 只用于日志，绝不参与任何重启逻辑）
+[pi-web] 2026-10-27T18:54:21.755Z [jitless] node:http 的惰性 getter 已封印：maxHeaderSize(value), globalAgent(agent), WebSocket(empty), CloseEvent(empty), MessageEvent(empty)
+[pi-web] 2026-10-27T18:54:21.768Z [jitless] node:https 上没有任何惰性 getter，跳过
+[pi-web] 2026-10-27T18:54:21.778Z [jitless] 兼容层安装完成：httpLazy=installed（maxHeaderSize, globalAgent, WebSocket, CloseEvent, MessageEvent） fetch=installed globals=Headers:kept, Request:kept, Response:kept, FormData:kept, Blob:kept, File:kept
+[pi-web] 2026-10-27T18:54:21.779Z jitless 兼容层：active=true（WebAssembly=undefined；active=false 表示有 JIT 可用、按现役形态运行）
+[pi-web] 2026-10-27T18:54:21.795Z 载荷根 = /data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web（依据：__dirname（本入口脚本所在目录）；next 入口=true package.json=true）
+[pi-web] WARN 2026-10-27T18:54:21.817Z PI_ANDROID_ROOTS 基座一致性存疑：sandbox=/storage/emulated/0/Android/data/org.fellow99.pi.PiDesktopAndroid/files/workspace（既不在 filesDir=/data/user/0/org.fellow99.pi.PiDesktopAndroid/files 之内，也不在 app-specific 外存之内，请核对宿主装配）
+[pi-web] 2026-10-27T18:54:21.837Z 环境契约（来自 payload/env.js）：
+  PI_CODING_AGENT_DIR = /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent
+  PI_OFFLINE = (未设置 ⇒ 出网可用)
+  PI_ANDROID_ROOTS = [{"id":"sandbox","label":"工作区","path":"\/storage\/emulated\/0\/Android\/data\/org.fellow99.pi.PiDesktopAndroid\/files\/workspace","permType":null}]
+  NO_PROXY = 127.0.0.1,localhost,::1
+  PI_WEB_HOSTNAME = 127.0.0.1｜PI_WEB_PORT = 0
+  PI_WEB_PASSWORD = (未设置 ⇒ 免密)
+  PI_WEB_APP_NAME = Pi Desktop｜PI_WEB_SKIP_VERSION_CHECK = 1
+[pi-web] 2026-10-27T18:54:21.838Z cwd 已切到载荷根：/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web
+[pi-web] WARN 2026-10-27T18:54:21.840Z 预览密钥轮换脚本缺失：/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web/bin/rotate-preview-secrets.js（跳过；请核对载荷是否为上游完整产物）
+[pi-web] 2026-10-27T18:54:21.887Z agent 资源已物化：复制 0 个、跳过 5 个（/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web → /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent）
+[pi-web] 2026-10-27T18:54:22.436Z 服务端口 = 35493（listen(0) 探测得到的空闲端口）
+[pi-web] 2026-10-27T18:54:22.437Z PI_WEB_HOSTNAME = 127.0.0.1｜PI_WEB_PASSWORD = (未设置 ⇒ 免密)
+[pi-web] 2026-10-27T18:54:22.444Z 优雅关停：bridge 0.2.0 的 host.js 无 handle() ⇒ server 生命周期随进程退出（硬约束 ⑥，如实登记）
+[pi-web] 2026-10-27T18:54:22.671Z 宿主桥证据（ping）：{"ok":true,"pong":"pong:1","type":"string","keys":"setBridge,invoke,ping"}
+[pi-web] 2026-10-27T18:56:50.688Z 启动：node=v24.2.0 pid=3826 cwd=/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web argv=["/system/bin/arm64/app_process64","/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/bootstrap.js"]
+[pi-web] 2026-10-27T18:56:50.698Z 平台事实：platform=android arch=arm64 execPath=/system/bin/arm64/app_process64（execPath 只用于日志，绝不参与任何重启逻辑）
+[pi-web] 2026-10-27T18:56:50.894Z [jitless] node:http 的惰性 getter 已封印：maxHeaderSize(value), globalAgent(agent), WebSocket(empty), CloseEvent(empty), MessageEvent(empty)
+[pi-web] 2026-10-27T18:56:50.902Z [jitless] node:https 上没有任何惰性 getter，跳过
+[pi-web] 2026-10-27T18:56:50.910Z [jitless] 兼容层安装完成：httpLazy=installed（maxHeaderSize, globalAgent, WebSocket, CloseEvent, MessageEvent） fetch=installed globals=Headers:kept, Request:kept, Response:kept, FormData:kept, Blob:kept, File:kept
+[pi-web] 2026-10-27T18:56:50.911Z jitless 兼容层：active=true（WebAssembly=undefined；active=false 表示有 JIT 可用、按现役形态运行）
+[pi-web] 2026-10-27T18:56:50.919Z 载荷根 = /data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web（依据：__dirname（本入口脚本所在目录）；next 入口=true package.json=true）
+[pi-web] WARN 2026-10-27T18:56:50.933Z PI_ANDROID_ROOTS 基座一致性存疑：sandbox=/storage/emulated/0/Android/data/org.fellow99.pi.PiDesktopAndroid/files/workspace（既不在 filesDir=/data/user/0/org.fellow99.pi.PiDesktopAndroid/files 之内，也不在 app-specific 外存之内，请核对宿主装配）
+[pi-web] 2026-10-27T18:56:50.942Z 环境契约（来自 payload/env.js）：
+  PI_CODING_AGENT_DIR = /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent
+  PI_OFFLINE = (未设置 ⇒ 出网可用)
+  PI_ANDROID_ROOTS = [{"id":"sandbox","label":"工作区","path":"\/storage\/emulated\/0\/Android\/data\/org.fellow99.pi.PiDesktopAndroid\/files\/workspace","permType":null}]
+  NO_PROXY = 127.0.0.1,localhost,::1
+  PI_WEB_HOSTNAME = 127.0.0.1｜PI_WEB_PORT = 0
+  PI_WEB_PASSWORD = (未设置 ⇒ 免密)
+  PI_WEB_APP_NAME = Pi Desktop｜PI_WEB_SKIP_VERSION_CHECK = 1
+[pi-web] 2026-10-27T18:56:50.942Z cwd 已切到载荷根：/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web
+[pi-web] WARN 2026-10-27T18:56:50.944Z 预览密钥轮换脚本缺失：/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web/bin/rotate-preview-secrets.js（跳过；请核对载荷是否为上游完整产物）
+[pi-web] 2026-10-27T18:56:50.971Z agent 资源已物化：复制 0 个、跳过 5 个（/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload/pi-web → /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent）
+[pi-web] 2026-10-27T18:56:51.262Z 服务端口 = 35815（listen(0) 探测得到的空闲端口）
+[pi-web] 2026-10-27T18:56:51.262Z PI_WEB_HOSTNAME = 127.0.0.1｜PI_WEB_PASSWORD = (未设置 ⇒ 免密)
+[pi-web] 2026-10-27T18:56:51.275Z 优雅关停：bridge 0.2.0 的 host.js 无 handle() ⇒ server 生命周期随进程退出（硬约束 ⑥，如实登记）
+[pi-web] 2026-10-27T18:56:51.436Z 宿主桥证据（ping）：{"ok":true,"pong":"pong:1","type":"string","keys":"setBridge,invoke,ping"}
