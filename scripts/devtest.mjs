@@ -85,6 +85,23 @@ const say = (ok, label, detail = '') => {
   }
 }
 
+// G6 pty.node 锁（路线 A 原生件；存在才验——lock 与产物必须成对）
+{
+  const lock = path.join(PROJECT_ROOT, 'payload', 'extensions', 'android-pty', 'vendor', 'pty.node.lock.json');
+  const bin = path.join(PROJECT_ROOT, 'payload', 'extensions', 'android-pty', 'vendor', 'node-pty', 'build', 'Release', 'pty.node');
+  if (!fs.existsSync(lock)) {
+    console.log('⏭  G6 pty.node 锁 —— 未投放（路线 A 未执行）');
+  } else {
+    const want = JSON.parse(fs.readFileSync(lock, 'utf8'));
+    if (!fs.existsSync(bin)) {
+      say(false, 'G6 pty.node 锁', 'lock 在而产物缺：' + bin);
+    } else {
+      const sha = createHash('sha256').update(fs.readFileSync(bin)).digest('hex');
+      say(sha === want.sha256, 'G6 pty.node sha256 锁（路线 A）', `${sha.slice(0, 16)}… / ${want.version}`);
+    }
+  }
+}
+
 // G5 端上 engine-facts（可选：--facts 指向 run-as 拉回的 engine-facts.json）
 if (factsArg) {
   try {

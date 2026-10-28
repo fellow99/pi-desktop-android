@@ -981,6 +981,116 @@ async function runPtySelftest() {
   return report;
 }
 
+// ── 路线 A 原生件装载探针（Phase 4；node-pty android-arm64 自建产物的决定性验证）────────
+/**
+ * 测：vendored pty.node（NDK r28c 交叉编译，sha256 锁）能否在本进程内
+ *   ① require 装载（ABI/NODE_MODULE_VERSION 对齐判定）；
+ *   ② node-pty.spawn → forkpty（ioctl unlockpt/TIOCSCTTY —— O6 纯 JS 缺口由原生件补上）
+ *      → exec /system/bin/sh → pty 回显 PTY_ROUNDTRIP_OK。
+ * 任何失败（ABI/符号/SELinux/fork）都结构化落盘 —— 这就是路线 A 的 Go/No-Go 证据。
+ */
+async function runPtyNodeSelftest() {
+  if (process.env.PI_ANDROID_SELFTEST !== '1') return null;
+  const started = Date.now();
+  const report = { at: new Date().toISOString(), suite: '路线 A：pty.node 装载 + 真 PTY 回程（node-pty@1.1.0 自建）', results: [], summary: null };
+  const push = (r) => { report.results.push(r); log(`[ptynode-selftest] ${r.step} ok=${r.ok}${r.detail ? ' :: ' + String(r.detail).slice(0, 250) : ''}`); };
+  try {
+    const agentDir = selftestAgentDir();
+    const vendor = path.join(agentDir, 'extensions', 'android-pty', 'vendor', 'node-pty');
+    if (!fs.existsSync(path.join(vendor, 'build', 'Release', 'pty.node'))) {
+      push({ step: 'vendor-present', ok: false, detail: 'vendored pty.node 缺失：' + vendor });
+      report.summary = { total: 1, ok: 0, failed: 1, elapsedMs: Date.now() - started };
+      writeSelftestReport('pi-web.ptynode-selftest.json', report);
+      return report;
+    }
+    push({ step: 'vendor-present', ok: true, detail: vendor });
+    const { createRequire } = require('node:module');
+    const Module = require('node:module');
+    const req = createRequire(path.join(vendor, 'package.json'));
+    const dataNode = path.join(vendor, 'build', 'Release', 'pty.node');
+    let pty = null;
+    // 路线 1（诊断保留）：数据目录直接 require —— targetSdk≥29 SELinux 预期拒（G3 线）
+    try {
+      req(dataNode);
+      pty = req(vendor);
+      push({ step: 'require-ptynode', ok: true, detail: '数据目录直接 require 成功（该环境未强制 W^X）' });
+    } catch (directErr) {
+      push({ step: 'require-ptynode', ok: false, detail: '数据目录 require 失败（预期内）：' + describeError(directErr).slice(0, 140) });
+      // 路线 2（G3 合规执行位）：libpty_node.so 在 nativeLibraryDir（随 APK），process.dlopen
+      // 装载后把 exports 种进 require 缓存 ⇒ node-pty 的 loadNativeModule 直接命中缓存
+      const libDir = process.env.PI_ANDROID_NATIVE_LIB_DIR || '';
+      if (!libDir) {
+        push({ step: 'dlopen-native-lib-dir', ok: false, detail: 'PI_ANDROID_NATIVE_LIB_DIR 未注入（Kotlin 宿主未升级？）' });
+        report.summary = { total: 3, ok: 1, failed: 2, elapsedMs: Date.now() - started };
+        writeSelftestReport('pi-web.ptynode-selftest.json', report);
+        return report;
+      }
+      try {
+        // 未压缩 libs 时代 nativeLibraryDir 是空壳，真身在 APK 内 ⇒ 先试实体路径，失败回落 soname
+        // （soname 解析走应用 linker namespace，与 libnode.so 同目录族）
+        const soPath = fs.existsSync(path.join(libDir, 'libpty_node.so'))
+          ? path.join(libDir, 'libpty_node.so')
+          : 'libpty_node.so';
+        const m = new Module(dataNode);
+        m.filename = dataNode;
+        m.paths = Module._nodeModulePaths(path.dirname(dataNode));
+        process.dlopen(m, soPath);
+        req.cache[req.resolve(dataNode)] = m;
+        pty = req(vendor);
+        push({ step: 'dlopen-native-lib-dir', ok: true, detail: 'nativeLibraryDir dlopen + 缓存种子成功（' + soPath.slice(-40) + '）' });
+      } catch (err2) {
+        push({ step: 'dlopen-native-lib-dir', ok: false, detail: describeError(err2) });
+        report.summary = { total: 3, ok: 1, failed: 2, elapsedMs: Date.now() - started };
+        writeSelftestReport('pi-web.ptynode-selftest.json', report);
+        return report;
+      }
+    }
+    const roundtrip = await new Promise((resolve) => {
+      let out = '';
+      let term;
+      try {
+        term = pty.spawn('/system/bin/sh', ['-c', 'echo PTY_ROUNDTRIP_OK; id; tty'], {
+          name: 'xterm-color',
+          cwd: homeDir(),
+          env: process.env,
+        });
+      } catch (err) {
+        resolve({ out: '', error: 'spawn 抛错：' + describeError(err) });
+        return;
+      }
+      const timer = setTimeout(() => {
+        try { term.kill(); } catch { /* 已退 */ }
+        resolve({ out, timedOut: true });
+      }, 15_000);
+      term.onData((data) => {
+        out += data;
+        if (out.includes('PTY_ROUNDTRIP_OK')) {
+          clearTimeout(timer);
+          setTimeout(() => { try { term.kill(); } catch { /* 已退 */ } resolve({ out, timedOut: false }); }, 400);
+        }
+      });
+    });
+    const ok = !roundtrip.error && roundtrip.out.includes('PTY_ROUNDTRIP_OK');
+    push({
+      step: 'pty-roundtrip', ok,
+      detail: roundtrip.error ? roundtrip.error
+        : (ok ? `回显命中（${roundtrip.timedOut ? 'kill 后' : '正常'}）输出前 160 字：` + roundtrip.out.replace(/\s+/g, ' ').slice(0, 160)
+             : '未捕获回显（timedOut=' + !!roundtrip.timedOut + '）输出：' + roundtrip.out.replace(/\s+/g, ' ').slice(0, 160)),
+    });
+    report.summary = {
+      total: report.results.length,
+      ok: report.results.filter((r) => r.ok).length,
+      failed: report.results.filter((r) => !r.ok).length,
+      elapsedMs: Date.now() - started,
+    };
+  } catch (err) {
+    report.summary = { error: describeError(err), elapsedMs: Date.now() - started };
+  }
+  writeSelftestReport('pi-web.ptynode-selftest.json', report);
+  log(`路线 A pty.node 探针：${report.summary.ok}/${report.summary.total} 通过（${report.summary.elapsedMs}ms），报告 pi-web.ptynode-selftest.json`);
+  return report;
+}
+
 // ── 主流程 ────────────────────────────────────────────────────────────────────
 async function main() {
   log(`启动：node=${process.version} pid=${process.pid} cwd=${process.cwd()} argv=${JSON.stringify(process.argv.slice(0, 3))}`);
@@ -1062,6 +1172,9 @@ async function main() {
 
   // Phase 4 O6 PTY 探针（暂缓项重启评估第一步；只测不改行为）
   await runPtySelftest();
+
+  // Phase 4 路线 A：pty.node 装载 + 真 PTY 回程（决定性 Go/No-Go 证据）
+  await runPtyNodeSelftest();
 
   closer = await startNextInProcess(payloadRoot, hostname, port);
   await waitForReady(hostname, port);

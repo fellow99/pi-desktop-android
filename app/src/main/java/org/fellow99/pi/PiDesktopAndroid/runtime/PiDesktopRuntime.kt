@@ -111,6 +111,12 @@ object PiDesktopRuntime {
             put("no_proxy", noProxy)
             put("PI_WEB_APP_NAME", "Pi Desktop")
             put("PI_WEB_SKIP_VERSION_CHECK", "1")
+            // 路线 A：pty.node 以 libpty_node.so 随 APK 进 nativeLibraryDir（G3 合规执行位；
+            // 数据目录 dlopen 被 SELinux 拒）——JS 侧经 process.dlopen + require 缓存种子装载
+            put(
+                "PI_ANDROID_NATIVE_LIB_DIR",
+                appContext.applicationInfo.nativeLibraryDir,
+            )
             if (selftest) put("PI_ANDROID_SELFTEST", "1") // 调试/验收：launch 脚本自检宿主能力（am start --ez selftest true）
         }
 

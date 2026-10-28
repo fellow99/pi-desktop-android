@@ -1,0 +1,16 @@
+{
+  "name": "pty.node",
+  "version": "node-pty@1.1.0 (source) cross-built",
+  "abi": "arm64-v8a",
+  "androidApi": 24,
+  "size": 90816,
+  "sha256": "b965c62d8ab066d8d5b290c34c924b597699aaaa94ea4dabb6eedad414077a93",
+  "builtFrom": {
+    "nodeHeaders": "nodejs.org dist v24.22.1（npmmirror 镜像下载）",
+    "ndk": "r28c (28.2.13676358)",
+    "flags": "clang++ -std=gnu++17 -fPIC -shared -O2 -DNAPI_DISABLE_CPP_EXCEPTIONS -DNODE_ADDON_API_DISABLE_DEPRECATED",
+    "source": "node-pty@1.1.0 npm 源码（未改动）"
+  },
+  "enginePairing": "libnode.so v24.22.1 (be1d1641…)；NODE_MODULE_VERSION 137",
+  "flags": "clang++ -std=gnu++17 -fPIC -shared -O2 -DNAPI_DISABLE_CPP_EXCEPTIONS -DNODE_ADDON_API_DISABLE_DEPRECATED -Wl,--no-as-needed -Wl,-l:libnode.so（DT_NEEDED 引擎符号可达）"
+}

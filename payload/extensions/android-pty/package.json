@@ -1,0 +1,8 @@
+{
+  "name": "android-pty",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Route-A evaluation surface for node-pty android-arm64 (vendored, sha256-locked); terminal.pty capability remains structured-unsupported.",
+  "pi": { "extensions": ["./index.js"] }
+}
