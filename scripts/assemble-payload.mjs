@@ -524,6 +524,18 @@ async function main() {
     }
     console.log(`壳资产      : ${APP_PAYLOAD_ENTRIES.join(', ')} → stage`);
 
+    // ⑤'' 上游 bin 资产（能力清单 §F P1-2「预览密钥轮换」）：pi-web-launch 在
+    // <payloadRoot>/bin/rotate-preview-secrets.js 找它；v0.12.1 上游有此文件，
+    // 早期产物未随包 ⇒ 启动日志 WARN 跳过（不轮换 = 发布包里固化着可跳闸门的密钥）。
+    // 该文件不受任何补丁触碰，打补丁态/ pristine 态内容一致。
+    const rotateSource = path.join(opts.piWeb, 'bin', 'rotate-preview-secrets.js');
+    if (!fs.existsSync(rotateSource)) {
+      throw new AssembleError(`上游缺 bin/rotate-preview-secrets.js：${rotateSource}（v0.12.1 应有；上游结构变化需人工核对 pi-web-launch 的调用契约）`);
+    }
+    await fsp.mkdir(path.join(stageRoot, 'bin'), { recursive: true });
+    await fsp.copyFile(rotateSource, path.join(stageRoot, 'bin', 'rotate-preview-secrets.js'));
+    console.log('上游 bin     : bin/rotate-preview-secrets.js → stage（预览密钥轮换随包 ✔）');
+
     // ⑤' vendor 兼容变换（O2 处置，宪法 C6 如实登记）
     //    引擎 24.2.0 = --with-intl=none：/\p{ID_Start}/ 等 Unicode 属性转义在模块**编译期**抛
     //    SyntaxError ⇒ Next 进程内启动必炸（Phase 1 E2E 实测）。对 compiled 产物做 ASCII 等价

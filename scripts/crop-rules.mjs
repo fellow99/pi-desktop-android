@@ -142,6 +142,171 @@ export const CROP_RULES = [
     safeByDefault: true
   },
   {
+    id: 'nm-sourcemaps',
+    kind: 'glob',
+    pattern: 'node_modules/**/*.map',
+    keep: [],
+    reason:
+      'Source map（.js.map/.mjs.map/.css.map）：V8 栈回溯美化用的离线符号表，运行期从不读取。'
+      + '本工程 stage 实测 7,792 文件 205,990,055 B——是文件数/体积裁剪的最大头（能力清单 §F P1-1）。',
+    expectedFiles: 7792,
+    expectedSavingBytes: 205990055,
+    evidence: '✅ 本机 stage 实测（2026-10-28 基线 51,551 文件/558.8MB）/ ⬜ E2E 复核（引擎引导用例）',
+    planRef: 'docs/000-工程规划.md §7.2 · docs/安卓环境能力清单-0.12.1.md §F 第1级 #1',
+    prepareRef: '本工程新增（ark 无此规则，其产物谱系不同）',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-dts',
+    kind: 'glob',
+    pattern: 'node_modules/**/*.d.ts',
+    keep: [],
+    reason:
+      'TypeScript 声明文件：编辑器/类型检查用，Node 运行期永不加载。'
+      + 'stage 实测 9,354 文件 33,638,639 B。',
+    expectedFiles: 9354,
+    expectedSavingBytes: 33638639,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2 · docs/安卓环境能力清单-0.12.1.md §F 第1级 #1',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-dmts',
+    kind: 'glob',
+    pattern: 'node_modules/**/*.d.mts',
+    keep: [],
+    reason: '同 nm-dts（ESM 声明）：stage 实测 1,888 文件 6,509,221 B。',
+    expectedFiles: 1888,
+    expectedSavingBytes: 6509221,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-dcts',
+    kind: 'glob',
+    pattern: 'node_modules/**/*.d.cts',
+    keep: [],
+    reason: '同 nm-dts（CJS 声明）：stage 实测 161 文件 738,920 B。',
+    expectedFiles: 161,
+    expectedSavingBytes: 738920,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-js-flow',
+    kind: 'glob',
+    pattern: 'node_modules/**/*.js.flow',
+    keep: [],
+    reason: 'Flow 类型定义：运行期不读取。stage 实测 37 文件 1,160,528 B。',
+    expectedFiles: 37,
+    expectedSavingBytes: 1160528,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-docs-md',
+    kind: 'glob',
+    pattern: 'node_modules/**/*.md',
+    keep: ['node_modules/**/LICENSE*', 'node_modules/**/LICENCE*', 'node_modules/**/COPYING*', 'node_modules/**/NOTICE*'],
+    reason:
+      'Markdown 文档（README/CHANGELOG/发布说明等）：运行期不读取；**保留许可类 .md**'
+      + '（LICENSE.md 等，合规）。stage 实测 1,745 文件 13,981,068 B（其中许可类 29 文件保留）。',
+    expectedFiles: 1716,
+    expectedSavingBytes: 13934354,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核（pi 技能 .md 走 payload/skills，不在 node_modules，不受影响）',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-readme-nomd',
+    kind: 'glob',
+    pattern: 'node_modules/**/README*',
+    keep: [],
+    reason: '无扩展名/非 .md 的 README（.rst/.txt/裸名）：与 nm-docs-md 同理。stage 实测族 807 文件 5,874,113 B（含 .md 重叠，归属以本规则先命中计）。',
+    expectedFiles: 807,
+    expectedSavingBytes: 5874113,
+    evidence: '✅ 本机 stage 实测（族口径）/ ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-changelog-nomd',
+    kind: 'glob',
+    pattern: 'node_modules/**/CHANGELOG*',
+    keep: [],
+    reason: 'CHANGELOG 族（任意扩展）：发布历史，运行期无用。stage 实测族 163 文件 3,238,713 B。',
+    expectedFiles: 163,
+    expectedSavingBytes: 3238713,
+    evidence: '✅ 本机 stage 实测（族口径）/ ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-tests-dir',
+    kind: 'glob',
+    pattern: 'node_modules/**/__tests__/**',
+    keep: [],
+    reason: '包内测试目录：运行期从不 import。stage 实测 151 文件 622,373 B。'
+      + '刻意**不**裁裸 `test/`（个别包把运行期数据放那里，保守起见不碰）。',
+    expectedFiles: 151,
+    expectedSavingBytes: 622373,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'nm-mocks-dir',
+    kind: 'glob',
+    pattern: 'node_modules/**/__mocks__/**',
+    keep: [],
+    reason: '测试 mock 目录：同上。stage 实测 21 文件 14,365 B。',
+    expectedFiles: 21,
+    expectedSavingBytes: 14365,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
+    id: 'next-build-trace',
+    kind: 'glob',
+    pattern: '.next/trace',
+    keep: [],
+    reason: 'Next 构建期性能 trace（单文件）：设备上无意义。stage 实测 1 文件 431,942 B。',
+    expectedFiles: 1,
+    expectedSavingBytes: 431942,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: true
+  },
+  {
+    id: 'next-types-dir',
+    kind: 'glob',
+    pattern: '.next/types/**',
+    keep: [],
+    reason:
+      'Next 生成的路由 TS 类型（next typecheck/IDE 用）。载荷不含 tsconfig（assemble 只复制'
+      + ' package.json/next.config.ts/public/.next），prod server 不加载。stage 实测 74 文件 645,993 B。',
+    expectedFiles: 74,
+    expectedSavingBytes: 645993,
+    evidence: '✅ 本机 stage 实测 / ⬜ E2E 复核',
+    planRef: 'docs/000-工程规划.md §7.2',
+    prepareRef: '本工程新增',
+    safeByDefault: false
+  },
+  {
     id: 'platform-native',
     kind: 'glob',
     pattern: 'node_modules/**/*.node',

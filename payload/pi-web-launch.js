@@ -574,6 +574,168 @@ function materializeAgentResources(payloadRoot) {
   return { copied, skipped };
 }
 
+// ── 引擎引导事实（能力清单 §F P1-3/P1-4：形态事实落盘 + Intl 探针常态化）──────────
+/**
+ * 在 require 任何 Next 代码**之前**，把引擎的 as-built 事实写到
+ * `<HOME>/payload/pi-web.boot-facts.json`（Kotlin 侧 EngineFacts 轮询合并进 engine-facts.json）。
+ *
+ * 为什么必须在引导最前面：翻译层 SEGV（能力清单 §E）发生在 Next require 风暴期——
+ * 这份文件是那种场景下**唯一能落盘的引擎证据**（node 版本 / Intl 逐项 / WASM / execPath）。
+ * 换引擎回归时比对 intl 块即可守门（devtest.mjs 的端上取证半边）。
+ *
+ * Intl 探针口径（与 docs/002 O2 同表）：
+ *   · constructors 逐项 typeof（Collator/NumberFormat/DateTimeFormat/PluralRules/
+ *     RelativeTimeFormat/Segmenter/ListFormat/DisplayNames）；
+ *   · propertyEscapeCompile：`/\p{Script=Greek}/u` 与 `/\p{ID_Start}/u` 能否编译
+ *     （no-icu 引擎在**编译期**抛 SyntaxError，垫片救不了 ⇒ 这是 O2 的第一死因）；
+ *   · propertyEscapeExec：编译通过时再试匹配（small-icu 应 ok）；
+ *   · defaultLocale / toLocaleString 语义抽查。
+ * 全程不抛：探针失败本身就是事实。
+ */
+function writeBootFacts(payloadRoot, jitlessState) {
+  const safe = (fn) => {
+    try { return fn(); } catch (err) { return `error: ${describeError(err)}`; }
+  };
+  const intl = safe(() => {
+    const present = typeof Intl !== 'undefined';
+    const ctor = (name) => (present && typeof Intl[name] === 'function');
+    const reEscape = (source) => {
+      try { new RegExp(source, 'u'); return true; } catch { return false; }
+    };
+    return {
+      present,
+      constructors: {
+        Collator: ctor('Collator'),
+        NumberFormat: ctor('NumberFormat'),
+        DateTimeFormat: ctor('DateTimeFormat'),
+        PluralRules: ctor('PluralRules'),
+        RelativeTimeFormat: ctor('RelativeTimeFormat'),
+        Segmenter: ctor('Segmenter'),
+        ListFormat: ctor('ListFormat'),
+        DisplayNames: ctor('DisplayNames'),
+      },
+      propertyEscapeCompile: {
+        scriptGreek: reEscape('\\p{Script=Greek}'),
+        idStart: reEscape('\\p{ID_Start}'),
+      },
+      propertyEscapeExec: safe(() => {
+        if (!reEscape('\\p{Script=Greek}')) return false;
+        return new RegExp('\\p{Script=Greek}', 'u').test('Ω');
+      }),
+      defaultLocale: safe(() => (present ? Intl.DateTimeFormat().resolvedOptions().locale : null)),
+      numberToLocaleString: safe(() => (1.23).toLocaleString('en-US') === '1.23'),
+    };
+  });
+  const wasm = safe(() => {
+    if (typeof WebAssembly === 'undefined') return { available: false };
+    // 最小合法 wasm 模块（仅 magic+version 的空模块）；validate 需要完整模块形态
+    const ok = WebAssembly.validate(Buffer.from('AGFzbQEAAAA=', 'base64'));
+    return { available: true, validateOk: ok };
+  });
+  const facts = {
+    at: new Date().toISOString(),
+    node: process.version,
+    platform: process.platform,
+    arch: process.arch,
+    execPathBasename: path.basename(String(process.execPath || '')),
+    pid: process.pid,
+    jitless: { active: jitlessState && jitlessState.active === true },
+    intl,
+    wasm,
+  };
+  const out = path.join(homeDir(), 'payload', 'pi-web.boot-facts.json');
+  try {
+    const tmp = `${out}.tmp-${process.pid}`;
+    fs.writeFileSync(tmp, JSON.stringify(facts, null, 2) + '\n', 'utf8');
+    fs.renameSync(tmp, out);
+    log(`引擎引导事实已写：${out}（node=${facts.node} intl.present=${facts.intl.present}`
+      + ` propertyEscape=${facts.intl.propertyEscapeCompile.scriptGreek && facts.intl.propertyEscapeCompile.idStart} wasm=${JSON.stringify(facts.wasm)}）`);
+  } catch (err) {
+    logWarn(`引擎引导事实写入失败（诊断资产，不影响主链路）：${describeError(err)}`);
+  }
+  return facts;
+}
+
+// ── 宿主能力自检（调试/验收通道；默认关闭）────────────────────────────────────
+/**
+ * `PI_ANDROID_SELFTEST=1` 时（Kotlin 侧仅当 `am start --ez selftest true` 注入），
+ * 在 startNext 之前逐个调用宿主能力并把结果落
+ * `<HOME>/payload/pi-web.selftest.json`。
+ *
+ * 选择 dryRun/只读动作：自检验证「注册面 + 通路 + 契约形状」，**不弹**选择器/权限窗
+ * （那需要人守着）；交互路径由 `/saf-pick-folder` 等扩展命令人工验收。
+ * 自检失败**不阻断启动**（写完报告继续）——它是诊断资产。
+ */
+async function runHostSelftest(payloadRoot) {
+  if (process.env.PI_ANDROID_SELFTEST !== '1') return null;
+  const candidates = [];
+  const scriptDir = process.argv[1] ? path.dirname(process.argv[1]) : '';
+  if (scriptDir.length > 0) candidates.push(path.join(scriptDir, 'host.js'));
+  candidates.push(path.join(payloadRoot, 'host.js'));
+  let host = null;
+  let hostPath = '';
+  for (const candidate of candidates) {
+    if (!fs.existsSync(candidate)) continue;
+    try { host = require(candidate); hostPath = candidate; break; } catch { /* 下一个 */ }
+  }
+  const calls = [
+    ['runtime.facts', {}],
+    ['runtime.keepAlive', { dryRun: true, enable: true }],
+    // 真实启动前台服务（selftest 是受控验收通道；POST_NOTIFICATIONS 未授权时通知被系统隐藏，服务仍在）
+    ['runtime.keepAlive', { enable: true }],
+    ['perm.check', { permType: 'sandbox' }],
+    ['perm.check', { permType: 'notification' }],
+    ['perm.check', { permType: 'saf' }],
+    ['perm.check', { permType: 'ohos.permission.READ_WRITE_DOCUMENTS_DIRECTORY' }],
+    ['perm.request', { permissions: ['ohos.permission.READ_WRITE_DOWNLOAD_DIRECTORY'] }],
+    ['fs.pickFolder', { dryRun: true }],
+    ['fs.pickFiles', { dryRun: true, mimeTypes: ['text/plain'] }],
+    ['notify.show', { title: 'Pi Desktop 自检', body: 'notify.show 通路验证（selftest）' }],
+    ['log.hilog', { level: 'info', text: 'selftest: log.hilog 通路' }],
+    ['terminal.pty', {}],
+    ['shell.openExternal', { dryRun: true, url: 'https://example.com/' }],
+  ];
+  const results = [];
+  for (const [name, args] of calls) {
+    const started = Date.now();
+    let entry;
+    if (!host || typeof host.invoke !== 'function') {
+      entry = { capability: name, ok: false, error: 'host.js 不可用' };
+    } else {
+      try {
+        const value = await Promise.race([
+          Promise.resolve(host.invoke(name, args)),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('invoke 超时(5s)')), 5000)),
+        ]);
+        entry = { capability: name, ok: true, result: value };
+      } catch (err) {
+        entry = { capability: name, ok: false, error: describeError(err) };
+      }
+    }
+    entry.elapsedMs = Date.now() - started;
+    results.push(entry);
+  }
+  const report = {
+    at: new Date().toISOString(),
+    hostPath: hostPath || null,
+    selftest: 'dryRun/read-only',
+    results,
+    summary: {
+      total: results.length,
+      ok: results.filter((r) => r.ok).length,
+      failed: results.filter((r) => !r.ok).length,
+    },
+  };
+  const out = path.join(homeDir(), 'payload', 'pi-web.selftest.json');
+  try {
+    fs.writeFileSync(out, JSON.stringify(report, null, 2) + '\n', 'utf8');
+  } catch (err) {
+    logWarn(`自检报告写入失败：${describeError(err)}`);
+  }
+  log(`宿主能力自检（selftest）：${report.summary.ok}/${report.summary.total} 通过，报告 ${out}`);
+  return report;
+}
+
 // ── 主流程 ────────────────────────────────────────────────────────────────────
 async function main() {
   log(`启动：node=${process.version} pid=${process.pid} cwd=${process.cwd()} argv=${JSON.stringify(process.argv.slice(0, 3))}`);
@@ -628,6 +790,9 @@ async function main() {
   rotatePreviewSecrets(payloadRoot);
   materializeAgentResources(payloadRoot);
 
+  // 引擎引导事实（P1-3/P1-4）：必须在任何 Next 代码被 require 之前落盘
+  writeBootFacts(payloadRoot, jitless);
+
   const hostname = process.env.PI_WEB_HOSTNAME && process.env.PI_WEB_HOSTNAME.length > 0
     ? process.env.PI_WEB_HOSTNAME
     : '127.0.0.1';
@@ -642,6 +807,9 @@ async function main() {
     + `${process.env.PI_WEB_PASSWORD ? `${process.env.PI_WEB_PASSWORD.length} 字符（不回显）` : '(未设置 ⇒ 免密)'}`);
 
   registerShutdownHook(payloadRoot);
+
+  // 宿主能力自检（仅 PI_ANDROID_SELFTEST=1；诊断资产，失败不阻断启动）
+  await runHostSelftest(payloadRoot);
 
   closer = await startNextInProcess(payloadRoot, hostname, port);
   await waitForReady(hostname, port);
