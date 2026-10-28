@@ -1,6 +1,18 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 签名材料不入库（宪法 C9 / 规划 §16.3）：
+//   keystore.properties（已 gitignore；模板见 keystore.properties.sample）提供
+//   storeFile/storePassword/keyAlias/keyPassword；文件缺失 ⇒ release 产出未签名包。
+// ─────────────────────────────────────────────────────────────────────────────
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -24,6 +36,14 @@ android {
         release {
             isMinifyEnabled = false
             // 签名材料本地持有、不入库（规划 §16.3）；首发为侧载/国内渠道签名 APK。
+            if (keystoreProps.isNotEmpty()) {
+                signingConfig = signingConfigs.create("release") {
+                    storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                    storePassword = keystoreProps.getProperty("storePassword")
+                    keyAlias = keystoreProps.getProperty("keyAlias")
+                    keyPassword = keystoreProps.getProperty("keyPassword")
+                }
+            }
         }
         debug {
             // G11：诊断面（--inspect/后门）只在 debug 构建，release 关闭（ark R7 同纪律）

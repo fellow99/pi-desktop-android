@@ -45,3 +45,5 @@ probe-work/
 secrets*
 # 引擎 .so（scripts/provision-engine.mjs 投放，不入库；来源 aosp-node-runtime v24.22.1 small-icu）
 app/src/main/jniLibs/
+# 签名材料（不入库；模板见 keystore.properties.sample）
+keystore.properties
