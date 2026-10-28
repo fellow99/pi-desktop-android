@@ -61,13 +61,13 @@ object PiDesktopRuntime {
         return runCatching { rt.logs(120).map { "[${it.stream}] ${it.text}" } }.getOrDefault(emptyList())
     }
 
-    /** 幂等启动；重复调用（Activity 重建）只返回既有状态流。 */
-    fun start(context: Context) {
+    /** 幂等启动；重复调用（Activity 重建）只返回既有状态流。selftest ⇒ 注入 PI_ANDROID_SELFTEST=1（launch 脚本跑能力自检）。 */
+    fun start(context: Context, selftest: Boolean = false) {
         appContext = context.applicationContext
         if (!started.compareAndSet(false, true)) return
         Thread({
             try {
-                runBoot()
+                runBoot(selftest)
             } catch (t: Throwable) {
                 // fail() 已写入状态；这里是兜底（异常从 runBoot 抛出的路径）
                 if (_state.value !is ShellState.Failed) {
@@ -77,12 +77,12 @@ object PiDesktopRuntime {
         }, "pi-desktop-boot").start()
     }
 
-    private fun runBoot() {
+    private fun runBoot(selftest: Boolean) {
         rt = NodeRuntime.getInstance(appContext)
 
         say("注册宿主能力…")
         HostCapabilities.register(appContext, rt)
-        // 桩能力只消费 applicationContext；Phase 2 的 SAF/通知请求流改接前台 Activity（specs/104）。
+        // 桩能力只消费 applicationContext；SAF/通知请求流经 HostCapabilities.attach(activity) 接前台 Activity（specs/104 Phase 2）。
 
         say("准备载荷（首启解包 27k 文件，约 20-40s；二次启动毫秒级）…")
         val archive = materializeArchive()
@@ -104,18 +104,22 @@ object PiDesktopRuntime {
         val noProxy = (noProxyBase.split(',').map { it.trim() }.filter { it.isNotEmpty() } +
             listOf("127.0.0.1", "localhost", "::1")).distinct().joinToString(",")
 
-        val env = mapOf(
-            "PI_CODING_AGENT_DIR" to agentDir.absolutePath,
-            "PI_ANDROID_ROOTS" to roots.toString(),
-            "NO_PROXY" to noProxy,
-            "no_proxy" to noProxy,
-            "PI_WEB_APP_NAME" to "Pi Desktop",
-            "PI_WEB_SKIP_VERSION_CHECK" to "1",
-        )
+        val env = buildMap {
+            put("PI_CODING_AGENT_DIR", agentDir.absolutePath)
+            put("PI_ANDROID_ROOTS", roots.toString())
+            put("NO_PROXY", noProxy)
+            put("no_proxy", noProxy)
+            put("PI_WEB_APP_NAME", "Pi Desktop")
+            put("PI_WEB_SKIP_VERSION_CHECK", "1")
+            if (selftest) put("PI_ANDROID_SELFTEST", "1") // 调试/验收：launch 脚本自检宿主能力（am start --ez selftest true）
+        }
 
         say("启动进程内 Node…")
         val appEntryAbs = File(payloadRoot, "pi-web/pi-web-launch.js")
         check(appEntryAbs.isFile) { "载荷缺入口：$appEntryAbs（组装产物不完整？）" }
+        // 形态事实落盘（能力清单 §F P1-3）：启动期先写一版（bootFacts=pending）；
+        // launch 脚本跑起来后由 waitReadyPort 轮询合并 pi-web.boot-facts.json。
+        EngineFacts.writeAll(appContext, payloadRoot)
         // jitless 说明：早先 24.2.0(no-icu) 引擎在翻译层模拟器引导期 SEGV，曾按环境强制 jitless；
         // 换装 24.22.1(small-icu) 后参考工程同模拟器以默认 JIT 全通 ⇒ 撤除强制（默认 false）。
         val result = rt.start(
@@ -143,19 +147,26 @@ object PiDesktopRuntime {
         val incoming = File(appContext.cacheDir, "payload-incoming")
         incoming.mkdirs()
         val out = File(incoming, "pi-web.tar.gz")
-        if (!out.isFile || out.length() == 0L) {
-            // AGP 会把 noCompress 的 .gz 资产「去壳」改名 .tar ⇒ 两个名字都兼容
-            val hasGzName = appContext.assets.list("pi-web")?.contains("pi-web.tar.gz") == true
-            val assetPath = if (hasGzName) "pi-web/pi-web.tar.gz" else "pi-web/pi-web.tar"
-            appContext.assets.open(assetPath).use { input ->
-                out.outputStream().use { output -> input.copyTo(output, 256 * 1024) }
-            }
+        // ⚠️ 每次启动都重新拷贝：cacheDir 跨 APK 升级存活，若只在缺失时拷贝，
+        // 换载荷后（新 APK/新 sha）会一直解包**旧缓存**——marker 按旧 sha 命中，
+        // 载荷永不更新（2026-10-29 模拟器实测踩坑：boot-facts/selftest/bin 全缺席）。
+        // 幂等键属于【解包】（PayloadArchive marker），不属于【asset→cache 搬运】。
+        val hasGzName = appContext.assets.list("pi-web")?.contains("pi-web.tar.gz") == true
+        val assetPath = if (hasGzName) "pi-web/pi-web.tar.gz" else "pi-web/pi-web.tar"
+        val tmp = File(incoming, "pi-web.tar.gz.tmp")
+        appContext.assets.open(assetPath).use { input ->
+            tmp.outputStream().use { output -> input.copyTo(output, 256 * 1024) }
+        }
+        if (!tmp.renameTo(out)) {
+            out.delete()
+            if (!tmp.renameTo(out)) tmp.copyTo(out, overwrite = true)
         }
         return out
     }
 
-    /** 读就绪 marker 拿真实端口（不猜、不硬编码；规划 §4 启动时序）。 */
+    /** 读就绪 marker 拿真实端口（不猜、不硬编码；规划 §4 启动时序）。顺带合并引擎引导事实。 */
     private fun waitReadyPort(timeoutMs: Long): Int {
+        var factsMerged = false
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (rt.state.value is NodeState.Failed) {
@@ -166,6 +177,10 @@ object PiDesktopRuntime {
                 val record = runCatching { JSONObject(marker.readText()) }.getOrNull()
                 val port = record?.optInt("port", 0) ?: 0
                 if (port > 0) return port
+            }
+            if (!factsMerged) {
+                factsMerged = EngineFacts.observeBootFacts(appContext, payloadRoot)
+                if (factsMerged) say("引擎引导事实已合并（engine-facts.json）…")
             }
             Thread.sleep(400)
         }

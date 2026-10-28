@@ -18,6 +18,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import org.fellow99.pi.PiDesktopAndroid.host.HostCapabilities
 import org.fellow99.pi.PiDesktopAndroid.runtime.PiDesktopRuntime
 import org.fellow99.pi.PiDesktopAndroid.runtime.PiDesktopRuntime.ShellState
 
@@ -37,6 +38,8 @@ class MainActivity : Activity() {
     private lateinit var errorLog: TextView
     private lateinit var web: WebView
     private var webAttached = false
+    /** 上次崩溃横幅（Loading 态持续显示；null=无记录）。 */
+    private var crashBanner: String? = null
 
     private val ui = Handler(Looper.getMainLooper())
 
@@ -97,8 +100,54 @@ class MainActivity : Activity() {
         root.addView(web, FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT))
         setContentView(root)
 
-        PiDesktopRuntime.start(this)
+        // Phase 2：SAF/权限弹窗需要 Activity 承载（HostCapabilities 经此发起 startActivityForResult）
+        HostCapabilities.attach(this)
+
+        // 崩溃哨兵（PiApplication）留下的「上次异常退出」记录 ⇒ 启动横幅（错误恢复路径入口）。
+        // ⚠️ 存字段而非只改一次 text：observeState 的 Loading 分支每 250ms 覆写 loadingText，
+        //    不入字段横幅会被第一个 tick 抹掉。
+        crashBanner = PiApplication.lastCrash(this)?.let { crash ->
+            val iso = Regex("iso=([^\\n]+)").find(crash)?.groupValues?.get(1) ?: "未知时间"
+            val exc = Regex("exception=([^\\n]+)").find(crash)?.groupValues?.get(1) ?: "未知异常"
+            "⚠ 上次异常退出（$iso，$exc）——若反复出现请查 app.log 与 docs/evidence\n"
+        }
+        loadingText.text = (crashBanner ?: "") + loadingText.text
+
+        val selftest = intent?.getBooleanExtra("selftest", false) == true
+        PiDesktopRuntime.start(this, selftest)
         observeState()
+
+        maybeDebugHooks(intent)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        // singleTask：运行中再 am start（带 selftest/crash-test extra）走这里，不走 onCreate
+        setIntent(intent)
+        maybeDebugHooks(intent)
+    }
+
+    /** 受控验收钩子（模拟器调试用；发布包无入口）。 */
+    private fun maybeDebugHooks(intent: Intent?) {
+        if (intent == null) return
+        // `--ez crash-test` 会把 extra 名存成连字符形态 ⇒ 两种键名都认
+        val crashTest = intent.getBooleanExtra("crashTest", false) || intent.getBooleanExtra("crash-test", false)
+        if (crashTest) {
+            // 800ms 后主线程抛未捕获异常 ⇒ 端到端验证 PiApplication 哨兵落盘 + 下次启动横幅
+            ui.postDelayed({
+                throw IllegalStateException("crash-test：受控验收（PiApplication 哨兵验证）")
+            }, 800)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        HostCapabilities.handleActivityResult(requestCode, resultCode, data)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        HostCapabilities.handlePermissionResult(requestCode, permissions, grantResults)
     }
 
     private fun observeState() {
@@ -108,7 +157,7 @@ class MainActivity : Activity() {
                 when (val s = PiDesktopRuntime.state.value) {
                     is ShellState.Loading -> {
                         loadingText.visibility = View.VISIBLE
-                        loadingText.text = "Pi Desktop\n${s.stage}"
+                        loadingText.text = (crashBanner ?: "") + "Pi Desktop\n${s.stage}"
                     }
                     is ShellState.Ready -> {
                         loadingText.visibility = View.GONE
@@ -151,6 +200,8 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
+        // 未决 SAF/权限请求落「cancelled」→ Node 侧轮询可收敛；随后优雅关停（仅 finish 路径）
+        HostCapabilities.detach(this)
         // 优雅关停：尽力而为（bridge 0.2.0 无 Node 侧钩子；server 随进程退出释放）
         if (isFinishing) {
             runCatching {
