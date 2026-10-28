@@ -31,8 +31,19 @@
 | T1-7 会话持久化 | 重启应用 → 会话列表仍在 | ⬜ 随 T1-2 | — |
 | T1-8 敏感信息扫描 | 仓库 grep 无 Key 明文/凭证 | ✅ 实际 Key/generic sk-/凭证模式 全 0 命中 | 本次提交前扫描 |
 
-## T2 后续阶段（⬜ 规划占位）
+## T2 Phase 2 宿主能力（✅ 模拟器实测 2026-10-29；SSE/真弹窗项见 docs/002 T2 表）
 
-- T2-x SAF 选择器/授权流（Phase 2，补丁 0005/0006 契约）
-- T2-x git204 / pnpm 套件（Phase 3，对标 ark）
-- T2-x 机型验证矩阵扩容（Phase 3+）
+| 用例 | 判据 | 结果 | 证据 |
+|---|---|---|---|
+| T2-1 宿主能力自检 | `am start --ez selftest true` → selftest 报告 14/14 | ✅ | `pi-web.selftest.json`（run-as 读回） |
+| T2-2 引擎引导事实/Intl | boot-facts：Intl 8 构造器+属性转义编译+exec 全 true；wasm validateOk | ✅ | `pi-web.boot-facts.json` |
+| T2-3 形态事实合并 | engine-facts.json 含 platform/decision/payloadSha + bootFacts | ✅ | `engine-facts.json` |
+| T2-4 前台服务+Doze | isForeground=true(dataSync)；deep-idle 进程/服务存活；SSE ⬜ | ✅ | dumpsys（docs/002 T2-5/6） |
+| T2-5 崩溃哨兵 | crash-test → last-crash.txt 落盘 + 重启横幅 | ✅ | `crash/last-crash.txt` + evidence 截图 |
+| T2-6 预览密钥轮换随包 | app.log「预览密钥已轮换」替代 WARN | ✅ | app.log 04:28:09.732 |
+| T2-7 SAF dryRun 契约 | pickFolder/pickFiles dryRun 回 would-Intent | ✅ | selftest 报告 |
+| T2-8 SAF 真弹窗 | 人工选择 → 持久化授权 + 结果文件 | ⬜ headless | —（人工路径） |
+| T2-9 git204 / pnpm 套件 | Phase 3（对标 ark） | ⬜ | — |
+| T2-10 机型验证矩阵扩容 | ≥2 真机 × 2 Android 版本（真机项，挂起） | ⬜ | 模拟器口径见 docs/002 |
+| T2-11 裁剪回归守门 | `node scripts/devtest.mjs` 全绿（G1 引擎锁/G2 资产 sha/G3 规则自审/G4 Intl 残留/G5 端上事实） | ✅ G1–G4；G5 可选 | devtest 输出 |
+| T2-12 载荷裁剪 | stage ≤ 31k 文件 / ≤ 320MiB（对标 ark 27k/375MB 档） | ✅ 30,413 / 307.4MiB（tar.gz 74.5MiB） | assemble --apply 日志 |
