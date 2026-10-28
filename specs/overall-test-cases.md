@@ -47,3 +47,17 @@
 | T2-10 机型验证矩阵扩容 | ≥2 真机 × 2 Android 版本（真机项，挂起） | ⬜ | 模拟器口径见 docs/002 |
 | T2-11 裁剪回归守门 | `node scripts/devtest.mjs` 全绿（G1 引擎锁/G2 资产 sha/G3 规则自审/G4 Intl 残留/G5 端上事实） | ✅ G1–G4；G5 可选 | devtest 输出 |
 | T2-12 载荷裁剪 | stage ≤ 31k 文件 / ≤ 320MiB（对标 ark 27k/375MB 档） | ✅ 30,413 / 307.4MiB（tar.gz 74.5MiB） | assemble --apply 日志 |
+
+## T3 Phase 3（✅ 模拟器实测 2026-10-29；取证见 docs/002 Phase 3 节）
+
+| 用例 | 判据 | 结果 | 证据 |
+|---|---|---|---|
+| T3-1 git 单源一致性 | sync --check：39 文件一致 + synced-from 标记 | ✅ | `scripts/sync-git-extension.mjs --check` |
+| T3-2 git 宿主单测 | node --test tests/*.test.mjs = 25 pass/0 fail | ✅ | 本机 node:test |
+| T3-3 git204-lite 设备链 | init→…→status 8 步全 OK（debug+release 双包） | ✅ | `pi-web.git-selftest.json` |
+| T3-4 pnpm bundle 载入执行 | --version=9.15.9 / config get / add 进度真实推进 | ✅ | `pi-web.pnpm-selftest.json`（output 字段） |
+| T3-5 pnpm 终止信号（R8-1） | CLI 完成路径在本环境不落地 ⇒ 120s 超时 | ❌→⬜ 真机 | 同上（timedOut 字段） |
+| T3-6 回归四件套 | 包体/签名/首启/facts 入 baseline | ✅ | `build/regression.json` |
+| T3-7 合规机械项 | G1–G7/G10/G11 PASS | ✅ | compliance-check 输出 |
+| T3-8 侧载 release 签名 APK | apksigner + zipalign-P16 + 冒烟 | ✅ | app-release.apk 156.8MiB |
+| T3-9 clone/远端 git 用例 | 依赖 pi-web 会话面 | ⬜ | — |
