@@ -1,0 +1,10 @@
+10-28 14:46:51.145 10731 10820 I NODE_BRIDGE: out 1793198811145 [pi-web] 2026-10-28T14:46:51.145Z [pty-selftest] OK ptmx-open :: /dev/ptmx open 成功（应用域 SELinux 放行；dsh 口径成立）
+10-28 14:46:51.289 10731 10820 I NODE_BRIDGE: out 1793198811289 [pi-web] 2026-10-28T14:46:51.288Z [pty-selftest] NO devpts :: mounts=devpts /dev/pts devpts rw,seclabel,relatime,mode=600,ptmxmode=000 0 0 | /dev/pts=ls: /dev/pts: Permission denied
+10-28 14:46:51.290 10731 10820 I NODE_BRIDGE: out 1793198811290 [pi-web] 2026-10-28T14:46:51.290Z [pty-selftest] NO slave-open :: 0..5 全失败（0:EACCES 1:ENOENT 2:ENOENT 3:ENOENT 4:ENOENT 5:ENOENT；无 ioctl unlockpt 的预期限制）
+10-28 14:46:51.347 10731 10820 I NODE_BRIDGE: out 1793198811347 [pi-web] 2026-10-28T14:46:51.347Z [pty-selftest] NO toybox-script :: NO_SCRIPT
+10-28 14:46:51.391 10731 10820 I NODE_BRIDGE: out 1793198811391 [pi-web] 2026-10-28T14:46:51.390Z [pty-selftest] OK stty :: /system/bin/stty
+10-28 14:46:51.394 10731 10820 I NODE_BRIDGE: out 1793198811394 [pi-web] 2026-10-28T14:46:51.393Z O6 PTY 探针：pass=2 fail=3（254ms），报告 pi-web.pty-selftest.json
+10-28 14:46:51.395 10731 10820 I NODE_BRIDGE: out 1793198811395 [pi-web] 2026-10-28T14:46:51.395Z [ptynode-selftest] vendor-present ok=true :: /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent/extensions/android-pty/vendor/node-pty
+10-28 14:46:51.462 10731 10820 I NODE_BRIDGE: out 1793198811462 [pi-web] 2026-10-28T14:46:51.462Z [ptynode-selftest] require-ptynode ok=true :: 数据目录直接 require 成功（该环境未强制 W^X）
+10-28 14:46:51.922 10731 10820 I NODE_BRIDGE: out 1793198811922 [pi-web] 2026-10-28T14:46:51.920Z [ptynode-selftest] pty-roundtrip ok=true :: 回显命中（正常）输出前 160 字：PTY_ROUNDTRIP_OK uid=10264(u0_a264) gid=10264(u0_a264) groups=10264(u0_a264),3003(inet),9997(everybody),20264(u0_a264_cache),50264(all_a264) context=u:r:untrust
+10-28 14:46:51.924 10731 10820 I NODE_BRIDGE: out 1793198811924 [pi-web] 2026-10-28T14:46:51.924Z 路线 A pty.node 探针：3/3 通过（528ms），报告 pi-web.ptynode-selftest.json

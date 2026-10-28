@@ -61,3 +61,16 @@
 | T3-7 合规机械项 | G1–G7/G10/G11 PASS | ✅ | compliance-check 输出 |
 | T3-8 侧载 release 签名 APK | apksigner + zipalign-P16 + 冒烟 | ✅ | app-release.apk 156.8MiB |
 | T3-9 clone/远端 git 用例 | 依赖 pi-web 会话面 | ⬜ | — |
+
+## T4 Phase 4 · PTY 路线 A（✅ 模拟器实测 2026-10-29；取证见 docs/002 Phase 4 两节）
+
+| 用例 | 判据 | 结果 | 证据 |
+|---|---|---|---|
+| T4-1 O6 探针 | ptmx-open/devpts/slave/script/stty 五步结构化 | ✅ | `evidence/pty-selftest.json` |
+| T4-2 交叉编译 | NDK r28c + headers@24.22.1 → pty.node（aarch64/Android24） | ✅ | `vendor/pty.node.lock.json` |
+| T4-3 装载（debug） | 数据目录 require 成功（DT_NEEDED libnode.so 符号可达） | ✅ | `pi-web.ptynode-selftest.json` |
+| T4-4 真 PTY 回程（debug） | node-pty.spawn sh → PTY_ROUNDTRIP_OK + id/tty（forkpty 全链 621ms） | ✅ | 同上 |
+| T4-5 装载+回程（release） | 同 T4-3/4（528ms） | ✅ | `evidence/pty-route-a-release.logcat.txt` |
+| T4-6 lock/provision/devtest 门禁 | sha256 `b965c62d…` 三处一致 | ✅ | devtest G6 |
+| T4-7 terminal.pty 产品化 | android-exec pty 通道 + /api/terminal 联调 | ⬜ 随 pi-web（真机窗口）+ 用户拍板 | — |
+| T4-8 ptmx-open 真机复测 | user 版 SELinux 口径 | ⬜ 真机 | — |

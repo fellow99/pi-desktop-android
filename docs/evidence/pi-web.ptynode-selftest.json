@@ -1,0 +1,27 @@
+{
+  "at": "2026-10-28T14:03:37.988Z",
+  "suite": "路线 A：pty.node 装载 + 真 PTY 回程（node-pty@1.1.0 自建）",
+  "results": [
+    {
+      "step": "vendor-present",
+      "ok": true,
+      "detail": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent/extensions/android-pty/vendor/node-pty"
+    },
+    {
+      "step": "require-ptynode",
+      "ok": true,
+      "detail": "数据目录直接 require 成功（该环境未强制 W^X）"
+    },
+    {
+      "step": "pty-roundtrip",
+      "ok": true,
+      "detail": "回显命中（正常）输出前 160 字：PTY_ROUNDTRIP_OK uid=10262(u0_a262) gid=10262(u0_a262) groups=10262(u0_a262),3003(inet),9997(everybody),20262(u0_a262_cache),50262(all_a262) context=u:r:untrust"
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "ok": 3,
+    "failed": 0,
+    "elapsedMs": 522
+  }
+}
