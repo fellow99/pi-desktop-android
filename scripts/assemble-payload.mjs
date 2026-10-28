@@ -528,6 +528,8 @@ async function main() {
     //    引擎 24.2.0 = --with-intl=none：/\p{ID_Start}/ 等 Unicode 属性转义在模块**编译期**抛
     //    SyntaxError ⇒ Next 进程内启动必炸（Phase 1 E2E 实测）。对 compiled 产物做 ASCII 等价
     //    字符类替换（标识符匹配场景功能等价）；替换后断言零残留，否则 exit 2。
+    const skipVendorCompat = process.argv.includes('--no-vendor-compat');
+    if (skipVendorCompat) console.log('vendor 兼容  : --no-vendor-compat ⇒ 跳过（small-icu 引擎原生支持属性转义）');
     const vendorCompat = [
       { rel: 'node_modules/next/dist/compiled/@edge-runtime/primitives/url.js.text.js' },
       { rel: 'node_modules/next/dist/compiled/edge-runtime/index.js' },
@@ -542,6 +544,7 @@ async function main() {
     ];
     let compatApplied = 0;
     for (const { rel } of vendorCompat) {
+      if (skipVendorCompat) { compatApplied += 1; continue; }
       const p = path.join(stageRoot, rel);
       if (!fs.existsSync(p)) continue;
       const before = fs.readFileSync(p, 'utf8');
@@ -557,7 +560,7 @@ async function main() {
     if (compatApplied !== vendorCompat.length) {
       throw new AssembleError(`vendor 兼容变换覆盖不全：${compatApplied}/${vendorCompat.length}（上游产物结构变化？）`);
     }
-    console.log('vendor 兼容  : Intl 属性转义 → ASCII 等价字符类（' + compatApplied + ' 文件，O2 处置）✔');
+    console.log('vendor 兼容  : ' + (skipVendorCompat ? '跳过（--no-vendor-compat）' : 'Intl 属性转义 → ASCII 等价字符类（' + compatApplied + ' 文件，O2 处置）✔'));
 
     const staged = walkTree(stageRoot).filter((f) => f.error === undefined);
     console.log(`stage 合计  : ${staged.length} 文件 / ${human(totalBytes(staged))}`);

@@ -56,9 +56,13 @@ android {
 }
 
 dependencies {
-    // 运行时两库（Maven Central；bridge 提供 Kotlin API + JNI 引导件，runtime 提供引擎 .so）
+    // JNI 桥（Maven Central）：Kotlin API + libnode_bridge.so + libnode_host_client.so + 引导 JS。
+    // 引擎 libnode.so + libc++_shared.so 由 scripts/provision-engine.mjs 投放到 src/main/jniLibs
+    // （不入库）；来源 aosp-node-runtime v24.22.1（--with-intl=small-icu，runtime.lock.json 锁 sha256
+    // be1d16414a1e…）。为什么不用 Maven node-runtime:24.2.0：该构建 --with-intl=none ⇒ Intl 全缺 ⇒
+    // Next16 compiled 产物 Unicode 属性转义在编译期 SyntaxError（O2 实测），且翻译层模拟器引导 SEGV；
+    // 参考工程 dsh-desktop-android docs/010 阶段2 同墙同解（同模拟器 DeepSeek 对话/看图全通）。
     implementation(libs.node.bridge)
-    runtimeOnly(libs.node.runtime)
 
     implementation(libs.kotlinx.coroutines.android)
 }
