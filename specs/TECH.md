@@ -15,7 +15,7 @@ Kotlin/Android 宿主（Activity + 系统 WebView）+ **库提供的进程内 No
 | compileSdk / targetSdk / minSdk | 36 / 36 / 24 | 与库矩阵一致（`runtime.lock.json#matrix`） |
 | ABI | 仅 `arm64-v8a` | `libnode.so` 只出 arm64 |
 | node-bridge | `io.github.fellow99:node-bridge:0.2.0`（implementation） | Kotlin API（StateFlow）+ JNI 引导件 + NAPI addon + 内建 JS 载荷 |
-| node-runtime | `io.github.fellow99:node-runtime:24.2.0`（runtimeOnly） | `libnode.so` 84,128,040 B，`--with-intl=none`，八项 ELF 门禁（含 16KB 对齐）已过 |
+| 引擎 | aosp-node-runtime **v24.22.1（small-icu）**，经 scripts/provision-engine.mjs 投放 jniLibs（不入库；sha256 be1d16414a1e…） | 24.2.0 为 no-icu ⇒ Next16 属性转义编译期炸（O2 实测）；dsh 同墙同解（docs/010 阶段2）。**偏离登记**：规划 §12 原锁 24.2.0，v0.4 变更记录为准 |
 | 上游基线 | `pi` v1.2.0 / `pi-web` v0.12.1 | 子模块固定 tag，补丁按 tag 建目录 |
 | Next | 16.3.8（webpack 构建，`next build --webpack`） | 进程内启动：`next/dist/server/lib/start-server.js` |
 | 构建机 Node | ≥22.19（本机 v24.7.0） | 仅宿主机组装用；设备上是 24.2.0 引擎 |
