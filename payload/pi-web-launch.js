@@ -736,6 +736,166 @@ async function runHostSelftest(payloadRoot) {
   return report;
 }
 
+// ── Phase 3 设备侧套件（git204-lite / pnpm O8 探针；PI_ANDROID_SELFTEST=1 才跑）────────
+/**
+ * 都跑在 **startNext 之前**（launch 窗口）——这是模拟器上唯一可靠的执行窗口（§E 翻译层
+ * 会在 Next require 风暴期 SEGV）。扩展本体来自**已物化**的 agentDir（测的就是装机面）。
+ * 报告各自落盘（pi-web.git-selftest.json / pi-web.pnpm-selftest.json）；pnpm 在 bundle
+ * 重编译前先写 {"stage":"running"} 占位 —— 万一该步触发翻译层缺陷，已完成的证据不丢。
+ */
+function selftestAgentDir() {
+  return process.env.PI_CODING_AGENT_DIR || path.join(homeDir(), 'pi-agent');
+}
+
+function writeSelftestReport(name, report) {
+  const out = path.join(homeDir(), 'payload', name);
+  try {
+    fs.writeFileSync(out, JSON.stringify(report, null, 2) + '\n', 'utf8');
+  } catch (err) {
+    logWarn(`${name} 写入失败：${describeError(err)}`);
+  }
+  return out;
+}
+
+/** 单步带超时（挂起的工具调用不该拖垮整个窗口；pc 侧教训：诊断面必须可超时）。 */
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} 超时(${ms}ms)`)), ms)),
+  ]);
+}
+
+async function runGitSelftest() {
+  if (process.env.PI_ANDROID_SELFTEST !== '1') return null;
+  const started = Date.now();
+  const report = { at: new Date().toISOString(), suite: 'git204-lite（规划 §10 验收的本地链）', results: [], summary: null };
+  try {
+    const agentDir = selftestAgentDir();
+    const loadTool = async (name) => {
+      const abs = path.join(agentDir, 'extensions', 'android-git', 'lib', 'tools', name + '.js');
+      const mod = await import(pathToFileURL(abs).href);
+      return mod.default;
+    };
+    const work = path.join(homeDir(), 'devtest-work', 'repo');
+    fs.rmSync(work, { recursive: true, force: true });
+    fs.mkdirSync(work, { recursive: true });
+    const ctx = { cwd: work };
+    const step = async (name, tool, params) => {
+      const t = await loadTool(tool);
+      const r = await withTimeout(t.execute('t-' + name, params, undefined, undefined, ctx), 10_000, 'git.' + name);
+      const text = (r.content || []).map((c) => c.text || '').join('\n');
+      const ok = r.isError !== true;
+      report.results.push({ name, ok, text: text.slice(0, 200) });
+      log(`[git-selftest] ${ok ? 'OK' : 'FAIL'} ${name}${ok ? '' : ' :: ' + text.slice(0, 200)}`);
+      return r;
+    };
+    await step('init', 'init', { dir: '.' });
+    await step('config-name', 'config', { action: 'set', key: 'user.name', value: 'pi-devtest' });
+    await step('config-email', 'config', { action: 'set', key: 'user.email', value: 'pi-devtest@example.invalid' });
+    fs.writeFileSync(path.join(work, 'a.txt'), 'hello\n');
+    await step('add', 'add', { filepath: 'a.txt' });
+    await step('commit', 'commit', { message: 'test: 初始提交' });
+    await step('log', 'log', { depth: 5 });
+    await step('branch-create', 'branch', { action: 'create', name: 'feat/x', checkout: true });
+    await step('status', 'status', {});
+    report.summary = {
+      total: report.results.length,
+      ok: report.results.filter((r) => r.ok).length,
+      failed: report.results.filter((r) => !r.ok).length,
+      elapsedMs: Date.now() - started,
+    };
+  } catch (err) {
+    report.summary = { error: describeError(err), elapsedMs: Date.now() - started, ok: 0, failed: 1, total: report.results.length + 1 };
+  }
+  writeSelftestReport('pi-web.git-selftest.json', report);
+  log(`git204-lite 自检：${report.summary.ok}/${report.summary.total} 通过（${report.summary.elapsedMs}ms），报告 pi-web.git-selftest.json`);
+  return report;
+}
+
+async function runPnpmSelftest() {
+  if (process.env.PI_ANDROID_SELFTEST !== '1') return null;
+  const started = Date.now();
+  const report = {
+    at: new Date().toISOString(), suite: 'pnpm O8 探针（规划 §11/R8-1：进程内 bundle 真实 install --ignore-scripts）',
+    results: [], summary: null, stage: 'running',
+  };
+  // 先落占位：bundle 在翻译层重编译是本轮最高风险步骤（R8-1），崩了也要留下前半程证据
+  writeSelftestReport('pi-web.pnpm-selftest.json', report);
+  try {
+    const agentDir = selftestAgentDir();
+    const runnerUrl = pathToFileURL(path.join(agentDir, 'extensions', 'android-pnpm', 'lib', 'runner.mjs')).href;
+    const runner = await import(runnerUrl);
+    const work = path.join(homeDir(), 'devtest-work', 'pnpm-proj');
+    fs.rmSync(work, { recursive: true, force: true });
+    fs.mkdirSync(work, { recursive: true });
+    fs.writeFileSync(path.join(work, 'package.json'), JSON.stringify({ name: 'pnpm-probe', version: '0.0.0' }, null, 2));
+    process.env.npm_config_update_notifier = 'false';
+    let hangConfirmed = false; // R8-1：终止信号不落地已证实 ⇒ 后续步骤止损跳过
+    const step = async (name, args, dir, assert) => {
+      if (hangConfirmed) {
+        report.results.push({ name, skipped: true, reason: '前序步骤已证实：该环境 CLI 终止信号不落地（120s 观察足够）' });
+        return { code: -1 };
+      }
+      const r = await runner.runPnpm(args, { cwd: dir, timeoutMs: 20_000 });
+      if (r.timedOut) hangConfirmed = true;
+      const extra = assert ? assert() : {};
+      const ok = r.code === 0 && !(extra && extra.assertFail);
+      report.results.push({ name, code: r.code, ms: r.ms, ok, output: String(r.output || '').replace(/\s+/g, ' ').slice(0, 400), ...extra });
+      log(`[pnpm-selftest] ${ok ? 'OK' : 'FAIL'} ${name}（exit=${r.code}，${r.ms}ms）${r.code !== 0 || !ok ? ' :: ' + String(r.output || '').replace(/\s+/g, ' ').slice(0, 300) : ''}`);
+      return r;
+    };
+    await step('--version', ['--version'], homeDir());
+    // 离线可判定步骤：把「安装机制是否工作」与「registry 是否可达」解耦（R8-1 判据设计）
+    await step('config-get-registry', ['config', 'get', 'registry'], homeDir());
+    {
+      const localPkg = path.join(work, 'local-pkg');
+      fs.mkdirSync(localPkg, { recursive: true });
+      fs.writeFileSync(path.join(localPkg, 'package.json'), JSON.stringify({ name: 'local-pkg', version: '1.0.0' }, null, 2));
+      await step('add-local-dir', ['add', '--ignore-scripts', './local-pkg'], work, () => ({
+        lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
+        nodeModules: fs.existsSync(path.join(work, 'node_modules', 'local-pkg')) || fs.existsSync(path.join(work, 'node_modules', 'local-pkg', 'package.json')),
+      }));
+    }
+    if (process.env.PI_OFFLINE !== '1') {
+      const storeDir = path.join(homeDir(), 'pnpm-store');
+      const addArgs = ['add', '--ignore-scripts', 'ms@2.1.3', '--store-dir', storeDir];
+      let add = await step('add-ms', addArgs, work, () => ({
+        nodeModules: fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
+        lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
+        assertFail: !fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
+      }));
+      if (add.code !== 0 || !fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json'))) {
+        // 默认 registry 不可达（现网常见）⇒ 显式镜像重试一次（devtest 探针专属回退，如实记录）
+        const fallback = process.env.PI_DEVTEST_NPM_REGISTRY || 'https://repo.huaweicloud.com/repository/npm/';
+        process.env.npm_config_registry = fallback;
+        add = await step('add-ms-fallback-registry', addArgs, work, () => ({
+          registry: fallback,
+          nodeModules: fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
+          lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
+          assertFail: !fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
+        }));
+        delete process.env.npm_config_registry;
+      }
+      await step('list', ['list'], work);
+      await step('store-status', ['store', 'status', '--store-dir', storeDir], homeDir());
+    } else {
+      report.results.push({ name: 'add-ms', skipped: true, reason: 'PI_OFFLINE=1（离线降级）' });
+    }
+    report.summary = {
+      total: report.results.length,
+      ok: report.results.filter((r) => r.ok).length,
+      failed: report.results.filter((r) => r.ok === false).length,
+      elapsedMs: Date.now() - started,
+    };
+  } catch (err) {
+    report.summary = { error: describeError(err), elapsedMs: Date.now() - started, ok: 0, failed: 1, total: report.results.length + 1 };
+  }
+  report.stage = 'done';
+  writeSelftestReport('pi-web.pnpm-selftest.json', report);
+  log(`pnpm O8 探针：${report.summary.ok}/${report.summary.total} 通过（${report.summary.elapsedMs}ms），报告 pi-web.pnpm-selftest.json`);
+  return report;
+}
+
 // ── 主流程 ────────────────────────────────────────────────────────────────────
 async function main() {
   log(`启动：node=${process.version} pid=${process.pid} cwd=${process.cwd()} argv=${JSON.stringify(process.argv.slice(0, 3))}`);
@@ -810,6 +970,10 @@ async function main() {
 
   // 宿主能力自检（仅 PI_ANDROID_SELFTEST=1；诊断资产，失败不阻断启动）
   await runHostSelftest(payloadRoot);
+
+  // Phase 3 设备侧套件（同门控；git 在前、pnpm 最后——后者含最高翻译层风险步骤）
+  await runGitSelftest();
+  await runPnpmSelftest();
 
   closer = await startNextInProcess(payloadRoot, hostname, port);
   await waitForReady(hostname, port);

@@ -1,0 +1,8 @@
+{
+  "name": "android-pnpm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "In-process vendored pnpm (9.15.9) as a pi agent extension for Android; no node binary to spawn.",
+  "pi": { "extensions": ["./index.js"] }
+}

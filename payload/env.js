@@ -24,6 +24,9 @@ const KEYS = Object.freeze({
   noProxy: 'NO_PROXY',
   noProxyLower: 'no_proxy',
   roots: 'PI_ANDROID_ROOTS',
+  /** 单源别名：harmony-git（同步自 pi-desktop-hos，禁侧改）的围栏读 PI_HOS_ROOTS —— 同值别名，
+   *  上游统一变量名后移除（规划 §10「单源」适配；android-pnpm 两个名字都认）。 */
+  rootsHosAlias: 'PI_HOS_ROOTS',
   skipVersionCheck: 'PI_WEB_SKIP_VERSION_CHECK',
   appName: 'PI_WEB_APP_NAME',
   webHostname: 'PI_WEB_HOSTNAME',
@@ -150,6 +153,7 @@ function buildEnv(base, options) {
   env[KEYS.noProxyLower] = env[KEYS.noProxy];
   const roots = buildRoots(source, homeRoot, warn);
   env[KEYS.roots] = roots.value;
+  env[KEYS.rootsHosAlias] = roots.value; // 单源别名（harmony-git fence 提示用；同值同生命周期）
   if (roots.fallback) {
     warn(`${KEYS.roots} 产自**兜底清单**（不是选择器结果）：带 "fallback": true 机器可读标记`);
   }

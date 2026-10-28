@@ -1,0 +1,8 @@
+{
+  "name": "harmony-git",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure-JS git (isomorphic-git) as a pi agent extension for HarmonyOS; replaces the missing git binary.",
+  "pi": { "extensions": ["./index.js"] }
+}
