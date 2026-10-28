@@ -896,6 +896,91 @@ async function runPnpmSelftest() {
   return report;
 }
 
+// ── O6 PTY 探针（规划 §14.2 O6；Phase 4 暂缓项重启评估的第一步）──────────────────
+/**
+ * 背景：ark（OHOS）应用域 /dev/ptmx 全 EACCES（无 devpts 挂载）⇒ PTY 死路；
+ * dsh（Android 同门）实测 /dev/ptmx **可开** —— 两口径相反，Android 侧真相由本探针定分晓。
+ *
+ * 测什么（每步都能独立成立为结论，任何一步失败不影响后续）：
+ *   ① SELinux 判定：fs.openSync('/dev/ptmx','r+') 能否拿到 fd（O6 核心问题）；
+ *   ② devpts 挂载与 /dev/pts 枚举（spawn /system/bin/sh，O5 已证通道）；
+ *   ③ slave 可开性：无 ioctl 的 JS 限制下，盲试 /dev/pts/0..5（unlockpt 缺失 ⇒ 预期 EIO；
+ *      若意外可开 ⇒ 纯 JS PTY 路线成立，升级结论）；
+ *   ④ toybox `script` 桥：`script -qfc sh /dev/null` 可用 ⇒ 零原生件 PTY 路线成立（R-PTY-B）；
+ *   ⑤ stty 在位性（终终端属性设置的传统通道）。
+ *
+ * 本探针**只评估不改变行为**：terminal.pty 能力维持结构化 unsupported，复活与否由评估结论+用户决策。
+ */
+async function runPtySelftest() {
+  if (process.env.PI_ANDROID_SELFTEST !== '1') return null;
+  const started = Date.now();
+  const report = { at: new Date().toISOString(), suite: 'O6 PTY 探针（规划 §14.2；暂缓项重启评估）', results: [], summary: null };
+  const push = (name, r) => { report.results.push(r); log(`[pty-selftest] ${r.ok === true ? 'OK' : r.ok === false ? 'NO' : 'INFO'} ${name}${r.detail ? ' :: ' + String(r.detail).slice(0, 200) : ''}`); };
+  const sh = (cmd, timeoutMs = 8000) => new Promise((resolve) => {
+    try {
+      const { spawn } = require('node:child_process');
+      const child = spawn('/system/bin/sh', ['-c', cmd], { cwd: homeDir() });
+      let out = '';
+      const timer = setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* 已退 */ } resolve(out); }, timeoutMs);
+      child.stdout.on('data', (d) => { out += d; });
+      child.stderr.on('data', (d) => { out += d; });
+      child.on('close', () => { clearTimeout(timer); resolve(out); });
+      child.on('error', () => { clearTimeout(timer); resolve(out + '\n[spawn-error]'); });
+    } catch (err) { resolve('[throw] ' + describeError(err)); }
+  });
+  try {
+    // ① SELinux 判定：/dev/ptmx open
+    try {
+      const fd = fs.openSync('/dev/ptmx', 'r+');
+      fs.closeSync(fd);
+      push('ptmx-open', { name: 'ptmx-open', ok: true, detail: '/dev/ptmx open 成功（应用域 SELinux 放行；dsh 口径成立）' });
+    } catch (err) {
+      push('ptmx-open', { name: 'ptmx-open', ok: false, detail: `/dev/ptmx open 失败：${err.code || err.message}（ark 更严口径成立）` });
+    }
+    // ② devpts 挂载 + /dev/pts 枚举
+    {
+      const mounts = await sh('grep devpts /proc/mounts || echo NO_DEVPTS');
+      const pts = await sh('ls /dev/pts 2>&1 || echo LS_FAIL');
+      push('devpts', { name: 'devpts', ok: mounts.includes('devpts') && !pts.includes('LS_FAIL'), detail: `mounts=${mounts.trim().slice(0, 120)} | /dev/pts=${pts.trim().slice(0, 80)}` });
+    }
+    // ③ slave 盲试（无 ioctl/unlockpt 的 JS 限制：unlock 缺失 ⇒ 预期 EIO；意外可开 ⇒ 升级结论）
+    {
+      let slave = null;
+      const errs = [];
+      for (let n = 0; n <= 5; n += 1) {
+        try {
+          const sfd = fs.openSync(`/dev/pts/${n}`, 'r+');
+          fs.closeSync(sfd);
+          slave = `/dev/pts/${n}`;
+          break;
+        } catch (err) { errs.push(`${n}:${err.code}`); }
+      }
+      push('slave-open', { name: 'slave-open', ok: slave !== null, detail: slave ? `slave 可开：${slave}（纯 JS PTY 路线成立）` : `0..5 全失败（${errs.join(' ')}；无 ioctl unlockpt 的预期限制）` });
+    }
+    // ④ toybox script 桥
+    {
+      const w = await sh('command -v script && echo HAS_SCRIPT || echo NO_SCRIPT');
+      push('toybox-script', { name: 'toybox-script', ok: w.includes('HAS_SCRIPT'), detail: w.trim().slice(0, 120) || '(空)' });
+    }
+    // ⑤ stty
+    {
+      const w = await sh('command -v stty && echo HAS_STTY || echo NO_STTY');
+      push('stty', { name: 'stty', ok: w.includes('HAS_STTY'), detail: w.trim().slice(0, 80) });
+    }
+    report.summary = {
+      total: report.results.length,
+      pass: report.results.filter((r) => r.ok === true).length,
+      fail: report.results.filter((r) => r.ok === false).length,
+      elapsedMs: Date.now() - started,
+    };
+  } catch (err) {
+    report.summary = { error: describeError(err), elapsedMs: Date.now() - started };
+  }
+  writeSelftestReport('pi-web.pty-selftest.json', report);
+  log(`O6 PTY 探针：pass=${report.summary.pass} fail=${report.summary.fail}（${report.summary.elapsedMs}ms），报告 pi-web.pty-selftest.json`);
+  return report;
+}
+
 // ── 主流程 ────────────────────────────────────────────────────────────────────
 async function main() {
   log(`启动：node=${process.version} pid=${process.pid} cwd=${process.cwd()} argv=${JSON.stringify(process.argv.slice(0, 3))}`);
@@ -974,6 +1059,9 @@ async function main() {
   // Phase 3 设备侧套件（同门控；git 在前、pnpm 最后——后者含最高翻译层风险步骤）
   await runGitSelftest();
   await runPnpmSelftest();
+
+  // Phase 4 O6 PTY 探针（暂缓项重启评估第一步；只测不改行为）
+  await runPtySelftest();
 
   closer = await startNextInProcess(payloadRoot, hostname, port);
   await waitForReady(hostname, port);
