@@ -33,8 +33,8 @@
 
 | 阶段 | 状态 | 出口证据 |
 |---|---|---|
-| Phase 0 消费方探针 | ✅ | `docs/002-真机验证记录.md`（O1/O2/O3/O4/O5/O7） |
-| Phase 1 端到端链路 | ⚠️ | 载荷组装+壳+启动链路（解包/编排/宿主桥）✅；WebView 渲染被模拟器 berberis 翻译层 SIGSEGV 阻塞（docs/002 E2E 节，真机交接命令已备） |
-| Phase 2 宿主能力补齐 | ⬜ | SAF 桥/perm 流（本期仅桩） |
-| Phase 3 git/pnpm + 合规发布 | ⬜ | — |
-| Phase 4 加固演进 | ⬜ | — |
+| Phase 0 消费方探针 | ✅ | `docs/002-真机验证记录.md`（O1/O2/O3/O4/O5/O7）；**2026-10-29 增 O6 PTY 探针 ✅**（Phase 4 节） |
+| Phase 1 端到端链路 | ⚠️ | 载荷组装+壳+启动链路（解包/编排/宿主桥）✅；WebView 渲染被模拟器 berberis 翻译层 SIGSEGV 阻塞（docs/002 E2E 节，真机交接命令已备）；§F 第 1 级收尾 6/6 ✅（裁剪 76.5MiB/轮换随包/engine-facts/devtest/崩溃哨兵/L-ENV 报告） |
+| Phase 2 宿主能力补齐 | 🔶 4/5 | SAF 真接入+授权流+前台服务+§8 矩阵回填 ✅（selftest 14/14）；机型验证矩阵 ⏸ 真机项（docs/002 Phase 1/2 收尾节） |
+| Phase 3 git/pnpm + 合规发布 | 🔶 4/5+1🔶 | android-git 单源+宿主单测 25/0+设备 8/8 ✅；回归四件套 ✅；合规机械项全过 ✅；侧载签名 APK ✅；android-pnpm 代码落地、R8-1 终止信号本环境不成立 ⏸ 真机复核（docs/002 Phase 3 节） |
+| Phase 4 加固演进 | 🔶 进行中 | O6 PTY 探针 ✅ + 路线 A pty.node 交叉编译+真 PTY 回程双包 3/3 ✅（docs/002 Phase 4 两节）；`:node` 独立进程/引擎升级/Google Play ⬜ |
