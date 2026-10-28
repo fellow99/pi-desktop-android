@@ -1,0 +1,12 @@
+10-28 11:55:14.971   570   570 I adbd    : adbd service requested 'exec:run-as 'org.fellow99.pi.PiDesktopAndroid' 'cat' 'files/node-bridge/payload/pi-web.pty-selftest.json''
+10-28 11:56:30.968   570   570 I adbd    : adbd service requested 'exec:run-as 'org.fellow99.pi.PiDesktopAndroid' 'cat' 'files/node-bridge/payload/pi-web.pty-selftest.json''
+10-28 11:56:31.567   570   570 I adbd    : adbd service requested 'exec:run-as 'org.fellow99.pi.PiDesktopAndroid' 'cat' 'files/node-bridge/payload/pi-web.pty-selftest.json''
+10-28 11:56:48.375   570   570 I adbd    : adbd service requested 'exec:run-as 'org.fellow99.pi.PiDesktopAndroid' 'cat' 'files/node-bridge/payload/pi-web.pty-selftest.json''
+10-28 11:56:58.240   570   570 I adbd    : adbd service requested 'exec:run-as 'org.fellow99.pi.PiDesktopAndroid' 'cat' 'files/node-bridge/payload/pi-web.pty-selftest.json''
+10-28 11:57:15.730 10144 10222 I NODE_BRIDGE: out 1793188635730 [pi-web] 2026-10-28T11:57:15.729Z [pty-selftest] OK ptmx-open :: /dev/ptmx open 成功（应用域 SELinux 放行；dsh 口径成立）
+10-28 11:57:15.942 10144 10222 I NODE_BRIDGE: out 1793188635942 [pi-web] 2026-10-28T11:57:15.941Z [pty-selftest] NO devpts :: mounts=devpts /dev/pts devpts rw,seclabel,relatime,mode=600,ptmxmode=000 0 0 | /dev/pts=ls: /dev/pts: Permission denied
+10-28 11:57:15.945 10144 10222 I NODE_BRIDGE: out 1793188635944 [pi-web] 2026-10-28T11:57:15.943Z [pty-selftest] NO slave-open :: 0..5 全失败（0:EACCES 1:ENOENT 2:ENOENT 3:ENOENT 4:ENOENT 5:ENOENT；无 ioctl unlockpt 的预期限制）
+10-28 11:57:16.041 10144 10222 I NODE_BRIDGE: out 1793188636040 [pi-web] 2026-10-28T11:57:16.038Z [pty-selftest] NO toybox-script :: NO_SCRIPT
+10-28 11:57:16.104 10144 10222 I NODE_BRIDGE: out 1793188636104 [pi-web] 2026-10-28T11:57:16.102Z [pty-selftest] OK stty :: /system/bin/stty
+10-28 11:57:16.117 10144 10222 I NODE_BRIDGE: out 1793188636117 [pi-web] 2026-10-28T11:57:16.108Z O6 PTY 探针：pass=2 fail=3（384ms），报告 pi-web.pty-selftest.json
+10-28 11:58:26.706   570   570 I adbd    : adbd service requested 'exec:run-as 'org.fellow99.pi.PiDesktopAndroid' 'cat' 'files/node-bridge/payload/pi-web.pty-selftest.json''
