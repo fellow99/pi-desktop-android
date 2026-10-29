@@ -113,9 +113,19 @@ row(9, 'AI 生成内容标识', 'MANUAL', '对标 ark 壳层常驻灰字标识�
   const vc = /versionCode='(\d+)'/.exec(badging)?.[1];
   const assetsDir = path.join(ROOT, '..', 'assets');
   const iconMaterials = fs.existsSync(assetsDir) && fs.readdirSync(assetsDir).some((f) => /^logo\.(png|svg|ico|icns)$/.test(f) || f.startsWith('logo-'));
-  const okAll = pkg === 'org.fellow99.pi.PiDesktopAndroid' && label === 'Pi Desktop' && typeof vc === 'string';
+  // G10 图标物化：五密度 legacy + adaptive 前景 + anydpi-v26 XML 在位，且 Manifest 引用
+  const resDir = path.join(ROOT, 'app', 'src', 'main', 'res');
+  const densities = ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi'];
+  const iconFiles = densities.flatMap((d) => ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']
+    .map((f) => path.join(resDir, `mipmap-${d}`, f)));
+  iconFiles.push(path.join(resDir, 'mipmap-anydpi-v26', 'ic_launcher.xml'));
+  iconFiles.push(path.join(resDir, 'mipmap-anydpi-v26', 'ic_launcher_round.xml'));
+  const iconProduced = iconFiles.every((p) => fs.existsSync(p));
+  const manifest = fs.readFileSync(path.join(ROOT, 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
+  const iconReferenced = /android:icon="@mipmap\/ic_launcher"/.test(manifest) && /android:roundIcon="@mipmap\/ic_launcher_round"/.test(manifest);
+  const okAll = pkg === 'org.fellow99.pi.PiDesktopAndroid' && label === 'Pi Desktop' && typeof vc === 'string' && iconProduced && iconReferenced;
   row(10, '包名/应用名/图标三一致', okAll ? 'PASS' : 'FAIL',
-    `pkg=${pkg} label=${label} versionCode=${vc} ../assets 图标材料=${iconMaterials ? '在（logo.png/svg/ico + 带底版）' : '缺'}`);
+    `pkg=${pkg} label=${label} versionCode=${vc} 材料=${iconMaterials ? '在' : '缺'} 物化=${iconProduced ? `15 位图+2 XML 在` : '缺，跑 node scripts/generate-icons.mjs'} Manifest引用=${iconReferenced}`);
 }
 
 // G11 发布资产卫生（release 不可调试）
