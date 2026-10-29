@@ -59,6 +59,10 @@ android {
         jvmTarget = "17"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     packaging {
         jniLibs {
             // 16 KB 对齐门禁（G5）：uncompressed + page-aligned 由 AGP 保序

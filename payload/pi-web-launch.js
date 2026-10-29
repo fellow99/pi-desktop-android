@@ -44,6 +44,31 @@ try {
   });
 } catch (_) { /* 定义失败则保持引擎默认；不阻断启动 */ }
 
+// ── Android 宿主保护：补 AbortSignal.throwIfAborted（Node 25+ API）────────────
+// 现象：引擎为 Node v24.22.1，而 pi-ai 1.2.0 的模型目录读写/发现（models-store/
+//   models.js）与 @anthropic-ai/sdk 调用了 AbortSignal.prototype.throwIfAborted()
+//   （Node 25 才有）⇒ 模型目录枚举报「e?.throwIfAborted is not a function」，UI 显
+//   「模型错误」且选择器为空（No models）。实际会话不受影响（会话显式锁定
+//   provider/modelId，不走目录枚举），但模型选择/刷新不可用。
+// 处置：按 WHATWG 规范补垫片——aborted 时抛 name=AbortError 的 DOMException。
+//   Node 17+ 有全局 DOMException；已存在则绝不覆盖。同样须在任何业务模块前安装。
+try {
+  if (typeof AbortSignal !== 'undefined'
+      && typeof AbortSignal.prototype.throwIfAborted !== 'function') {
+    Object.defineProperty(AbortSignal.prototype, 'throwIfAborted', {
+      configurable: true,
+      writable: true,
+      value: function throwIfAborted() {
+        if (this != null && this.aborted) {
+          const err = new DOMException('The operation was aborted.', 'AbortError');
+          err.code = 20; // ABORT_ERR（规范值）
+          throw err;
+        }
+      }
+    });
+  }
+} catch (_) { /* DOMException 不可用则保持默认；目录枚举降级，不阻断启动 */ }
+
 const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
