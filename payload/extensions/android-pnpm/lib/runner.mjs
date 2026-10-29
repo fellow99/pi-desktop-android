@@ -134,6 +134,15 @@ export function runPnpm(args, opts) {
       process.stderr.write = tee(origErrWrite);
       process.argv = [origArgv[0], 'pnpm', ...args];
       process.chdir(cwd);
+      // Android 无 /tmp：依赖 temp-dir 的包（pnpm 内嵌 .pnpm/temp-dir）在 lstat('/tmp') 处
+      // unhandledRejection ⇒ 整个 bundle 崩溃（真机实测）。恒把 TMPDIR/TMP/TEMP 指到可写缓存目录。
+      const os = createRequire(import.meta.url)('node:os');
+      const tmpBase = (process.env.PI_ANDROID_HOME && (process.env.PI_ANDROID_HOME + '/tmp'))
+        || path.join(os.homedir() || cwd, 'tmp');
+      try { fsSync.mkdirSync(tmpBase, { recursive: true }); } catch { /* 建不了则 pnpm 自报错 */ }
+      process.env.TMPDIR = tmpBase;
+      process.env.TMP = tmpBase;
+      process.env.TEMP = tmpBase;
       if (opts.env) for (const [k, v] of Object.entries(opts.env)) process.env[k] = v;
       process.exit = (c) => finish(typeof c === 'number' ? c : 0);
       const req = createRequire(import.meta.url);
