@@ -37,15 +37,42 @@ export class PnpmRunnerError extends Error {
  * 以「exit 调用 / exit 事件 / 超时」三者为完成信号。
  *
  * @param {string[]} args CLI 参数（不含 'pnpm' 本身）
- * @param {{ cwd: string, env?: Record<string,string>, timeoutMs?: number }} opts
- * @returns {Promise<{ code: number, ms: number, output: string, timedOut?: boolean }>}
+ * @param {{ cwd: string, env?: Record<string,string>, timeoutMs?: number,
+ *           silent?: boolean,
+ *           expectArtifacts?: Array<string|{path:string,minBytes?:number,waitMs?:number}>,
+ *           until?: (poll: () => boolean) => Promise<boolean>|boolean }} opts
+ *   silent：true 时丢弃 pnpm 对 stdout/stderr 的写入（仍保留最多 8KB 到 output 供失败诊断），
+ *           不污染 pi 主进程日志（C1：输出静默）。
+ *   expectArtifacts：产物路径（相对 cwd）数组；完成判据不再只信 exit 信号，而是以产物落盘为准
+ *           （R8-1：本环境 CLI 终止信号不落地）。runPnpm 会在 install 后等到全部产物出现/超时。
+ *   until：自定义完成谓词（收一个 poll 函数，可在内部轮询）；给非产物型完成信号留口。
+ * @returns {Promise<{ code: number, ms: number, output: string, timedOut?: boolean,
+ *                     artifacts?: Record<string,boolean>, artifactSatisfied?: boolean }>}
  */
 export function runPnpm(args, opts) {
   if (!existsSync(BUNDLE)) {
     return Promise.reject(new PnpmRunnerError(`vendored bundle 缺失：${BUNDLE}（载荷不完整？）`));
   }
-  const { cwd, timeoutMs = 120_000 } = opts;
+  const { cwd, timeoutMs = 120_000, silent = false, expectArtifacts = [], until = null } = opts;
   if (!cwd) return Promise.reject(new PnpmRunnerError('opts.cwd 必填（工作目录围栏在 index.js 层做）'));
+
+  // 产物断言状态（C1：exit 信号不可信时的替代完成判据）。静默完成靠它而非 code。
+  const artList = expectArtifacts.map((a) => (typeof a === 'string' ? { path: a } : a));
+  const artAbs = (p) => path.isAbsolute(p) ? p : path.resolve(cwd, p);
+  const fsSync = createRequire(import.meta.url)('node:fs');
+  const probeArtifacts = () => {
+    const status = {};
+    for (const a of artList) {
+      try {
+        const st = fsSync.statSync(artAbs(a.path));
+        // kind 默认 file；'dir' 只要求目录存在；'any' 二者皆可
+        const kind = a.kind || 'file';
+        const typeOk = kind === 'dir' ? st.isDirectory() : kind === 'any' ? true : st.isFile();
+        status[a.path] = typeOk && (!a.minBytes || st.size >= a.minBytes);
+      } catch { status[a.path] = false; }
+    }
+    return status;
+  };
 
   return new Promise((resolve) => {
     const started = Date.now();
@@ -56,20 +83,26 @@ export function runPnpm(args, opts) {
     const chunks = [];
     let captured = 0;
     let done = false;
+    let artifactPoll = null;
     const origOutWrite = process.stdout.write.bind(process.stdout);
     const origErrWrite = process.stderr.write.bind(process.stderr);
+    // silent：仍捕获最多 8KB 供诊断，但不写入真实 fd（完成静默）；非 silent 保持 tee 落 app.log
     const tee = (orig) => (chunk, ...rest) => {
       if (captured < 8192) {
         const s = typeof chunk === 'string' ? chunk : chunk.toString();
         chunks.push(s.slice(0, 8192 - captured));
         captured += s.length;
       }
-      return orig(chunk, ...rest);
+      return silent ? true : orig(chunk, ...rest);
     };
+    // 完成时附加产物断言（C1）：即便 exit 信号缺失/超时，只要产物齐即判成功
+    const artifactSnapshot = () => (artList.length ? probeArtifacts() : undefined);
+    const artifactsOk = (snapshot) => !artList.length || Object.values(snapshot || {}).every(Boolean);
     const finish = (code, extra = {}) => {
       if (done) return;
       done = true;
       clearTimeout(timer);
+      if (artifactPoll) clearInterval(artifactPoll);
       process.off('exit', onRealExit);
       process.stdout.write = origOutWrite;
       process.stderr.write = origErrWrite;
@@ -77,11 +110,24 @@ export function runPnpm(args, opts) {
       process.exit = origExit;
       process.exitCode = origExitCode;
       try { process.chdir(origCwd); } catch { /* cwd 已失效 */ }
-      resolve({ code, ms: Date.now() - started, output: chunks.join(''), ...extra });
+      const artifacts = artifactSnapshot();
+      const artifactSatisfied = artifactsOk(artifacts);
+      // 有产物断言时以产物为准（exit 信号在本环境不可靠）：产物齐 → code 归一为 0
+      const effectiveCode = artList.length ? (artifactSatisfied ? 0 : (code === 0 ? 1 : code)) : code;
+      resolve({ code: effectiveCode, ms: Date.now() - started, output: chunks.join(''), artifacts, artifactSatisfied, ...extra });
     };
     const timer = setTimeout(() => finish(124, { timedOut: true }), timeoutMs);
     const onRealExit = (code) => { if (!done) finish(typeof code === 'number' ? code : 0); };
     process.on('exit', onRealExit);
+
+    // 产物轮询：CLI 一旦把全部产物落盘即可提前完成（不等本环境不可靠的 exit 信号，C1）。
+    // 给 CLI 500ms 发动宽限，之后每 120ms 探一次；产物齐即经 finish 归一成 code 0。
+    if (artList.length) {
+      setTimeout(() => {
+        if (done) return;
+        artifactPoll = setInterval(() => { if (artifactsOk(probeArtifacts())) finish(0, { via: 'artifacts' }); }, 120);
+      }, 500);
+    }
 
     try {
       process.stdout.write = tee(origOutWrite);

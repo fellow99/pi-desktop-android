@@ -839,6 +839,31 @@ async function runGitSelftest() {
     await step('log', 'log', { depth: 5 });
     await step('branch-create', 'branch', { action: 'create', name: 'feat/x', checkout: true });
     await step('status', 'status', {});
+    // C2：网络 clone 远端用例（isomorphic-git 纯 JS，不走系统 git）。默认浅克隆一个极小公开
+    // 仓库；可用 PI_DEVTEST_GIT_CLONE_URL 覆盖。网络不可达/离线时如实记为 skipped，不拉低本地链结果。
+    if (process.env.PI_SKIP_NETWORK_SELFTEST === '1') {
+      report.results.push({ name: 'clone-remote', ok: true, skipped: true, reason: 'PI_SKIP_NETWORK_SELFTEST=1' });
+    } else {
+      const cloneUrl = process.env.PI_DEVTEST_GIT_CLONE_URL || 'https://github.com/octocat/Hello-World.git';
+      const cloneDir = path.join(homeDir(), 'devtest-work', 'clone-target');
+      fs.rmSync(cloneDir, { recursive: true, force: true });
+      const t0 = Date.now();
+      try {
+        const t = await loadTool('clone');
+        const r = await withTimeout(
+          t.execute('t-clone', { url: cloneUrl, dir: cloneDir, depth: 1 }, undefined, undefined, { cwd: work }),
+          45_000, 'git.clone');
+        const text = (r.content || []).map((c) => c.text || '').join('\n');
+        const headExists = fs.existsSync(path.join(cloneDir, '.git')) || fs.existsSync(path.join(cloneDir, 'README'))
+          || fs.readdirSync(cloneDir).length > 0;
+        const ok = r.isError !== true && headExists;
+        report.results.push({ name: 'clone-remote', ok, ms: Date.now() - t0, url: cloneUrl, dir: cloneDir, text: text.slice(0, 200) });
+        log(`[git-selftest] ${ok ? 'OK' : 'FAIL'} clone-remote（${Date.now() - t0}ms）${ok ? '' : ' :: ' + text.slice(0, 200)}`);
+      } catch (e) {
+        report.results.push({ name: 'clone-remote', ok: false, ms: Date.now() - t0, url: cloneUrl, error: describeError(e) });
+        log(`[git-selftest] FAIL clone-remote :: ${describeError(e)}`);
+      }
+    }
     report.summary = {
       total: report.results.length,
       ok: report.results.filter((r) => r.ok).length,
@@ -872,15 +897,16 @@ async function runPnpmSelftest() {
     fs.writeFileSync(path.join(work, 'package.json'), JSON.stringify({ name: 'pnpm-probe', version: '0.0.0' }, null, 2));
     process.env.npm_config_update_notifier = 'false';
     let hangConfirmed = false; // R8-1：终止信号不落地已证实 ⇒ 后续步骤止损跳过
-    const step = async (name, args, dir, assert) => {
-      if (hangConfirmed) {
+    const step = async (name, args, dir, assert, runnerOpts = {}) => {
+      if (hangConfirmed && !runnerOpts.expectArtifacts) {
         report.results.push({ name, skipped: true, reason: '前序步骤已证实：该环境 CLI 终止信号不落地（120s 观察足够）' });
         return { code: -1 };
       }
-      const r = await runner.runPnpm(args, { cwd: dir, timeoutMs: 20_000 });
-      if (r.timedOut) hangConfirmed = true;
+      // C1：可传 expectArtifacts 让完成判据脱离不可靠的 exit 信号（产物齐即提前 code 0）
+      const r = await runner.runPnpm(args, { cwd: dir, timeoutMs: 20_000, ...runnerOpts });
+      if (r.timedOut && !r.artifactSatisfied) hangConfirmed = true;
       const extra = assert ? assert() : {};
-      const ok = r.code === 0 && !(extra && extra.assertFail);
+      const ok = r.code === 0 && r.artifactSatisfied !== false && !(extra && extra.assertFail);
       report.results.push({ name, code: r.code, ms: r.ms, ok, output: String(r.output || '').replace(/\s+/g, ' ').slice(0, 400), ...extra });
       log(`[pnpm-selftest] ${ok ? 'OK' : 'FAIL'} ${name}（exit=${r.code}，${r.ms}ms）${r.code !== 0 || !ok ? ' :: ' + String(r.output || '').replace(/\s+/g, ' ').slice(0, 300) : ''}`);
       return r;
@@ -895,16 +921,18 @@ async function runPnpmSelftest() {
       await step('add-local-dir', ['add', '--ignore-scripts', './local-pkg'], work, () => ({
         lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
         nodeModules: fs.existsSync(path.join(work, 'node_modules', 'local-pkg')) || fs.existsSync(path.join(work, 'node_modules', 'local-pkg', 'package.json')),
-      }));
+      }), { silent: true, expectArtifacts: [path.join('node_modules', 'local-pkg', 'package.json'), 'pnpm-lock.yaml'] });
     }
     if (process.env.PI_OFFLINE !== '1') {
       const storeDir = path.join(homeDir(), 'pnpm-store');
       const addArgs = ['add', '--ignore-scripts', 'ms@2.1.3', '--store-dir', storeDir];
+      // C1：以 node_modules/ms/package.json + lockfile 为完成判据（exit 信号在本环境不落地）
+      const addArtifacts = [path.join('node_modules', 'ms', 'package.json'), 'pnpm-lock.yaml'];
       let add = await step('add-ms', addArgs, work, () => ({
         nodeModules: fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
         lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
         assertFail: !fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
-      }));
+      }), { silent: true, expectArtifacts: addArtifacts });
       if (add.code !== 0 || !fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json'))) {
         // 默认 registry 不可达（现网常见）⇒ 显式镜像重试一次（devtest 探针专属回退，如实记录）
         const fallback = process.env.PI_DEVTEST_NPM_REGISTRY || 'https://repo.huaweicloud.com/repository/npm/';
@@ -914,7 +942,7 @@ async function runPnpmSelftest() {
           nodeModules: fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
           lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
           assertFail: !fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
-        }));
+        }), { silent: true, expectArtifacts: addArtifacts });
         delete process.env.npm_config_registry;
       }
       await step('list', ['list'], work);

@@ -57,8 +57,12 @@ function fail(text, details = {}) {
   return { content: [{ type: 'text', text }], details, isError: true };
 }
 
-/** 统一执行壳：围栏 + 离线闸 + runPnpm + 结构化返回（输出本身直落 app.log，不搬运）。 */
-async function executePnpm(toolName, args, { readOnly = false, allowOutsideRoot = false } = {}, ctx) {
+/**
+ * 统一执行壳：围栏 + 离线闸 + runPnpm + 结构化返回（输出本身直落 app.log，不搬运）。
+ * @param artifacts C1：写操作的产物断言（相对项目目录）；传入后完成判据以产物落盘为准，
+ *                  规避本环境 pnpm bundle exit 信号不落地（R8-1），并默认走 silent（不污染主日志）。
+ */
+async function executePnpm(toolName, args, { readOnly = false, allowOutsideRoot = false, artifacts = null } = {}, ctx) {
   try {
     assertBundlePresent();
     const cwd = ctx?.cwd || process.cwd();
@@ -69,14 +73,23 @@ async function executePnpm(toolName, args, { readOnly = false, allowOutsideRoot 
       return fail(`${toolName} 拒绝：PI_OFFLINE=1（离线模式只读面=list/why/store_status；规划 §11.1）`);
     }
     const full = buildArgs(args, { readOnly });
-    const { code, ms, output } = await runPnpm(full, { cwd });
-    const head = code === 0
-      ? `✓ pnpm ${args.join(' ')}（exit 0，${ms}ms）`
-      : `✗ pnpm ${args.join(' ')}（exit ${code}，${ms}ms）`;
-    return ok(
-      `${head}\n输出已直落 app.log（进程内 bundle 不劫持 stdout）。\n策略：--ignore-scripts 恒注入（设备 spawn 受限，规划 §11.1）；bundle=${PNPM_VERSION_BUNDLED}`,
-      { code, ms, args: full },
-    );
+    // C1：有产物断言 ⇒ silent（输出仅在失败时带尾部）+ 以产物为完成判据；无断言维持原 tee 行为
+    const { code, ms, output, artifacts: artStatus, artifactSatisfied, via } = await runPnpm(full, {
+      cwd,
+      timeoutMs: readOnly ? 60_000 : 180_000,
+      silent: !!artifacts,
+      expectArtifacts: artifacts || [],
+    });
+    const judgedByArtifacts = !!artifacts;
+    const success = code === 0 && (!judgedByArtifacts || artifactSatisfied);
+    const head = success
+      ? `✓ pnpm ${args.join(' ')}（完成${via === 'artifacts' ? '·产物断言' : `·exit 0`}，${ms}ms）`
+      : `✗ pnpm ${args.join(' ')}（exit ${code}，${ms}ms${judgedByArtifacts ? `，产物未齐：${JSON.stringify(artStatus)}` : ''}）`;
+    const text = success
+      ? `${head}\n完成判据：${judgedByArtifacts ? `产物落盘（${artifacts.map((a) => (typeof a === 'string' ? a : a.path)).join('、')}）；输出静默，不落主日志` : 'exit 0；输出直落 app.log'}。策略：--ignore-scripts 恒注入；bundle=${PNPM_VERSION_BUNDLED}`
+      : `${head}\n输出尾部：\n${String(output || '').replace(/\s+/g, ' ').slice(-800)}`;
+    const result = success ? ok(text, { code, ms, args: full }) : fail(text, { code, ms, args: full, artifacts: artStatus });
+    return result;
   } catch (e) {
     return fail(`pnpm ${toolName} 失败：${(e && e.message) || e}`);
   }
@@ -103,7 +116,10 @@ export default function register(pi) {
     toolDef('pnpm_install', '安装项目依赖（等价 pnpm install；--ignore-scripts 恒注入——依赖生命周期脚本的包会不完整，结果如实以 exit code 为准）', {
       type: 'object',
       properties: { dir: { type: 'string', description: '项目目录（默认会话当前目录）' } },
-    }, (params, ctx) => executePnpm('pnpm_install', ['install'], {}, { ...ctx, cwd: projectDir(params, ctx) })),
+    }, (params, ctx) => executePnpm('pnpm_install', ['install'], {
+      // C1：完成判据 = lockfile 落盘（空依赖项目不建 node_modules/.modules.yaml，故以 lockfile 为准），脱离不可靠 exit
+      artifacts: ['pnpm-lock.yaml'],
+    }, { ...ctx, cwd: projectDir(params, ctx) })),
 
     toolDef('pnpm_add', '添加依赖（pnpm add <pkg…>；--ignore-scripts 恒注入——需要脚本的包在设备上不可完整安装，规划 §11.1）', {
       type: 'object',
@@ -120,7 +136,8 @@ export default function register(pi) {
       const args = ['add'];
       if (params.dev) args.push('--save-dev');
       args.push(...params.packages.map(String));
-      return executePnpm('pnpm_add', args, {}, { ...ctx, cwd: projectDir(params, ctx) });
+      // C1：产物断言 = lockfile 落盘（包目录名随包名/版本变化，lockfile 是稳定的 add 完成标志）
+      return executePnpm('pnpm_add', args, { artifacts: ['pnpm-lock.yaml'] }, { ...ctx, cwd: projectDir(params, ctx) });
     }),
 
     toolDef('pnpm_remove', '移除依赖（pnpm remove）', {
