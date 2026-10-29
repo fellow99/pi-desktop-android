@@ -140,10 +140,17 @@ object PiDesktopRuntime {
             fail("start", "运行时投递失败 rc=${result.code}：${result.message ?: "-"}")
         }
 
+        // force-stop/异常退出后旧 ready.json 会残留，记着上一轮的端口；本轮端口是 listen(0)
+        // 随机探取，几乎必变。不清理会让 waitReadyPort 立刻读到旧端口、awaitHttpReady 死等已死
+        // 的旧服务 90s 后进错误页（2026-10-29 真机 T1-7 实测竞态）。启动新 Node 前清掉它，
+        // waitReadyPort 只会看到本轮新写的 marker。boot-facts 同生命周期，一并清。
+        readyMarker.delete()
+        File(payloadRoot, "pi-web.boot-facts.json").delete()
+
         say("等待服务就绪（marker + /api/web-auth）…")
         val port = waitReadyPort(timeoutMs = 150_000)
         say("探活 http://127.0.0.1:$port/api/web-auth …")
-        awaitHttpReady(port, timeoutMs = 90_000)
+        awaitHttpReady(timeoutMs = 90_000, initialPort = port)
         rt.markRunning()
         _state.value = ShellState.Ready(port, "http://127.0.0.1:$port/")
     }
@@ -193,11 +200,19 @@ object PiDesktopRuntime {
         fail("ready-marker", "就绪 marker 超时（${timeoutMs}ms）", null)
     }
 
-    /** HTTP 探活 /api/web-auth（400ms 间隔，90s 超时；与 ark 同口径）。 */
-    private fun awaitHttpReady(port: Int, timeoutMs: Long) {
+    /** HTTP 探活 /api/web-auth（400ms 间隔，90s 超时；与 ark 同口径）。
+     *  探活期间持续重读 marker：若端口变了（marker 被本轮/新轮覆写）切到新端口，避免死等旧端口。 */
+    private fun awaitHttpReady(timeoutMs: Long, initialPort: Int) {
         val deadline = System.currentTimeMillis() + timeoutMs
         var last = "(尚未探测)"
+        var port = initialPort
         while (System.currentTimeMillis() < deadline) {
+            val record = runCatching { JSONObject(readyMarker.readText()) }.getOrNull()
+            val freshPort = record?.optInt("port", 0) ?: 0
+            if (freshPort > 0 && freshPort != port) {
+                say("就绪端口更新：$port → $freshPort")
+                port = freshPort
+            }
             try {
                 val conn = URL("http://127.0.0.1:$port/api/web-auth").openConnection() as HttpURLConnection
                 conn.connectTimeout = 2000
