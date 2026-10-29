@@ -524,6 +524,17 @@ async function main() {
     }
     console.log(`壳资产      : ${APP_PAYLOAD_ENTRIES.join(', ')} → stage`);
 
+    // ⑤a 运行期配置 next.config.js（真机根因，2026-10-29）：载荷内不含 @next/swc-* 原生
+    // 绑定，Next 运行期若加载上游 next.config.ts 会 dlopen SWC 而原生崩溃（FORTIFY
+    // pthread_mutex）。CONFIG_FILES 中 .js 优先于 .ts ⇒ 放等价 CJS 配置绕开运行期 SWC。
+    // 源在 payload/next.config.runtime.js（上游工作区不落地，避免污染 next build）。
+    const runtimeConfigSrc = path.join(APP_PAYLOAD_DIR, 'next.config.runtime.js');
+    if (!fs.existsSync(runtimeConfigSrc)) {
+      throw new AssembleError(`壳资产缺失：${runtimeConfigSrc}（运行期 next.config.js 的 CJS 源）`);
+    }
+    await fsp.copyFile(runtimeConfigSrc, path.join(stageRoot, 'next.config.js'));
+    console.log('运行期配置   : next.config.runtime.js → stage/next.config.js（绕开运行期 SWC）');
+
     // ⑤'' 上游 bin 资产（能力清单 §F P1-2「预览密钥轮换」）：pi-web-launch 在
     // <payloadRoot>/bin/rotate-preview-secrets.js 找它；v0.12.1 上游有此文件，
     // 早期产物未随包 ⇒ 启动日志 WARN 跳过（不轮换 = 发布包里固化着可跳闸门的密钥）。

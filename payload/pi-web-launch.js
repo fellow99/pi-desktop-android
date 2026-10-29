@@ -28,6 +28,22 @@
 
 'use strict';
 
+// ── Android 宿主保护：冻结 process.title（真机根因修复 2026-10-29）──────────────────
+// 现象：进程内 Node 内嵌于 app_process64（aosp-node-bridge 形态），任何对 process.title 的
+//   赋值都会在真机（Xiaomi M2105K81C / Android 11 / arm64）**同步 SIGSEGV**（最小复现：
+//   仅一行 `process.title = 'x'` 即崩，无 JS 异常）。libuv 设进程名会原地覆写 argv 内存，
+//   该映射在本宿主形态不可写。Next 16 的 startServer() 同步第一行就是
+//   `process.title = 'next-server (v…)'` ⇒ 此前真机必崩于 Next 引导起点。
+// 处置：把 setter 冻结为 no-op（getter 保留语义，返回固定名）。必须在任何 next/dist
+//   模块被 require **之前**安装。诊断价值（ps 名）在本平台以 app.log/pid 替代。
+try {
+  Object.defineProperty(process, 'title', {
+    configurable: true,
+    get() { return 'pi-web'; },
+    set() { /* no-op：app_process 内嵌宿主下赋值即 SIGSEGV */ }
+  });
+} catch (_) { /* 定义失败则保持引擎默认；不阻断启动 */ }
+
 const fs = require('node:fs');
 const http = require('node:http');
 const net = require('node:net');
