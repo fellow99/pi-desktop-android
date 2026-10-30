@@ -79,8 +79,10 @@ jobs:
           # pnpm≥10 对含原生 postinstall 的依赖（node-pty/unrs-resolver 等）默认拦截会 ERR_PNPM_IGNORED_BUILDS
           pnpm install --dir "$GITHUB_WORKSPACE/../pi-web" --lockfile=false \
             --allow-build node-pty --allow-build @google/genai --allow-build protobufjs --allow-build unrs-resolver
-          # 上游不提交 pnpm-lock.yaml，且 .gitignore 未忽略它 ⇒ 删掉防 assemble 收尾 pristine 检查误报
-          rm -f "$GITHUB_WORKSPACE/../pi-web/pnpm-lock.yaml"
+          # 上游不提交 pnpm-lock.yaml/pnpm-workspace.yaml，且 .gitignore 未忽略它们 ⇒
+          # 删掉防 assemble 收尾 pristine 检查误报（pnpm 12 会在无 workspace 时生成 pnpm-workspace.yaml）
+          rm -f "$GITHUB_WORKSPACE/../pi-web/pnpm-lock.yaml" \
+                "$GITHUB_WORKSPACE/../pi-web/pnpm-workspace.yaml"
 
       - name: 载荷组装（补丁幂等 → 裁剪 → 确定性归档 → assets）
         run: node scripts/assemble-payload.mjs --apply --pi-web "$GITHUB_WORKSPACE/../pi-web"
