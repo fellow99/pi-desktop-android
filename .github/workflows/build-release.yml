@@ -96,10 +96,10 @@ jobs:
         run: |
           set -euo pipefail
           # pnpm≥10 对含原生 postinstall 的依赖（node-pty/unrs-resolver 等）默认拦截会 ERR_PNPM_IGNORED_BUILDS；
-          # public-hoist-pattern='*' 复刻本地 hoisted 布局（pi-web 上游在 hoisted 下才能 build：
-          # refractor/all 需顶层可见，isolated 布局 webpack 报 Can't resolve）
+          # node-linker=hoisted 复刻本地平铺布局：pnpm isolated 布局 refractor/all 不可见 ⇒ webpack
+          # Can't resolve；hoisted 下顶层为实体目录，运行时零依赖 .pnpm（本地实盘同为平铺）
           pnpm install --dir "$GITHUB_WORKSPACE/../pi-web" --lockfile=false \
-            --config.public-hoist-pattern='*' \
+            --config.node-linker=hoisted \
             --allow-build node-pty --allow-build @google/genai --allow-build protobufjs --allow-build unrs-resolver
           # 上游不提交 pnpm-lock.yaml/pnpm-workspace.yaml，且 .gitignore 未忽略它们 ⇒
           # 删掉防 assemble 收尾 pristine 检查误报（pnpm 12 会在无 workspace 时生成 pnpm-workspace.yaml）

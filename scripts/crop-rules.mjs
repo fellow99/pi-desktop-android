@@ -31,6 +31,22 @@ export const PURE_JS_PREFIXES = Object.freeze([
 /** @type {CropRule[]} */
 export const CROP_RULES = [
   {
+    id: 'pnpm-virtual-store',
+    kind: 'glob',
+    pattern: 'node_modules/.pnpm/**',
+    keep: [],
+    reason:
+      'pnpm≥10 linker 的虚拟 store（硬链接宿）。hoisted 布局下顶层已是实体文件，运行时零依赖 .pnpm；'
+      + '裁剪避免 ustar 超长路径（.pnpm 包名带 + 版本后缀，超 100 字节会触发 GNU 长名头），'
+      + '本机 pi-web 为旧 pnpm 平铺（无 .pnpm）故不暴露；CI pnpm12 首次暴露，2026-10-30 实修）。',
+    expectedFiles: 0,
+    expectedSavingBytes: 0,
+    evidence: '🔶 CI 实测（2026-10-30 第七轮彩排 ustar 长路径失败后补规则；hoisted 下 .pnpm 为目录壳）',
+    planRef: 'docs/000-工程规划.md §7.2（跨平台补充）',
+    prepareRef: '—（本工程 001-building-workflow CI 适配）',
+    safeByDefault: true
+  },
+  {
     id: 'next-nft-json',
     kind: 'glob',
     pattern: '.next/**/*.nft.json',
