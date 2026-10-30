@@ -30,7 +30,7 @@ jobs:
   build-apk:
     name: 载荷组装 → 引擎门禁 → APK → Release
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90   # pi-web 首次全量 next build，60min 可能吃紧（参考工程 opencode 亦需全量构建）
     env:
       PI_WEB_TAG: v0.12.1
       PDA_NODE_RUNTIME_VER: 24.22.1
@@ -71,7 +71,11 @@ jobs:
           git -C "$GITHUB_WORKSPACE/../pi-web" describe --tags --exact-match
 
       - name: 安装 pi-web 依赖（pnpm；上游无 lock，非冻结安装）
-        run: pnpm install --dir "$GITHUB_WORKSPACE/../pi-web"
+        run: |
+          set -euo pipefail
+          pnpm install --dir "$GITHUB_WORKSPACE/../pi-web" --lockfile=false
+          # 上游不提交 pnpm-lock.yaml，且 .gitignore 未忽略它 ⇒ 删掉防 assemble 收尾 pristine 检查误报
+          rm -f "$GITHUB_WORKSPACE/../pi-web/pnpm-lock.yaml"
 
       - name: 载荷组装（补丁幂等 → 裁剪 → 确定性归档 → assets）
         run: node scripts/assemble-payload.mjs --apply --pi-web "$GITHUB_WORKSPACE/../pi-web"
@@ -109,11 +113,17 @@ jobs:
         run: ./gradlew :app:assemble${VARIANT} --stacktrace --no-daemon
 
       # ── 产物收集 + 合规核对 ──────────────────────────────────────────────────
-      - name: 合规核对（zipalign -P 16 / aapt2 badging / compliance-check G1–G11）
-        if: ${{ env.VARIANT == 'release' }}
+      # 跨平台工具链：compliance-check.mjs 只在 Windows 用 LOCALAPPDATA 解析 build-tools，
+      # Linux 上需把 build-tools 注入 PATH（aapt/zipalign）。debug/release 两变体都跑核对：
+      # debug 只做轻量（.so 白名单 + 16KB 对齐），release 追加签名校验 + compliance-check 门禁
+      # （G11 debuggable 对 debug 必然 FAIL，故仅 release 跑全量門禁）。
+      - name: 产物核对（.so 白名单 / 16KB 对齐 / release 追加签名与合规门禁）
         run: |
           set -euo pipefail
-          APK="app/build/outputs/apk/release/app-release.apk"
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          export PATH="$BT:$PATH"   # compliance-check 的 aapt/zipalign 依赖 PATH（Linux）
+          LOWER_VARIANT="${VARIANT,,}"
+          APK="app/build/outputs/apk/${LOWER_VARIANT}/app-${LOWER_VARIANT}.apk"
           test -f "$APK"
           echo "── .so 清单（G3 白名单）──"
           unzip -l "$APK" | grep -E '\.so$' || true
@@ -121,14 +131,15 @@ jobs:
             echo "::error::APK 出现 G3 白名单外的 .so"; exit 1
           fi
           echo "── 16KB 页对齐（G5）──"
-          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
-          "$BT/zipalign" -c -P 16 -v 4 "$APK" | tail -3
-          echo "── 签名验证 ──"
-          "$BT/apksigner" verify --print-certs "$APK" | sed -n '1,6p'
+          zipalign -c -P 16 -v 4 "$APK" | tail -3
           echo "── 版本 / 包名 / 标签（G10）──"
-          "$BT/aapt2" dump badging "$APK" 2>/dev/null | grep -E "^package:|application-label:"
-          echo "── 合规机械项 G1–G11 ──"
-          node scripts/compliance-check.mjs --apk "$APK"
+          aapt2 dump badging "$APK" 2>/dev/null | grep -E '^package:|application-label:' || true
+          if [ "${VARIANT}" = "release" ]; then
+            echo "── 签名验证──"
+            apksigner verify --print-certs "$APK" | sed -n '1,6p'
+            echo "── 合规机械项 G1–G11 ──"
+            node scripts/compliance-check.mjs --apk "$APK"
+          fi
 
       - name: 收集产物（重命名 + SHA-256 清单）
         run: |
