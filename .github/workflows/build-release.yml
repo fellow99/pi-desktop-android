@@ -66,6 +66,16 @@ jobs:
       - name: 引擎门禁（verify-runtime：SHA-256=lock + ELF 六项）
         run: node scripts/verify-runtime.mjs --aar "$PDA_NODE_RUNTIME_AAR"
 
+      - name: 检出父工程品牌素材（pi-workspace assets → ../assets）
+        run: |
+          set -euo pipefail
+          # 载荷品牌化（brand-assets.mjs）需要父工程素材 ../assets；sparse checkout 只拉 assets 目录
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/fellow99/pi-workspace.git "$GITHUB_WORKSPACE/../pi-workspace"
+          git -C "$GITHUB_WORKSPACE/../pi-workspace" sparse-checkout set assets
+          ln -s "$GITHUB_WORKSPACE/../pi-workspace/assets" "$GITHUB_WORKSPACE/../assets"
+          ls "$GITHUB_WORKSPACE/../assets/logo.svg" >/dev/null && echo "品牌素材就绪 ✓"
+
       # ── pi-web 上游 + 载荷组装（pipeline 见 docs/000 §16.3）──────────────────
       - name: 检出 pi-web @ ${{ env.PI_WEB_TAG }}
         run: |
