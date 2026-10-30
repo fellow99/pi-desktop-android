@@ -40,11 +40,14 @@ jobs:
         uses: actions/checkout@v4
 
       # ── 工具链 ──────────────────────────────────────────────────────────────
-      - name: Node 24（脚本执行 + corepack pnpm）
+      - name: Node 24（脚本执行 + corepack pnpm，固定版本避免 approve-builds 行为漂移）
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: corepack enable
+      - run: |
+          corepack enable
+          corepack prepare pnpm@12.16.1 --activate   # pnpm≥10 默认拒绝依赖构建脚本，需 --allow-build（R1）
+          pnpm --version
 
       - name: JDK 17（AGP 8.10）+ Gradle 缓存
         uses: actions/setup-java@v4
@@ -70,10 +73,12 @@ jobs:
           git clone --depth 1 --branch "${PI_WEB_TAG}" https://github.com/agegr/pi-web.git "$GITHUB_WORKSPACE/../pi-web"
           git -C "$GITHUB_WORKSPACE/../pi-web" describe --tags --exact-match
 
-      - name: 安装 pi-web 依赖（pnpm；上游无 lock，非冻结安装）
+      - name: 安装 pi-web 依赖（pnpm 12 --allow-build；上游无 lock，非冻结安装）
         run: |
           set -euo pipefail
-          pnpm install --dir "$GITHUB_WORKSPACE/../pi-web" --lockfile=false
+          # pnpm≥10 对含原生 postinstall 的依赖（node-pty/unrs-resolver 等）默认拦截会 ERR_PNPM_IGNORED_BUILDS
+          pnpm install --dir "$GITHUB_WORKSPACE/../pi-web" --lockfile=false \
+            --allow-build node-pty --allow-build @google/genai --allow-build protobufjs --allow-build unrs-resolver
           # 上游不提交 pnpm-lock.yaml，且 .gitignore 未忽略它 ⇒ 删掉防 assemble 收尾 pristine 检查误报
           rm -f "$GITHUB_WORKSPACE/../pi-web/pnpm-lock.yaml"
 
