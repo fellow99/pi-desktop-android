@@ -1,107 +1,96 @@
 # 001-building-workflow — plan（GitHub Actions 构建流程技术方案）
 
 > 技术方案与 as-built 说明。对应 spec.md 的验收表。
+> 参考先例：`oc-desktop-android/specs/001-building-workflow/plan.md`（已 CI 真跑发布全绿）。
 
 ## 方案总览
-单文件双触发器：`.github/workflows/release.yml`
+单文件 `build-release.yml` 双触发（对齐参考工程）：
 
 ```
-push tags v*            → job build (release=true)  → softprops/action-gh-release
-push(branch) / pull_request → job build (release=false)   （不发 Release，只验证可重复构建）
+push tags v*            → 构建 + verify-runtime 门禁 + 签名 + GitHub Release
+workflow_dispatch       → 同样构建链但 Release 步按设计跳过（仅验证与 artifact 留存）
 ```
 
-Runner：`ubuntu-24.04`（x86_64 宿主做载荷/APK 构建；引擎本身是 arm64 .so，仅投放不执行，与宿主架构无关）。
+Runner：`ubuntu-latest`（参考工程同款；hosted runner 预装 Android SDK、license 已接受，缺组件由 AGP 自动补装）。
+timeout-minutes: 60；`concurrency` 按 ref 分组防并发互踩（参考工程同款，R11 纪律）。
 
-## Job 步骤设计（按序）
-1. **checkout**：`actions/checkout@v4`，本仓库（submodule 自身即 git 仓库，CI 直接 clone 该 repo）。
-2. **JDK 17**：`actions/setup-java@v4`（temurin, 17）。
-3. **Node 24 + pnpm**：`actions/setup-node@v4`（node-version 24）后 `corepack enable`；配 pnpm 缓存目录（pnpm store 在 $HOME/.local/share/pnpm/store）。
-4. **Android SDK**：`android-actions/setup-android@v3`；`sdkmanager "build-tools;36.0.0" "platforms;android-36"`（licenses 由 action 接受；platform 也由 AGP 自动下载，显式声明保证 zipalign/aapt2 在 PATH）。
-5. **检出 pi-web@v0.12.1**：
-   ```bash
-   git clone --depth 1 --branch v0.12.1 https://github.com/agegr/pi-web.git ../pi-web
-   ```
-   放 runner 的 sibling 目录（与本地 `../pi-web` 布局一致，脚本默认值即可命中；仍显式传参不依赖默认）。
-   `pnpm install --dir ../pi-web`（无 lock，非冻结安装）。
-6. **引擎投放**（v24.22.1 small-icu，免编 Node）：
-   ```bash
-   RT=$RUNNER_TEMP/aosp-node-runtime
-   mkdir -p $RT && cd $RT
-   # 取 lock 里登记的 release 归档（URL/sha256 从仓库内 runtime.lock.json 的同源副本？——见“偏差与取舍 D1”）
-   curl -sSL -o rt.tgz https://github.com/fellow99/aosp-node-runtime/releases/download/v24.22.1/node-v24.22.1-android-arm64-v8a.tar.gz
-   echo "fcf61ffc…  rt.tgz" | sha256sum -c -
-   tar xzf rt.tgz   # 解出 bin/arm64-v8a/{libnode.so,libc++_shared.so}
-   ```
-   本仓库没有 runtime.lock.json 副本（它在 aosp-node-runtime 仓）。CI 不克隆 runtime 全仓，直接用 release 归档，
-   再借用 `scripts/provision-engine.mjs`：它要求 `--runtime-dir` 下有 `runtime.lock.json` 和
-   `node-runtime/src/main/jniLibs/arm64-v8a/`。
-   **取舍 D2（采用）**：CI 里拼出最小 runtime-dir 布局——
-   `sparse checkout` aosp-node-runtime（depth 1，tag v24.22.1，只取 `runtime.lock.json`），
-   把解包的两个 .so 放进 `node-runtime/src/main/jniLibs/arm64-v8a/`，再跑本仓
-   `node scripts/provision-engine.mjs --runtime-dir $RT`（带 sha256+size 断言，失败 exit 2）。
-   这样 CI 与本地**同一条投放命令、同一份 lock、同一门禁口径**（宪法 C3），不新写拷贝逻辑。
-   ELF 八项门禁：归档来自已发布产物（发布时 provision.mjs 已验）；本仓 provision-engine 做 sha256/size 复核。
-7. **解码签名材料**（仅 release job，secrets 缺失则降级未签名并在日志显著标注——但本仓库已部署 secrets，正常路径是签名）：
-   ```bash
-   echo -n "$ANDROID_KEYSTORE" | base64 -d > pi-desktop-android.keystore
-   keytool -list -keystore pi-desktop-android.keystore -storepass "$KEYSTORE_PASSWORD" >/dev/null
-   printf 'storeFile=pi-desktop-android.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
-     "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > keystore.properties
-   ```
-   两个文件均 gitignored；日志只打 keytool 成功与否，不 cat 密码/keystore（C9）。
-8. **组装载荷**：`node scripts/assemble-payload.mjs --apply --pi-web "$PWD/../pi-web"`。
-   （需给脚本加 `--pi-web` 参数；当前 DEFAULT_PI_WEB 写死 sibling，CI 布局恰好也是 sibling，但显式参数更硬。——并入开发项，见 tasks T3。）
-9. **构建 APK**：
-   ```bash
-   ./gradlew :app:assembleRelease --no-daemon --stacktrace \
-     -PversionName=0.12.1 -PversionCode=2
-   ```
-10. **产物核对 + 合规**（验收 6/7）：
-    ```bash
-    APK=app/build/outputs/apk/release/app-release.apk
-    unzip -l "$APK" | grep -E '\.so$'
-    zipalign -c -P 16 -v 4 "$APK" | tail -3
-    apksigner verify --print-certs "$APK"
-    node scripts/compliance-check.mjs --apk "$APK"
-    ```
-    compliance-check 已对非 Windows 做 PATH 回退（aapt/zipalign）；`unzip` runner 自带。
-11. **改名 + 校验和**：
-    `pi-desktop-android-0.12.1-arm64-v8a.apk` + 同名 `.sha256`（`sha256sum` 生成，内容带文件名）。
-12. **发布**（仅 tag）：`softprops/action-gh-release@v2`（内置 `GITHUB_TOKEN`，`permissions: contents: write`），
-    挂载 apk + sha256；release notes 由 workflow 内 here-doc 生成（pi-web tag、引擎版本、commit SHA、合规结论摘要）。
-    name=`Pi Desktop Android 0.12.1`，prerelease=false，tag 已存在直接更新该 Release。
+## Engine 接入（核心变更，对齐参考工程）
+**为什么改 Maven Central**：参考工程已把引擎接入从「本地 aosp-node-runtime 目录 provision」改为
+`io.github.fellow99:node-runtime:24.22.1` 从 Maven Central 直解（runtime.lock.json 注明 2026-10-27 发布，
+2026-10-29 对 Central AAR 实测 verify-runtime 全绿）。本工程本地 jniLibs 引擎 sha=be1d16… 恰与 Central
+发布版一致 ⇒ 同一构建，可安全切换，且消除 CI 依赖 curl GitHub release 归档 + sparse-checkout 的复杂链路。
 
-## 代码改动点
-- **`app/build.gradle.kts`**：defaultConfig 内
-  ```kotlin
-  versionCode = (project.findProperty("versionCode") as String?)?.toInt() ?: 1
-  versionName = (project.findProperty("versionName") as String?) ?: "0.1.0"
-  ```
-  默认值不变 ⇒ 本地 `assembleDebug/Release` 行为零变化。
-- **`scripts/assemble-payload.mjs`**：
-  - `assertArchiveReadable()`：tar 命令解析改为
-    Windows 仍 `<SystemRoot>\System32\tar.exe`，其余平台直接 `'tar'`（GNU tar 支持 `-tzf`，输出同为条目列表）；
-    注释更新为“bsdtar(Win)/GNU tar(Linux) 独立第三方实现”。
-  - main() 增加 `--pi-web <dir>` 可选参数（默认值不变）。
-  两处均为**最小、行为保持**改动。
-- **不改**：provision-engine.mjs（已支持 --runtime-dir/env）、compliance-check.mjs（已跨平台）、gradle 配置、补丁。
+- `app/build.gradle.kts`：依赖块增 `runtimeOnly(libs.node.runtime)`。删除原「为什么不用 Maven node-runtime:24.2.0」注释
+  中的废弃原因（那是针对 24.2.0 intl=none 的旧版本）；保留 24.22.1 的出处说明。
+- `gradle/libs.versions.toml`：`nodeRuntime = "24.22.1"`。
+- 新增 `runtime.lock.json`（根目录）：镜像 aosp-node-runtime active 值，字段对齐参考工程：
+  `{ active: { node, abi, bridge, maven, libnodeSha256, libcxxSharedSha256, gates }, upstream, syncedAt }`。
+- 新增 `scripts/verify-runtime.mjs`：移植参考工程，改动仅为工程相关路径/校验常数从工程内 lock 读。
+  逻辑：AAR 定位（`--aar` 参数 / `PDA_NODE_RUNTIME_AAR` 环境变量 → mavenLocal → Gradle 缓存）→
+  zip 读 `jni/arm64-v8a/libnode.so` 与 `libc++_shared.so` → SHA-256 = lock → ELF 六项门禁
+  （ET_DYN · 无 PT_INTERP · EM_AARCH64 · DT_SONAME=libnode.so · 导出 `_ZN4node5StartEiPPc` · PT_LOAD 16KB 对齐）。
+- 保留 `provision-engine.mjs`：本地零网兜底（`--check` 验证 jniLibs 与 lock 一致），CI 不再调用。
+
+## 载荷组装（pi-web）
+与参考工程（其上游为 opencode）不同的原因：本工程载荷是 pi-web，需 pnpm 安装 + next build（补丁标记缺失时）。
+CI 步骤：
+1. `actions/checkout@v4` 检出本仓库。
+2. `git clone --depth 1 --branch v0.12.1 https://github.com/agegr/pi-web.git ${{ github.workspace }}/../pi-web`。
+3. `corepack enable` + `pnpm install --dir ../pi-web`（无 lock，非冻结）。
+4. `node scripts/assemble-payload.mjs --apply --pi-web ../pi-web`（断言 describe=v0.12.1；补丁标记命中；归档自检；pristine 收尾）。
+   - `--pi-web` 参数为本工程新增（让 CI 显式指向克隆路径，不依赖默认 sibling 约定之外的巧合）。
+
+## 签名分支（对齐参考工程 R4/R6）
+```
+if 全部 secrets 非空（ANDROID_KEYSTORE/KEYSTORE_PASSWORD/KEY_ALIAS/KEY_PASSWORD）:
+    base64 -d > pi-desktop-android.keystore
+    keytool -list 自检（值不可回读，这里是唯一可观测证据）
+    写 keystore.properties（umask 077）
+    VARIANT=release
+else:
+    VARIANT=debug（AGP debug keystore，可直接安装）
+    部分配置 → ::error:: 显式报错（防静默半配）
+```
+材料只落 workspace；`keystore.properties`/`*.keystore` 保持 gitignore（C9）。
+本仓库已部署 secrets ⇒ 正常路径为 release 签名包。
+
+## 步骤序列（对齐参考工程十一步）
+1. checkout 本仓库（fetch-depth: 0 保 abbrev 长度——本工程无基线守卫脚本依赖，但保守保留与参考一致）
+2. Node 24（corepack）+ pnpm
+3. JDK 17 + Gradle 缓存
+4. 引擎 AAR 预取：`curl -fsSL --retry 3 -o $RUNNER_TEMP/node-runtime-24.22.1.aar https://repo1.maven.org/maven2/io/github/fellow99/node-runtime/24.22.1/node-runtime-24.22.1.aar` → `PDA_NODE_RUNTIME_AAR` env
+5. `verify-runtime.mjs --aar`（门禁：AAR 内 libnode.so SHA-256=lock + ELF 六项；红则整流程失败）
+6. 检出 pi-web@v0.12.1 + pnpm install
+7. 签名注秘（VARIANT=release/debug 分支）
+8. `assemble-payload --apply --pi-web`
+9. `./gradlew :app:assemble${VARIANT} --stacktrace`
+10. 收集产物：`dist/pi-desktop-android-${ref_name}.apk` + `.sha256`；`actions/upload-artifact@v4` 始终上传
+11. GitHub Release（`if: startsWith(github.ref, 'refs/tags/v')`）：softprops/action-gh-release@v2，
+    name=`Pi Desktop Android ${ref_name}`，files=`dist/*`；`permissions: contents: write`
+
+## 代码改动点（最小）
+- 新增 `.github/workflows/build-release.yml`
+- 新增 `scripts/verify-runtime.mjs`（移植）
+- 新增 `runtime.lock.json`（根目录镜像）
+- `app/build.gradle.kts`：`runtimeOnly(libs.node.runtime)` + 注释更新
+- `gradle/libs.versions.toml`：`nodeRuntime = "24.22.1"`
+- `scripts/assemble-payload.mjs`：tar 跨平台 + `--pi-web`（已实现）
+- 回滚：撤销 `app/build.gradle.kts` 的 `-PversionName/-PversionCode` 属性化（对齐参考「不改构建脚本/不注入 tag」）
 
 ## 偏差与取舍
-- **D1 归档 sha256 来源**：archiveSha256 登记在 aosp-node-runtime/runtime.lock.json。CI 做 sparse checkout 取 lock 后，
-  优先**从 lock 动态读 URL+sha256**（jq/Node 一行解析），避免把哈希在 workflow 里写死成第二事实源（C3）。
-  若解析失败则 fail（不静默用硬编码）。
-- **D2 同命令投放**：CI 拼最小 runtime-dir 复用 provision-engine.mjs，而不是 curl 出来直接 cp（后者会绕过本仓校验）。
-- **D3 无 pnpm lock**：不冻结安装（上游现状）；缓存 pnpm store 只省时间不改解析。风险 R1。
-- **D4 versionCode**：workflow 里首发写 2，并用注释说明“发布序列单调递增，手动维护”；不做自动 git 计数（tag 浅克隆计数不可靠）。
-- **D5 签名缺失降级**：加 `if: secrets.ANDROID_KEYSTORE != ''` 不可在 run 级直接判 secret，改为在 step 内判
-  `[ -n "$ANDROID_KEYSTORE" ]`，缺失则跳过解码（gradle 自动出未签名包）并 `::warning::`；apksigner 步骤随之条件化，
-  compliance/Release notes 标注“unsigned”。已部署 secrets ⇒ 主路径签名。
+- **D1**：本工程载荷（pi-web）需 pnpm install + next build（参考工程 opencode 用 bun + 已有 bundle），
+  这是本工程特性，workflow 相应多两步（pnpm 安装 + assemble）。不偏移参考的结构骨架。
+- **D2**：verify-runtime 的 AAR 定位优先 `--aar`/env（CI 预取），mavenLocal/Gradle 缓存仅本机。
+- **D3**：不做 push/PR 触发（参考工程边界）。验证手段 = workflow_dispatch 真跑彩排 + 本机等价命令。
+- **D4**：版本不注入 tag（参考工程口径）。Release/APK 命名带 tag，APK 内 static 版本。
+- **D5**：gradle 不手工装 SDK 组件（hosted runner 预装 + AGP 自动补装），zipalign/aapt2 从 `$ANDROID_HOME/build-tools` 解析（compliance-check 已做 PATH 回退）。
 
 ## 风险登记
 | ID | 风险 | 缓解 |
 |---|---|---|
-| R1 | 无 pnpm-lock ⇒ 上游依赖漂移导致不可重复构建/偶发失败 | 日志固定 node/pnpm 版本；失败可见；后续推动上游或本仓锁定（本期不做，C4） |
-| R2 | Next16 webpack build 在 Linux 与 Windows 产物差异（路径/裁剪规则） | 裁剪规则按 rel 匹配；payload 验收以补丁 marker + 归档可读 + 文件数为准；CI 全绿即证 |
-| R3 | tag 名不符 v* 或 pi-web/引擎 tag 漂移 | on: push: tags: v*；脚本自身断言 pi-web describe=v0.12.1；引擎 lock 锁 24.22.1 |
+| R1 | pnpm 无 lock ⇒ 上游依赖漂移 | 固定 node/pnpm 版本；失败可见；本期不造锁（C4） |
+| R2 | Next16 webpack build 在 Linux 与 Windows 产物差异 | 裁剪规则按 rel 匹配；验收以补丁 marker + 归档可读 + 文件数为准 |
+| R3 | Maven Central 可达性（本机 repo1 偶发超时） | `curl --retry 3`；mirror 兜底（dependencyResolutionManagement 已配阿里云镜像） |
 | R4 | GITHUB_TOKEN 无写权限 Release 失败 | workflow 顶层 `permissions: contents: write` |
-| R5 | secrets 配错（base64/密码）构建尾段才失败 | 解码后立即 keytool -list 早失败；失败不产出 Release |
+| R5 | secrets 半配置 | 注秘步显式 `::error::` + exit 1 |
+| R6 | release 归档 sha 与 Central AAR 混淆 | verify-runtime 只认工程内 lock（单一事实源），CI 预取 AAR 路径显式 |
