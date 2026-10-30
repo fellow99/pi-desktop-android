@@ -107,7 +107,9 @@ jobs:
                 "$GITHUB_WORKSPACE/../pi-web/pnpm-workspace.yaml"
 
       - name: 载荷组装（补丁幂等 → 裁剪 → 确定性归档 → assets）
-        run: node scripts/assemble-payload.mjs --apply --pi-web "$GITHUB_WORKSPACE/../pi-web"
+        # --no-vendor-compat：该变换针对旧引擎 24.2.0(intl=none)；当前 24.22.1(small-icu)
+        # 原生支持 \p{ID_Start} 转义，跳过以免对 Linux next 产物误判（0/4 覆盖不全）
+        run: node scripts/assemble-payload.mjs --apply --no-vendor-compat --pi-web "$GITHUB_WORKSPACE/../pi-web"
 
       # ── 签名注秘（可选；无 secrets → debug 签名兜底）────────────────────────
       - name: 签名注秘（有 secrets → VARIANT=release；无 → debug）
