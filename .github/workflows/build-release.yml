@@ -1,0 +1,165 @@
+# build-release.yml —— tag 触发的自动构建与发布（需求 001-building-workflow）
+#
+# 规格链：specs/001-building-workflow/{spec,plan}.md · 参考先例：oc-desktop-android 同名 workflow（as-built 全绿）
+# 构建配方：docs/000-工程规划.md §16.3
+#
+# 触发：push v* tag（如 v0.12.1）→ 载荷组装 + 引擎门禁 + APK + GitHub Release
+#       workflow_dispatch 手动触发（仅构建验证与 artifact 留存，不发布）
+# 引擎：io.github.fellow99:node-bridge:0.2.0 + node-runtime:24.22.1 从 Maven Central 直解
+#       （规格链单一事实源 runtime.lock.json；verify-runtime.mjs 对预取 AAR 跑 SHA-256 + ELF 六项门禁）
+# 签名：secrets 可选注入（ANDROID_KEYSTORE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD）；
+#       配置齐全 → VARIANT=release 签名包；未配置 → VARIANT=debug 签名兜底（可直接安装）；
+#       部分配置 → ::error:: 显式失败。签名材料零入库（keystore.properties / *.keystore 已 gitignore）。
+# 版本：不把 tag 注入 versionName/versionCode（对齐参考工程）；tag 只用于 Release/APK 命名。
+name: build-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # gh-release：创建 Release 与上传附件（最小权限）
+
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-apk:
+    name: 载荷组装 → 引擎门禁 → APK → Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PI_WEB_TAG: v0.12.1
+      PDA_NODE_RUNTIME_VER: 24.22.1
+    steps:
+      # ── 检出 ────────────────────────────────────────────────────────────────
+      - name: 检出本仓库
+        uses: actions/checkout@v4
+
+      # ── 工具链 ──────────────────────────────────────────────────────────────
+      - name: Node 24（脚本执行 + corepack pnpm）
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: corepack enable
+
+      - name: JDK 17（AGP 8.10）+ Gradle 缓存
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      # ── 引擎门禁（Maven Central AAR；见 spec 环境契约 & plan D2）────────────────
+      - name: 引擎 AAR 预取（Central → PDA_NODE_RUNTIME_AAR，verify-runtime 门禁输入）
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/node-runtime-${PDA_NODE_RUNTIME_VER}.aar" \
+            "https://repo1.maven.org/maven2/io/github/fellow99/node-runtime/${PDA_NODE_RUNTIME_VER}/node-runtime-${PDA_NODE_RUNTIME_VER}.aar"
+          echo "PDA_NODE_RUNTIME_AAR=$RUNNER_TEMP/node-runtime-${PDA_NODE_RUNTIME_VER}.aar" >> "$GITHUB_ENV"
+
+      - name: 引擎门禁（verify-runtime：SHA-256=lock + ELF 六项）
+        run: node scripts/verify-runtime.mjs --aar "$PDA_NODE_RUNTIME_AAR"
+
+      # ── pi-web 上游 + 载荷组装（pipeline 见 docs/000 §16.3）──────────────────
+      - name: 检出 pi-web @ ${{ env.PI_WEB_TAG }}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch "${PI_WEB_TAG}" https://github.com/agegr/pi-web.git "$GITHUB_WORKSPACE/../pi-web"
+          git -C "$GITHUB_WORKSPACE/../pi-web" describe --tags --exact-match
+
+      - name: 安装 pi-web 依赖（pnpm；上游无 lock，非冻结安装）
+        run: pnpm install --dir "$GITHUB_WORKSPACE/../pi-web"
+
+      - name: 载荷组装（补丁幂等 → 裁剪 → 确定性归档 → assets）
+        run: node scripts/assemble-payload.mjs --apply --pi-web "$GITHUB_WORKSPACE/../pi-web"
+
+      # ── 签名注秘（可选；无 secrets → debug 签名兜底）────────────────────────
+      - name: 签名注秘（有 secrets → VARIANT=release；无 → debug）
+        env:
+          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE:-}" ]; then
+            for v in KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+              if [ -z "${!v:-}" ]; then
+                echo "::error::签名 secrets 部分配置：$v 为空 —— 请配齐 ANDROID_KEYSTORE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD 四项（或全部删除走 debug 兜底）"
+                exit 1
+              fi
+            done
+            printf '%s' "$ANDROID_KEYSTORE" | base64 -d > pi-desktop-android.keystore
+            # 值不可回读，keytool 自检是部署正确性的唯一可观测证据（C5/C10）
+            keytool -list -keystore pi-desktop-android.keystore -storepass "$KEYSTORE_PASSWORD" >/dev/null
+            umask 077
+            printf 'storeFile=pi-desktop-android.keystore\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+              "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > keystore.properties
+            echo "VARIANT=release" >> "$GITHUB_ENV"
+          else
+            echo "VARIANT=debug" >> "$GITHUB_ENV"
+            echo "::notice::未配置签名 secrets —— 产出 debug 签名 APK（可直接安装）。发布正式签名包请配置 ANDROID_KEYSTORE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD 四个 secrets（keystore 用 base64 -w0 编码）。"
+          fi
+
+      # ── APK（hosted runner 预装 Android SDK，license 已接受，缺组件 AGP 自动补装）──
+      - name: APK 构建（assembleRelease / assembleDebug）
+        run: ./gradlew :app:assemble${VARIANT} --stacktrace --no-daemon
+
+      # ── 产物收集 + 合规核对 ──────────────────────────────────────────────────
+      - name: 合规核对（zipalign -P 16 / aapt2 badging / compliance-check G1–G11）
+        if: ${{ env.VARIANT == 'release' }}
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          echo "── .so 清单（G3 白名单）──"
+          unzip -l "$APK" | grep -E '\.so$' || true
+          if unzip -l "$APK" | grep -E '\.so$' | awk -F/ '{print $NF}' | grep -vE '^(libnode\.so|libc\+\+_shared\.so|libnode_bridge\.so|libnode_host_client\.so)$'; then
+            echo "::error::APK 出现 G3 白名单外的 .so"; exit 1
+          fi
+          echo "── 16KB 页对齐（G5）──"
+          BT="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)"
+          "$BT/zipalign" -c -P 16 -v 4 "$APK" | tail -3
+          echo "── 签名验证 ──"
+          "$BT/apksigner" verify --print-certs "$APK" | sed -n '1,6p'
+          echo "── 版本 / 包名 / 标签（G10）──"
+          "$BT/aapt2" dump badging "$APK" 2>/dev/null | grep -E "^package:|application-label:"
+          echo "── 合规机械项 G1–G11 ──"
+          node scripts/compliance-check.mjs --apk "$APK"
+
+      - name: 收集产物（重命名 + SHA-256 清单）
+        run: |
+          set -euo pipefail
+          NAME="${GITHUB_REF_NAME:-manual}"
+          VARIANT_LOWER="${VARIANT,,}"
+          APK="app/build/outputs/apk/${VARIANT_LOWER}/app-${VARIANT_LOWER}.apk"
+          test -f "$APK"
+          mkdir -p dist
+          cp "$APK" "dist/pi-desktop-android-${NAME}.apk"
+          (cd dist && sha256sum "pi-desktop-android-${NAME}.apk" > "pi-desktop-android-${NAME}.apk.sha256")
+          ls -l dist
+
+      - name: 上传 artifact（无论是否发布均留存）
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-desktop-android-${{ github.ref_name }}
+          path: dist/
+
+      # ── 发布（仅 v* tag 触发；workflow_dispatch 到此为止）────────────────────
+      - name: GitHub Release（仅 refs/tags/v*）
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Pi Desktop Android ${{ github.ref_name }}
+          body: >
+            自动构建产物 · 载荷 pi-web ${{ env.PI_WEB_TAG }} ·
+            引擎 node-runtime ${{ env.PDA_NODE_RUNTIME_VER }}（arm64-v8a，verify-runtime 门禁全过）·
+            变体 ${{ env.VARIANT }} · 校验请比对附件 .sha256 ·
+            构建提交 ${{ github.sha }}。
+          files: |
+            dist/*.apk
+            dist/*.sha256
+          generate_release_notes: true
