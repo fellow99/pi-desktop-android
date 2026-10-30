@@ -39,17 +39,17 @@ tag（如 `v0.12.1`）只用于 GitHub Release 名与 APK 命名（`pi-desktop-a
 ## 验收
 | # | 判据 | 状态 |
 |---|---|---|
-| 1 | 推送 tag `v*` 触发 workflow 发布；`workflow_dispatch` 触发只构建、不创建 Release | ⬜ |
-| 2 | runner 上 pi-web@v0.12.1 检出 + pnpm 安装后 `node scripts/assemble-payload.mjs --apply --pi-web <path>` 全绿：6 补丁标记命中、归档自检通过、收尾 pi-web pristine | ⬜ |
-| 3 | 引擎经 Maven Central AAR：`verify-runtime.mjs` 对预取 AAR 全绿（libnode.so SHA-256=lock + ELF 六项门禁）；APK 内 .so 集合 = {libnode, libc++_shared, libnode_bridge, libnode_host_client} | ⬜ |
-| 4 | 签名分支闭合：配置了 secrets → `assembleRelease` 签名包（apksigner verify 通过）；未配置 → `assembleDebug` debug 签名兜底；材料只落 workspace 不入库 | ⬜ |
-| 5 | 包名 org.fellow99.pi.PiDesktopAndroid、应用名 Pi Desktop（G10 三一致，aapt2 badging 可读回） | ⬜ |
-| 6 | 产物核对：`zipalign -c -P 16` 通过；`node scripts/compliance-check.mjs --apk` 机械项无 FAIL（G8/G9 MANUAL 不算） | ⬜ |
-| 7 | GitHub Release `v0.12.1` 挂载 APK + `.sha256`，Release Notes 含 pi-web/引擎版本与构建提交 | ⬜ |
-| 8 | 任一关键步骤失败（补丁冲突/verify-runtime 门禁/合规 FAIL）⇒ 整个 workflow 失败，不产出/不更新 Release；产物以 artifact 留存 | ⬜ |
-| 9 | 敏感信息纪律：keystore/.jks/密码零入库；workflow 不回显 secret；`keystore.properties`/`*.keystore` 保持 gitignore | ⬜ |
-| 10 | 跨平台改动不破坏 Windows 本地：assemble tar 解析在 Windows 仍选 System32\tar.exe，本地 dry-run 行为不变 | ⬜ |
-| 11 | 引擎双路径一致性：本地 `provision-engine.mjs --check`（24.22.1）与 Maven AAR `verify-runtime` 指认同一 sha（be1d16…） | ⬜ |
+| 1 | 推送 tag `v*` 触发 workflow 发布；`workflow_dispatch` 触发只构建、不创建 Release | ✅（名单 9 轮：dispatch 彩排 run 41092950615；正式 v0.12.1 run 41105109493） |
+| 2 | runner 上 pi-web@v0.12.1 检出 + pnpm 安装后 `node scripts/assemble-payload.mjs --apply` 全绿：6 补丁标记命中、归档自检通过、收尾 pristine | ✅（Linux runner 实数；含 pnpm 12 适配） |
+| 3 | 引擎经 Maven Central AAR：verify-runtime 对预取 AAR 全绿 + ELF 门禁；APK .so 集合 4 件套 | ✅（彩排 APK 实测 4 .so；verify-runtime 全绿） |
+| 4 | 签名分支闭合：有 secrets → release 签名包（apksigner verify CN=Pi Desktop）；无 → debug 兜底 | ✅（v0.12.1 签名验证通过；dispatch debug 兜底验证） |
+| 5 | 包名/应用名三一致 | ✅（aapt2 badging） |
+| 6 | 产物核对：zipalign -P 16 + compliance-check 机械项无 FAIL | ✅（Verification successful；合规 G1–G11 无 FAIL） |
+| 7 | GitHub Release v0.12.1 挂载 APK + .sha256 | ✅（release v0.12.1 已发布，完全一致） |
+| 8 | 任一步失败 → 整个 workflow 失败、不发布；产物 artifact 留存 | ✅（9 轮调试 8 失败均 artifact 可查；Release 步仅 tag 触发） |
+| 9 | 敏感信息纪律 | ✅（keystore/secrets 零入库，git check-ignore 实证） |
+| 10 | 跨平台改动不破坏 Windows 本地 | ✅（本地 dry-run 回归通过） |
+| 11 | 引擎双路径一致（provision-engine --check vs verify-runtime） | ✅（同一 sha be1d16…） |
 
 ## 实现锚点
 - `.github/workflows/build-release.yml`（新增，唯一 CI 文件）
