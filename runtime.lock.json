@@ -1,0 +1,17 @@
+{
+  "$comment": "引擎运行时单一事实源的**本工程镜像引用**。权威文件：aosp-node-runtime 仓 runtime.lock.json（active=24.22.1）。升级 Node = 换 gradle/libs.versions.toml 的 nodeRuntime 版本 + 更新本文件 + 重跑 verify-runtime 门禁。接入方式：Maven Central AAR（io.github.fellow99:node-runtime:24.22.1，small-icu，2026-10-27 发布）；本地零网兜底 = scripts/provision-engine.mjs（同版本 jniLibs）。",
+  "active": {
+    "node": "24.22.1",
+    "abi": "arm64-v8a",
+    "bridge": "0.2.0",
+    "maven": {
+      "bridge": "io.github.fellow99:node-bridge:0.2.0 (Maven Central)",
+      "runtime": "io.github.fellow99:node-runtime:24.22.1 (Maven Central，small-icu；参考工程 oc-desktop-android 实测 Central AAR 全绿 2026-10-29)"
+    },
+    "libnodeSha256": "be1d16414a1e68983f27ac16e287395b71e4f4f5a79d78a78a741b583472397e",
+    "libcxxSharedSha256": "cd61762848882a16c8244c964a6f396c0caa0b440588a210ce9cc4ab0e6d9f0c",
+    "gates": ["ET_DYN", "no PT_INTERP", "aarch64", "soname=libnode.so", "node::Start exported", "16KB page align"]
+  },
+  "upstream": "d:/node-bridge-workspace/aosp-node-runtime/runtime.lock.json",
+  "syncedAt": "2026-10-30"
+}

@@ -10,8 +10,9 @@ minSdk = "24"
 targetSdk = "36"
 
 # 运行时两库（docs/000-工程规划.md §12 的锁定版本；升级须先改规划再改这里）
+# nodeRuntime = node-runtime AAR 的 Node 版本（small-icu；单一事实源 runtime.lock.json active.node）
 nodeBridge = "0.2.0"
-nodeRuntime = "24.2.0"
+nodeRuntime = "24.22.1"
 
 [libraries]
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
