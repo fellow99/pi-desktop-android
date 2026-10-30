@@ -26,7 +26,7 @@ import org.fellow99.pi.PiDesktopAndroid.runtime.PiDesktopRuntime.ShellState
 /**
  * 主入口（singleTask；模块 103 渲染壳）。
  *
- * 三态（失败可见，A5）：加载页（阶段文本）→ WebView（同源 Pi Web UI）/ 错误页（stage+日志尾）。
+ * 三态（失败可见，A5）：加载页（阶段文本）→ WebView（同源 Pi Desktop Web UI）/ 错误页（stage+日志尾）。
  * 围栏（§5 #11）：主 frame 非 loopback 一律交系统浏览器；禁止多窗口；返回键 = WebView 历史 → 退出。
  * 崩溃语义（§6.2 ⑥）：进程内 Node 不可重启 ⇒ 错误页明确提示「请重启应用」。
  */

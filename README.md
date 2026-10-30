@@ -134,6 +134,28 @@ node scripts/assemble-payload.mjs --apply      # -> app/src/main/assets/pi-web/p
 
 Output: `app/build/outputs/apk/debug/app-debug.apk` (~181 MB: engine 81.5 MB + payload 74.5 MiB).
 
+## Branding
+
+The display name is **Pi Desktop** (`res/values/strings.xml`; only the package id
+`org.fellow99.pi.PiDesktopAndroid` carries "Android"). All artwork comes from the
+parent project's `../assets` (`logo.png`, `logo.svg`, `logo-1024-with-bg.png`) — nothing is
+drawn by hand, and a missing/invalid asset is a hard failure.
+
+- **Launcher / adaptive icons** — `scripts/generate-icons.mjs` renders the five-density legacy
+  square + round icons and the adaptive foreground from the parent assets (`--check` verifies).
+- **In-app web branding** — during payload assembly `scripts/brand-assets.mjs` rewrites the staged
+  pi-web copy only (upstream `../pi-web` stays pristine): every user-visible `Pi Web` string becomes
+  `Pi Desktop` (≈1000 sites), the page logo is replaced byte-for-byte with `logo.svg`, and the
+  favicon / PWA / apple-touch icons are regenerated. It then asserts zero `Pi Web` leftovers outside
+  `node_modules`, the presence of `Pi Desktop` in pre-rendered HTML, and that technical identifiers
+  (`pi-web`, `@agegr/pi-web`, `PI_WEB_`, …) are untouched. The step is idempotent and supports
+  `--check`.
+
+Note the payload stage is hard-linked for zero-copy speed, so branding replaces each staged entry
+(temp-file + rename / unlink-before-write) rather than writing through the shared inode; the
+`build/pi-dist` source is verified to remain upstream-branded. See
+[`docs/安卓环境能力清单-0.12.1.md`](docs/安卓环境能力清单-0.12.1.md) §H REV-1.
+
 ## Install and run
 
 ```bash

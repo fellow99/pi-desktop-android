@@ -547,6 +547,17 @@ async function main() {
     await fsp.copyFile(rotateSource, path.join(stageRoot, 'bin', 'rotate-preview-secrets.js'));
     console.log('上游 bin     : bin/rotate-preview-secrets.js → stage（预览密钥轮换随包 ✔）');
 
+    // ⑤''' Web 侧品牌化（对标 hos 103 / ark applyWebBranding）：用户可见文案 Pi Web → Pi Desktop、
+    // 页面 Logo 换父工程 assets/logo.svg、favicon/PWA 图标按物料重生成；终检 0 残留。
+    // 必须在全部树操作（裁剪/壳资产/bin）之后、vendor 兼容变换与打包之前；脚本自行硬失败。
+    {
+      const brandScript = path.join(PROJECT_ROOT, 'scripts', 'brand-assets.mjs');
+      const r = spawnSync(process.execPath, [brandScript, stageRoot], { stdio: 'inherit' });
+      if (r.status !== 0) {
+        throw new AssembleError(`Web 品牌化失败（exit ${r.status ?? r.error?.message}）：${brandScript}`);
+      }
+    }
+
     // ⑤' vendor 兼容变换（O2 处置，宪法 C6 如实登记）
     //    引擎 24.2.0 = --with-intl=none：/\p{ID_Start}/ 等 Unicode 属性转义在模块**编译期**抛
     //    SyntaxError ⇒ Next 进程内启动必炸（Phase 1 E2E 实测）。对 compiled 产物做 ASCII 等价

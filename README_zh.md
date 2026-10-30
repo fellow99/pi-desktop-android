@@ -128,6 +128,24 @@ node scripts/assemble-payload.mjs --apply      # -> app/src/main/assets/pi-web/p
 
 产物：`app/build/outputs/apk/debug/app-debug.apk`（约 181 MB：引擎 81.5 MB + 载荷 74.5 MiB）。
 
+## 品牌化
+
+显示名为 **Pi Desktop**（`res/values/strings.xml`；只有应用 ID `org.fellow99.pi.PiDesktopAndroid`
+带 “Android”）。所有图标都来自父工程 `../assets`（`logo.png`、`logo.svg`、
+`logo-1024-with-bg.png`），不手绘，物料缺失/不可解析即硬失败。
+
+- **Launcher / adaptive 图标**——`scripts/generate-icons.mjs` 从父工程物料渲染五密度 legacy
+  方形/圆形图标与 adaptive 前景（`--check` 校验）。
+- **应用内 Web 品牌化**——载荷组装时由 `scripts/brand-assets.mjs` 只改写暂存的 pi-web 副本
+  （上游 `../pi-web` 保持 pristine）：用户可见的 `Pi Web` 文案全部改为 `Pi Desktop`（约千处），页面
+  Logo 逐字节替换为 `logo.svg`，favicon / PWA / apple-touch 图标按物料重生成。随后断言 `node_modules`
+  之外 0 处 `Pi Web` 残留、预渲染 HTML 含 `Pi Desktop`、技术标识符（`pi-web`、`@agegr/pi-web`、
+  `PI_WEB_` 等）不被改动。步骤幂等，支持 `--check`。
+
+注意载荷暂存为零拷贝**硬链接**，品牌化采用「临时文件 + rename」/「先 unlink 再写」替换暂存目录项，
+而不是写穿共享 inode；已验证 `build/pi-dist` 源仍保持上游品牌。详见
+[`docs/安卓环境能力清单-0.12.1.md`](docs/安卓环境能力清单-0.12.1.md) §H REV-1。
+
 ## 安装与运行
 
 ```bash
