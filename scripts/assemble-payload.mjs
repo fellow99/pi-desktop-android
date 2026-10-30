@@ -447,9 +447,12 @@ async function writeTarGz(rootDir, outPath) {
 }
 
 async function assertArchiveReadable(tarPath) {
-  // 归档可读性自检：用系统 bsdtar（Windows 10+ 自带 tar.exe）做**权威**逐条读取。
-  // （此前自研流式检查存在对齐误报；bsdtar 是独立第三方实现，仲裁力更强。）
-  const tarExe = path.join(process.env.SystemRoot || 'C:/Windows', 'System32', 'tar.exe');
+  // 归档可读性自检：用系统 tar 做**权威**逐条读取（独立第三方实现，仲裁力强于自研流式检查——
+  // 后者曾有对齐误报）。跨平台：Windows 10+ 用自带 bsdtar（System32\tar.exe）；
+  // Linux/macOS 用 PATH 上的 GNU/BSD tar（同样支持 -tzf，输出同为逐行条目）。
+  const tarExe = process.platform === 'win32'
+    ? path.join(process.env.SystemRoot || 'C:/Windows', 'System32', 'tar.exe')
+    : 'tar';
   const res = spawnSync(tarExe, ['-tzf', tarPath], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
   if (res.error || res.status !== 0) {
     const detail = res.error ? res.error.message : String(res.stderr || '').slice(-300);
@@ -479,8 +482,12 @@ async function sha256File(filePath) {
 async function main() {
   const argv = process.argv.slice(2);
   const apply = argv.includes('--apply');
+  const argOf = (name) => {
+    const i = argv.indexOf(name);
+    return i >= 0 ? argv[i + 1] : undefined;
+  };
   const opts = {
-    piWeb: DEFAULT_PI_WEB,
+    piWeb: argOf('--pi-web') ? path.resolve(argOf('--pi-web')) : DEFAULT_PI_WEB,
     patchDir: DEFAULT_PATCH_DIR,
     piDist: DEFAULT_PI_DIST,
     stage: DEFAULT_STAGE,
