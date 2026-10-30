@@ -28,6 +28,7 @@
 | `105-auth-loopback-no-password/` | ✅ | ✅ | `payload/env.js`（路线 ①） | ✅ 免密链路随 E2E 验证 |
 | `106-tools-extensions-same-name-overrides/` | ✅ | ✅ | `payload/extensions/android-*.js` | ✅ 装载随 E2E 验证（/roots、工具面） |
 | `107-compliance-and-security/` | ✅ | ✅ | Manifest/`network_security_config`/敏感信息扫描 | ✅ G1–G11 口径对照 |
+| `001-building-workflow/` | 🚧 | 🚧 | `.github/workflows/release.yml` + 脚本跨平台化 + gradle 版本属性 | 🚧 tag v0.12.1 触发签名 APK 发布（本模块开发中） |
 
 ## 里程碑对照（规划 §15）
 

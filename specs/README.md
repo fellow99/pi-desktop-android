@@ -30,6 +30,7 @@
 | `105-auth-loopback-no-password/` | 鉴权（loopback 免密路线 ①） | 105 |
 | `106-tools-extensions-same-name-overrides/` | 同名顶替扩展四件 | 106 |
 | `107-compliance-and-security/` | 合规与敏感信息纪律 | 107 |
+| `001-building-workflow/` | GitHub Actions 标签触发构建/发布流程 | —（工程化，非 ark 能力模块） |
 
 > 每个模块目录含 `spec.md`（需求/验收）与 `plan.md`（技术方案），as-built 状态以 ✅/⬜/⚠️ 标注。
 
