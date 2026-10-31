@@ -1,10 +1,10 @@
-# 001-building-workflow — tasks
+# 012-building-workflow — tasks
 
 > 依赖序任务清单。状态：⬜ 待做 / 🚧 进行中 / ✅ 完成。
-> 参考先例：oc-desktop-android/specs/001-building-workflow/tasks.md（as-built 全绿）。
+> 参考先例：oc-desktop-android/specs/012-building-workflow/tasks.md（as-built 全绿）。
 
 ## T1 spec/plan/test-cases
-- [x] T1.1 spec.md / plan.md / tasks.md / test-cases.md 落 `specs/001-building-workflow/`（不进父工程）
+- [x] T1.1 spec.md / plan.md / tasks.md / test-cases.md 落 `specs/012-building-workflow/`（不进父工程）
 - [x] T1.2 specs/README.md 模块表、SPECS_CHECKLIST.md 增补 001 行（as-built 状态随实现回填）
 
 ## T2 引擎接入 Maven Central（对齐参考工程）

@@ -28,7 +28,9 @@
 | `105-auth-loopback-no-password/` | ✅ | ✅ | `payload/env.js`（路线 ①） | ✅ 免密链路随 E2E 验证 |
 | `106-tools-extensions-same-name-overrides/` | ✅ | ✅ | `payload/extensions/android-*.js` | ✅ 装载随 E2E 验证（/roots、工具面） |
 | `107-compliance-and-security/` | ✅ | ✅ | Manifest/`network_security_config`/敏感信息扫描 | ✅ G1–G11 口径对照 |
-| `001-building-workflow/` | ✅ | ✅ | `.github/workflows/build-release.yml` + verify-runtime.mjs + runtime.lock.json + 脚本跨平台化 | ✅ tag v0.12.1 触发签名 APK 发布（run 41105109493 全绿，Release 已发布；dispatch 彩排 run 41092950615） |
+| `011-version-0.12.1/` | ✅ | ✅ | `.github/workflows/build-release.yml` + `runtime.lock.json` + `libs.versions.toml` | ✅ 上游 v1.2.0/v0.12.1、Node 24.22.1、bridge 0.2.0；应用 0.1.0/1 |
+| `012-building-workflow/` | ✅ | ✅ | `.github/workflows/build-release.yml` + verify-runtime.mjs + runtime.lock.json + 脚本跨平台化 | ✅ tag v0.12.1 触发签名 APK 发布（run 41105109493 全绿，Release 已发布；dispatch 彩排 run 41092950615） |
+| `013-branding/` | ✅ | ✅ | `scripts/generate-icons.mjs` + `scripts/brand-assets.mjs` + `res/values/strings.xml` | ✅ 五密度图标/adaptive、载荷 `Pi Web`→`Pi Desktop` 0 残留（能力清单 §H REV-1） |
 
 ## 里程碑对照（规划 §15）
 

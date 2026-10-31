@@ -43,7 +43,7 @@ export const CROP_RULES = [
     expectedSavingBytes: 0,
     evidence: '🔶 CI 实测（2026-10-30 第七轮彩排 ustar 长路径失败后补规则；hoisted 下 .pnpm 为目录壳）',
     planRef: 'docs/000-工程规划.md §7.2（跨平台补充）',
-    prepareRef: '—（本工程 001-building-workflow CI 适配）',
+    prepareRef: '—（本工程 012-building-workflow CI 适配）',
     safeByDefault: true
   },
   {

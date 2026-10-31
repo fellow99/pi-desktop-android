@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * brand-assets.mjs — Web 载荷品牌化（对标 pi-desktop-hos 的 103-branding /
+ * brand-assets.mjs — Web 载荷品牌化（对标 pi-desktop-hos 的 013-branding /
  * pi-desktop-ark assemble-payload 内联的 applyWebBranding）。
  *
  * ## 为什么需要它

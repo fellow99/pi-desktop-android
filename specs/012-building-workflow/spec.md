@@ -1,7 +1,7 @@
-# 001-building-workflow — spec（GitHub Actions 的构建流程）
+# 012-building-workflow — spec（GitHub Actions 的构建流程）
 
 > 模块规格（需求/验收）。事实权威：docs/000-工程规划.md（§16.3 构建流水线、§17 合规清单 G1–G11）；宪法：specs/constitution.md（C3 结论以库与真机为准、C5 失败可见、C9 敏感信息不入库、C10 可证伪的验收）。
-> 参考先例：`d:\opencode-workspace\oc-desktop-android\specs\001-building-workflow\`（同门工程的 as-built CI 方案，已真跑发布：run 40875919607 全绿）。
+> 参考先例：`d:\opencode-workspace\oc-desktop-android\specs\012-building-workflow\`（同门工程的 as-built CI 方案，已真跑发布：run 40875919607 全绿）。
 > 本模块只落本工程 `specs/`，**不**进父工程 pi-workspace。
 
 ## 需求

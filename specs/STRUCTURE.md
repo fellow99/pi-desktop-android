@@ -105,6 +105,17 @@ pi-desktop-android/
 │   ├── SPECS_CHECKLIST.md
 │   ├── STRUCTURE.md
 │   ├── TECH.md
+│   ├── 011-version-0.12.1/
+│   │   ├── plan.md
+│   │   └── spec.md
+│   ├── 012-building-workflow/
+│   │   ├── plan.md
+│   │   ├── spec.md
+│   │   ├── tasks.md
+│   │   └── test-cases.md
+│   ├── 013-branding/
+│   │   ├── plan.md
+│   │   └── spec.md
 │   ├── 101-runtime-integration-launch-orchestration/
 │   │   ├── plan.md
 │   │   └── spec.md

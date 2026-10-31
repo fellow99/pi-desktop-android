@@ -1,6 +1,6 @@
-# build-release.yml —— tag 触发的自动构建与发布（需求 001-building-workflow）
+# build-release.yml —— tag 触发的自动构建与发布（需求 012-building-workflow）
 #
-# 规格链：specs/001-building-workflow/{spec,plan}.md · 参考先例：oc-desktop-android 同名 workflow（as-built 全绿）
+# 规格链：specs/012-building-workflow/{spec,plan}.md · 参考先例：oc-desktop-android 同名 workflow（as-built 全绿）
 # 构建配方：docs/000-工程规划.md §16.3
 #
 # 触发：push v* tag（如 v0.12.1）→ 载荷组装 + 引擎门禁 + APK + GitHub Release

@@ -1,4 +1,4 @@
-# 001-building-workflow — test-cases
+# 012-building-workflow — test-cases
 
 > 验收测例。对齐参考工程 oc-desktop-android test-cases 口径：本机可执行 = 静态校验 + 等价命令；真实 tag 端到端 = 用户侧。
 > CI 类需求无 Playwright/后端 HTTP 面。判据纪律 C5：只认可读回的证据（命令输出/Release 资产）。

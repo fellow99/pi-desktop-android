@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * verify-runtime.mjs —— 运行时锁值校验（pi-desktop-android 001-building-workflow；移植自 oc-desktop-android 同款）。
+ * verify-runtime.mjs —— 运行时锁值校验（pi-desktop-android 012-building-workflow；移植自 oc-desktop-android 同款）。
  *
  * 引擎经 Maven 双包（io.github.fellow99:node-bridge/node-runtime）接入：node-bridge = Kotlin API/JNI 引导件，
  * node-runtime = libnode.so + libc++_shared.so（AAR），单一事实源 = 工程根 runtime.lock.json（镜像 aosp-node-runtime）。

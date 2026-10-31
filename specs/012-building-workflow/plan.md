@@ -1,7 +1,7 @@
-# 001-building-workflow — plan（GitHub Actions 构建流程技术方案）
+# 012-building-workflow — plan（GitHub Actions 构建流程技术方案）
 
 > 技术方案与 as-built 说明。对应 spec.md 的验收表。
-> 参考先例：`oc-desktop-android/specs/001-building-workflow/plan.md`（已 CI 真跑发布全绿）。
+> 参考先例：`oc-desktop-android/specs/012-building-workflow/plan.md`（已 CI 真跑发布全绿）。
 
 ## 方案总览
 单文件 `build-release.yml` 双触发（对齐参考工程）：
