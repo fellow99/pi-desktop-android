@@ -70,29 +70,8 @@ try {
 } catch (_) { /* 定义失败则保持引擎默认；不阻断启动 */ }
 
 // ── Android 宿主保护：补 AbortSignal.throwIfAborted（Node 25+ API）────────────
-// 现象：引擎为 Node v24.22.1，而 pi-ai 1.2.0 的模型目录读写/发现（models-store/
-//   models.js）与 @anthropic-ai/sdk 调用了 AbortSignal.prototype.throwIfAborted()
-//   （Node 25 才有）⇒ 模型目录枚举报「e?.throwIfAborted is not a function」，UI 显
-//   「模型错误」且选择器为空（No models）。实际会话不受影响（会话显式锁定
-//   provider/modelId，不走目录枚举），但模型选择/刷新不可用。
-// 处置：按 WHATWG 规范补垫片——aborted 时抛 name=AbortError 的 DOMException。
-//   Node 17+ 有全局 DOMException；已存在则绝不覆盖。同样须在任何业务模块前安装。
-try {
-  if (typeof AbortSignal !== 'undefined'
-      && typeof AbortSignal.prototype.throwIfAborted !== 'function') {
-    Object.defineProperty(AbortSignal.prototype, 'throwIfAborted', {
-      configurable: true,
-      writable: true,
-      value: function throwIfAborted() {
-        if (this != null && this.aborted) {
-          const err = new DOMException('The operation was aborted.', 'AbortError');
-          err.code = 20; // ABORT_ERR（规范值）
-          throw err;
-        }
-      }
-    });
-  }
-} catch (_) { /* DOMException 不可用则保持默认；目录枚举降级，不阻断启动 */ }
+// 引擎已升 node-runtime:26.13.0（Node 26 ≥25，含原生 throwIfAborted）⇒ 此垫片已不需要（111-pty-integration）。
+// 客户端（Chrome 94 WebView）的 throwIfAborted 垫片仍在 MainActivity polyfill-webview.js 保留。
 
 const fs = require('node:fs');
 const http = require('node:http');
@@ -658,6 +637,44 @@ function materializeAgentResources(payloadRoot) {
  *   · defaultLocale / toLocaleString 语义抽查。
  * 全程不抛：探针失败本身就是事实。
  */
+// ── PTY 常驻加载器（111-pty-integration）───────────────────────────────────
+// 这是**产品化**加载器（区别于 runPtyNodeSelftest 的 selftest 专用探针）：在 pi-web server boot 前
+// dlopen libpty_node.so（nativeLibraryDir，G3 合规执行位）并种子 require.cache，使
+// lib/terminal-manager.ts#require("node-pty")（node-pty 1.1.0 JS，载荷 node_modules overlay）命中。
+// 失败结构化上报（boot-facts pty.ready=false），绝不静默降级成假终端（宪法 A6）。
+let ptyNative = null; // { ok, version, detail }；ensurePtyNative() 的缓存结果
+function ensurePtyNative(payloadRoot) {
+  try {
+    const nativeLibDir = process.env.PI_ANDROID_NATIVE_LIB_DIR || '';
+    if (!nativeLibDir) {
+      return { ok: false, version: null, detail: 'PI_ANDROID_NATIVE_LIB_DIR 未注入（Kotlin 宿主未升级？）' };
+    }
+    const pkgDir = path.join(payloadRoot, 'node_modules', 'node-pty');
+    const pkgJson = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
+    const version = String(pkgJson.version);
+    if (!version.startsWith('1.1.')) {
+      return { ok: false, version, detail: `node-pty overlay 版本 ${version} 非 1.1.x（与 libpty_node.so 配对不符）` };
+    }
+    const nativePath = path.join(pkgDir, 'build', 'Release', 'pty.node');
+    if (!fs.existsSync(nativePath)) {
+      return { ok: false, version, detail: `node-pty overlay 占位缺失：${nativePath}` };
+    }
+    const soPath = fs.existsSync(path.join(nativeLibDir, 'libpty_node.so'))
+      ? path.join(nativeLibDir, 'libpty_node.so')
+      : 'libpty_node.so';
+    const Module = require('node:module');
+    const m = new Module(nativePath);
+    m.filename = nativePath;
+    m.paths = Module._nodeModulePaths(path.dirname(nativePath));
+    process.dlopen(m, soPath);
+    require.cache[require.resolve(nativePath)] = m;
+    log(`PTY 常驻加载器：dlopen(${soPath.slice(-40)}) + 种子 require.cache（node-pty@${version}）`);
+    return { ok: true, version, detail: `dlopen(libpty_node.so) + require.cache 种子（node-pty@${version}）` };
+  } catch (err) {
+    return { ok: false, version: null, detail: describeError(err) };
+  }
+}
+
 function writeBootFacts(payloadRoot, jitlessState) {
   const safe = (fn) => {
     try { return fn(); } catch (err) { return `error: ${describeError(err)}`; }
@@ -706,6 +723,7 @@ function writeBootFacts(payloadRoot, jitlessState) {
     execPathBasename: path.basename(String(process.execPath || '')),
     pid: process.pid,
     jitless: { active: jitlessState && jitlessState.active === true },
+    pty: ptyNative ? { ready: ptyNative.ok, version: ptyNative.version, detail: ptyNative.detail } : { ready: false, detail: 'not-run' },
     intl,
     wasm,
   };
@@ -1271,6 +1289,13 @@ async function main() {
 
   rotatePreviewSecrets(payloadRoot);
   materializeAgentResources(payloadRoot);
+
+  // PTY 常驻加载器（111-pty-integration）：在 pi-web server boot 之前 dlopen libpty_node.so
+  // （nativeLibraryDir）并种子 require.cache（node-pty 的 build/Release/pty.node 绝对路径），使
+  // lib/terminal-manager.ts#require("node-pty") 命中。失败结构化上报，不阻断启动（boot-facts pty.ready=false）。
+  ptyNative = ensurePtyNative(payloadRoot);
+  // terminal-capability.ts（Next 路由，同一进程）经 globalThis 读真装载结果（宪法 A6）
+  globalThis.__piWebPty = ptyNative;
 
   // 引擎引导事实（P1-3/P1-4）：必须在任何 Next 代码被 require 之前落盘
   writeBootFacts(payloadRoot, jitless);

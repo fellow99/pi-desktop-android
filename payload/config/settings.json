@@ -1,5 +1,5 @@
 {
   "shellPath": "/system/bin/sh",
-  "defaultTools": ["read", "write", "edit", "ls", "find", "grep", "bash"],
+  "defaultTools": ["read", "write", "edit", "ls", "find", "grep", "bash", "ptyBash"],
   "defaultProjectTrust": "ask"
 }

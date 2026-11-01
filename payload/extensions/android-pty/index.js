@@ -1,64 +1,181 @@
-// android-pty — pi-agent 扩展（Phase 4 路线 A：node-pty android-arm64 原生件）
+// android-pty — pi-agent 扩展（111-pty-integration：PTY 产品化）
 //
-// ⚠️ 本扩展是 **评估/验证面**，不是产品终端：terminal.pty 能力仍为结构化 unsupported
-// （规划 §8 #16 暂缓决策未撤销）；本扩展让「复活路线 A 的原生件」能被装载自检与
-// /pty-test 命令人工验证（真机交接窗口即可测），复活与否仍交用户决策。
-//
-// vendored：vendor/node-pty = node-pty@1.1.0 npm 包（lib/ 预编译 JS）+ build/Release/pty.node
-// （本工程 NDK r28c 交叉编译，sha256 锁见 vendor/pty.node.lock.json；规划 §10 单源纪律同样适用——
-//  node-pty 源码未改动，只有构建产物）。
-//
-// 加载失败（ABI/符号/SELinux）都按宪法 A6 结构化如实上报，绝不静默降级。
+// 原生件 libpty_node.so 由 node-pty AAR（io.github.fellow99:node-pty:26.13.0，node-pty@1.1.0）
+// 随 APK 进 nativeLibraryDir；启动期 pi-web-launch.js 的「PTY 常驻加载器」dlopen 它并种子
+// require.cache（<payload>/node_modules/node-pty/build/Release/pty.node）。因此这里
+// `require("node-pty")`（从本扩展向上解析到 payload/node_modules/node-pty，1.1.0，与原生配对）
+// 会命中已种子的原生件。失败结构化如实上报，绝不静默降级（宪法 A6）。
 import { createRequire } from "node:module";
-import { existsSync, readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const VENDOR = join(HERE, "vendor", "node-pty");
+const req = createRequire(import.meta.url);
 
+// node-pty 单例：首次 require 即命中启动期种子（原生已装载）。绝不缓存失败态——每次工具调用
+// 都尝试装载，若原生缺失则 throw（execute 把它结构化上报给模型）。
 function loadPty() {
-  if (!existsSync(join(VENDOR, "build", "Release", "pty.node"))) {
-    throw new Error("vendored pty.node 缺失（载荷不完整？）：" + VENDOR);
+  return req("node-pty");
+}
+
+const MAX_OUTPUT_BYTES = 256 * 1024;
+const DEFAULT_TIMEOUT_MS = 120_000;
+
+/** 简单截断到 UTF-8 字节上限（不切坏多字节字符）。 */
+function truncateUtf8(text, maxBytes) {
+  const buf = Buffer.from(text, "utf8");
+  if (buf.length <= maxBytes) return text;
+  for (let end = maxBytes; end > maxBytes - 4 && end > 0; end -= 1) {
+    const sliced = buf.subarray(0, end).toString("utf8");
+    if (!sliced.endsWith("\uFFFD")) return `${sliced}\n\n[PTY 输出已截断：共 ${buf.length} 字节，仅显示前 ${maxBytes}]`;
   }
-  const req = createRequire(join(VENDOR, "package.json"));
-  return req(VENDOR); // node-pty main = lib/index.js → utils.loadNative(build/Release/pty.node)
+  return `[输出不可截断（编码异常）]`;
+}
+
+/**
+ * 单次 spawn 到真 PTY（V1 试运行，非常驻）：完成判据 = PTY `onExit` 事件（node-pty waitpid，拿真退出码，
+ * 这是哨兵法拿不到的核心收益）。120s 超时 + 中止（signal）/杀进程组兑底。输出有界。
+ */
+function runPtyCommand(command, cwd, timeoutMs, signal) {
+  return new Promise((resolve) => {
+    let term = null;
+    let out = "";
+    let finished = false;
+    let timer = null;
+    const finish = (result) => {
+      if (finished) return;
+      finished = true;
+      if (timer) clearTimeout(timer);
+      try { if (term) term.kill("SIGKILL"); } catch { /* 已退 */ }
+      resolve(result);
+    };
+    timer = setTimeout(() => finish({ ok: false, timedOut: true, text: out, exitCode: null }), timeoutMs);
+    if (signal) {
+      try { if (signal.aborted) finish({ ok: false, aborted: true, text: out, exitCode: null }); else signal.addEventListener("abort", () => finish({ ok: false, aborted: true, text: out, exitCode: null }), { once: true }); }
+      catch { /* 忽略 signal 绑定失败 */ }
+    }
+    try {
+      term = loadPty().spawn("/system/bin/sh", ["-c", command], {
+        name: "xterm-256color",
+        cols: 80,
+        rows: 24,
+        cwd: cwd || process.cwd() || "/",
+        env: process.env,
+      });
+    } catch (err) {
+      finish({ ok: false, text: `node-pty spawn 失败：${(err && err.message) || err}`, exitCode: null });
+      return;
+    }
+    term.onData((data) => {
+      out += data;
+      if (Buffer.byteLength(out, "utf8") > MAX_OUTPUT_BYTES * 2) {
+        // 保留尾部，防无限刷屏累积
+        out = out.slice(-MAX_OUTPUT_BYTES);
+      }
+    });
+    term.onExit(({ exitCode }) => {
+      finish({ ok: exitCode === 0, text: out, exitCode });
+    });
+  });
+}
+
+function ptyBashSchema() {
+  return [
+    {
+      name: "command",
+      type: "string",
+      description: "The shell command to run.",
+      required: true,
+    },
+    {
+      name: "timeout",
+      type: "number",
+      description: "Timeout in milliseconds (default 120000).",
+      required: false,
+    },
+  ];
 }
 
 export default function register(pi) {
+  pi.registerTool({
+    name: "ptyBash",
+    label: "ptyBash",
+    description:
+      "Execute a shell command in a real PTY (pseudoterminal) and return the merged output with the "
+      + "exit code from the PTY's exit event. Default timeout 120 seconds; output truncated at 256KB.",
+    promptSnippet: "Execute shell commands in a real PTY (trial; V1 most-simplest)",
+    promptGuidelines: [
+      "This is the V1 trial of a PTY-backed shell tool (real teletype semantics, true exit codes).",
+      "Shell is mksh at /system/bin/sh; run in a fresh PTY per call (no persistent shell state).",
+      "Use `exit N`/command exit code to judge success; non-zero is an error result.",
+    ],
+    parameters: ptyBashSchema(),
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const command = typeof params?.command === "string" ? params.command : "";
+      if (!command.trim()) throw new Error("command is required");
+      const timeoutMs = (typeof params?.timeout === "number" && params.timeout > 0)
+        ? Math.min(params.timeout, DEFAULT_TIMEOUT_MS * 2)
+        : DEFAULT_TIMEOUT_MS;
+      const cwd = typeof ctx?.cwd === "string" && ctx.cwd ? ctx.cwd : process.cwd() || "/";
+
+      let result, loadErr = null;
+      try {
+        result = await runPtyCommand(command, cwd, timeoutMs, signal);
+      } catch (err) {
+        loadErr = (err && err.message) || String(err);
+      }
+      if (loadErr) {
+        return {
+          content: [{ type: "text", text: `PTY bash 不可用：${loadErr}\n（nativeLibraryDir 缺 libpty_node.so 或装载失败；boot-facts pty.ready 与 /api/terminal supported 应反映之）` }],
+          details: { failure: "pty-unavailable" },
+          isError: true,
+        };
+      }
+      let text = result.text;
+      const truncated = Buffer.byteLength(text, "utf8") > MAX_OUTPUT_BYTES;
+      if (!truncated && result.exitCode !== null && result.exitCode !== 0 && !/exit code/.test(text)) {
+        text = `${text}\n(exit code ${result.exitCode})`;
+      }
+      return {
+        content: [{ type: "text", text: truncateUtf8(text, MAX_OUTPUT_BYTES) }],
+        details: {
+          exitCode: result.exitCode,
+          timedOut: !!result.timedOut,
+          aborted: !!result.aborted,
+          truncated,
+        },
+        ...(result.ok && result.exitCode === 0 && !result.timedOut && !result.aborted ? {} : { isError: true }),
+      };
+    },
+  });
+
   pi.registerCommand("pty-test", {
-    description: "装载 vendored node-pty 并在真 PTY 里跑一次 sh 回显（路线 A 验证）",
+    description: "装载 node-pty（payload node_modules，命中启动期种子）并在真 PTY 里跑一次 sh 回显",
     handler: async (_args, ctx) => {
       let report;
       try {
         const pty = loadPty();
-        const result = await new Promise((resolve) => {
+        const term = pty.spawn("/system/bin/sh", ["-c", "echo PTY_ROUNDTRIP_OK; id; tty"], {
+          name: "xterm-color",
+          cwd: ctx?.cwd || process.cwd(),
+          env: process.env,
+        });
+        report = await new Promise((resolve) => {
           let out = "";
-          const term = pty.spawn("/system/bin/sh", ["-c", "echo PTY_ROUNDTRIP_OK; id; tty"], {
-            name: "xterm-color",
-            cwd: ctx.cwd || process.cwd(),
-            env: process.env,
-          });
-          const timer = setTimeout(() => {
-            try { term.kill(); } catch { /* 已退 */ }
-            resolve({ out, timedOut: true });
-          }, 10_000);
+          const timer = setTimeout(() => { try { term.kill(); } catch { /* 已退 */ } resolve(`${out}\n[10s 超时]`); }, 10_000);
           term.onData((data) => {
             out += data;
             if (out.includes("PTY_ROUNDTRIP_OK")) {
               clearTimeout(timer);
-              setTimeout(() => { try { term.kill(); } catch { /* 已退 */ } resolve({ out, timedOut: false }); }, 300);
+              setTimeout(() => { try { term.kill(); } catch { /* 已退 */ } resolve(out); }, 400);
             }
           });
         });
-        const ok = result.out.includes("PTY_ROUNDTRIP_OK");
-        report = (ok ? "✓ PTY 回程成功" : "⚠ 未捕获回显") + "（" + (result.timedOut ? "10s 超时" : "完成") + "）\n" +
-          "---- pty 输出 ----\n" + result.out.slice(0, 600);
+        report = (report.includes("PTY_ROUNDTRIP_OK") ? "✓ PTY 回程成功" : "⚠ 未捕获回显") + "\n---- pty 输出 ----\n" + report.slice(0, 600);
       } catch (err) {
-        report = "✗ pty.node 装载/执行失败：" + ((err && err.message) || err) +
-          "\n（ABI/符号/SELinux 归因见 pi-web.ptynode-selftest.json 与 docs/002 O6 节）";
+        report = "✗ node-pty 装载/执行失败：" + ((err && err.message) || err);
       }
-      if (ctx.hasUI) ctx.ui.notify(report, report.startsWith("✓") ? "info" : "warning");
+      if (ctx?.hasUI) ctx.ui.notify(report, report.startsWith("✓") ? "info" : "warning");
       else console.log(report);
     },
   });

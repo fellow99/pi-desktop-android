@@ -42,8 +42,8 @@ new file mode 100644
 index 0000000..39ef9b9
 --- /dev/null
 +++ b/lib/terminal-capability.ts
-@@ -0,0 +1,116 @@
-+import { closeSync, openSync, readFileSync, statSync } from "fs";
+@@ -0,0 +1,148 @@
++import { closeSync, existsSync, openSync, readFileSync, statSync } from "fs";
 +
 +/**
 + * 伪终端（PTY）能力的**唯一事实源** —— 运行时探测的「能力标志」，不是编译期常量。
@@ -68,8 +68,11 @@ index 0000000..39ef9b9
 +/**
 + * Node 在 HarmonyOS / OpenHarmony 上自报的 `process.platform`。
 + * `openharmony` 见设备实测（错误串里的 `openharmony-arm64`）；`harmonyos` 为同一内核的别名。
++ * ⚠️ Android 已从名单移除（111-pty-integration）：Android 上 supported **仅当**
++ *   `globalThis.__piWebPty.ok`（启动期常驻加载器 dlopen libpty_node.so 成功）为 true——见
++ *   `terminalCapability()` 的 android 分支。
 + */
-+const PTY_LESS_PLATFORMS = ["openharmony", "harmonyos", "android"];
++const PTY_LESS_PLATFORMS = ["openharmony", "harmonyos"];
 +
 +export interface TerminalCapabilitySupported {
 +  ok: true;
@@ -78,6 +81,8 @@ index 0000000..39ef9b9
 +  platform: string;
 +  arch: string;
 +  runtime: string;
++  /** 已装载的 node-pty 版本（Android，111-pty-integration）。 */
++  pty?: string | null;
 +}
 +
 +export interface TerminalCapabilityUnsupported {
@@ -125,6 +130,14 @@ index 0000000..39ef9b9
 +  } catch (error) {
 +    facts.push(`/dev/pts: ${errnoOf(error)}`);
 +  }
++  try {
++    const nativeLibDir = process.env.PI_ANDROID_NATIVE_LIB_DIR || "";
++    facts.push(`libpty_node.so: ${nativeLibDir ? (existsSync(`${nativeLibDir}/libpty_node.so`) ? "在位" : "缺") : "无 env"}`);
++    const marker = (globalThis as { __piWebPty?: { ok?: boolean; version?: string } }).__piWebPty;
++    facts.push(`pty 装载器: ${marker?.ok ? `ok (${marker.version})` : String(marker ? "fail" : "未运行")}`);
++  } catch (error) {
++    facts.push(`libpty_node.so: ${errnoOf(error)}`);
++  }
 +  return facts.join("; ");
 +}
 +
@@ -138,6 +151,25 @@ index 0000000..39ef9b9
 +  const platform = String(process.platform);
 +  const arch = String(process.arch);
 +  const runtime = `node ${String(process.version)}`;
++  const marker = (globalThis as { __piWebPty?: { ok?: boolean; version?: string; detail?: string } }).__piWebPty;
++  // Android：supported **仅当真装载**（启动期常驻加载器 dlopen libpty_node.so 成功，宪法 A6）。
++  if (platform === "android") {
++    if (marker?.ok === true) {
++      return { ok: true, capability: TERMINAL_CAPABILITY, supported: true, platform, arch, runtime, pty: marker.version ?? null };
++    }
++    return {
++      ok: false,
++      capability: TERMINAL_CAPABILITY,
++      supported: false,
++      reason: marker
++        ? `PTY 原生件装载失败：${marker.detail ?? "不明"}（libpty_node.so 未能 dlopen/种子 require.cache）`
++        : "PTY 装载器未运行（globalThis.__piWebPty 缺失）——启动链路异常，终端按 unsupported 降级。",
++      evidence: ptyEvidence(),
++      plan: "终端面板按 unsupported 降级；排查 libpty_node.so 装载（boot-facts pty.ready）。",
++      error: "终端不可用：本平台 PTY 原生件未装载成功（能力 terminal.pty = unsupported），不是可重试的故障。",
++      platform, arch, runtime,
++    } satisfies TerminalCapabilityUnsupported;
++  }
 +  if (!PTY_LESS_PLATFORMS.includes(platform)) {
 +    return { ok: true, capability: TERMINAL_CAPABILITY, supported: true, platform, arch, runtime };
 +  }
