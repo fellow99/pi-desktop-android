@@ -554,6 +554,31 @@ async function main() {
     await fsp.copyFile(rotateSource, path.join(stageRoot, 'bin', 'rotate-preview-secrets.js'));
     console.log('上游 bin     : bin/rotate-preview-secrets.js → stage（预览密钥轮换随包 ✔）');
 
+    // ⑤⁗ node-pty 1.1.0 运行期 JS overlay（111-pty-integration）：
+    //   · crop 把 pi-web 声明的 node_modules/node-pty（1.2.0-beta.15）整个裁掉；
+    //   · 而原生件 libpty_node.so（node-pty AAR）由 node-pty **1.1.0** 编译 ⇒ 配对纪律要求运行期
+    //     require("node-pty") 解析到 **1.1.0**（与原生同版本）。
+    //   · 故单源从 payload/extensions/android-pty/vendor/node-pty（已是 1.1.0）overlay 到载荷
+    //     node_modules/node-pty；并补 build/Release/pty.node **占位文件**（0B），使 node-pty 1.1.0
+    //     的 loadNative 直 req 命中启动期常驻加载器种子进 require.cache 的绝对路径。
+    //   此步必须晚于裁剪（裁掉旧版）与壳资产，且早于打包。
+    {
+      const PTY_VENDOR = path.join(APP_PAYLOAD_DIR, 'extensions', 'android-pty', 'vendor', 'node-pty');
+      const ptyDst = path.join(stageRoot, 'node_modules', 'node-pty');
+      if (!fs.existsSync(path.join(PTY_VENDOR, 'package.json'))) {
+        throw new AssembleError(`node-pty vendored 1.1.0 缺失：${PTY_VENDOR}`);
+      }
+      await fsp.cp(PTY_VENDOR, ptyDst, { recursive: true, force: true });
+      await fsp.mkdir(path.join(ptyDst, 'build', 'Release'), { recursive: true });
+      const placeholder = path.join(ptyDst, 'build', 'Release', 'pty.node');
+      if (!fs.existsSync(placeholder)) await fsp.writeFile(placeholder, Buffer.alloc(0));
+      const pkg = JSON.parse(fs.readFileSync(path.join(ptyDst, 'package.json'), 'utf8'));
+      if (String(pkg.version).startsWith('1.1.') === false) {
+        throw new AssembleError(`node-pty overlay 版本异常：${pkg.version}（期望 1.1.x 与 libpty_node.so 配对）`);
+      }
+      console.log(`PTY overlay  : node-pty@${pkg.version} (1.1.x) → stage/node_modules/node-pty + build/Release/pty.node 占位（与 libpty_node.so 配对）`);
+    }
+
     // ⑤''' Web 侧品牌化（对标 hos 103 / ark applyWebBranding）：用户可见文案 Pi Web → Pi Desktop、
     // 页面 Logo 换父工程 assets/logo.svg、favicon/PWA 图标按物料重生成；终检 0 残留。
     // 必须在全部树操作（裁剪/壳资产/bin）之后、vendor 兼容变换与打包之前；脚本自行硬失败。

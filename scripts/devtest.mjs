@@ -44,10 +44,11 @@ const say = (ok, label, detail = '') => {
   if (!ok) failures += 1;
 };
 
-// G1 引擎在位（sha256 门禁的权威判定在 provision 脚本本身）
+// G1 引擎在位（Maven AAR；sha256+ELF 门禁权威判定在 verify-runtime.mjs —— 111-pty-integration 前为
+// provision-engine --check 的 jniLibs 投放；引擎现由 node-runtime AAR 直解进 APK，jniLibs 不再本地投放）。
 {
-  const res = spawnSync(process.execPath, [path.join(HERE, 'provision-engine.mjs'), '--check'], { encoding: 'utf8' });
-  say(res.status === 0, 'G1 引擎在位（provision --check）', (res.stdout + res.stderr).trim().split('\n').pop() ?? '');
+  const res = spawnSync(process.execPath, [path.join(HERE, 'verify-runtime.mjs')], { encoding: 'utf8' });
+  say(res.status === 0, 'G1 引擎锁（verify-runtime）', (res.stdout + res.stderr).trim().split('\n').pop() ?? '');
 }
 
 // G2 载荷资产一致
@@ -85,21 +86,12 @@ const say = (ok, label, detail = '') => {
   }
 }
 
-// G6 pty.node 锁（路线 A 原生件；存在才验——lock 与产物必须成对）
+// G6 pty 原生件锁（111-pty-integration）：node-pty 经 Maven AAR 接入，verify-pty.mjs 断言
+// AAR 内 libpty_node.so 的 SHA-256 + ELF 门禁（含 DT_NEEDED libnode.so）。路线 A 的
+// vendored pty.node 评估件不再投放（随 AAR）。
 {
-  const lock = path.join(PROJECT_ROOT, 'payload', 'extensions', 'android-pty', 'vendor', 'pty.node.lock.json');
-  const bin = path.join(PROJECT_ROOT, 'payload', 'extensions', 'android-pty', 'vendor', 'node-pty', 'build', 'Release', 'pty.node');
-  if (!fs.existsSync(lock)) {
-    console.log('⏭  G6 pty.node 锁 —— 未投放（路线 A 未执行）');
-  } else {
-    const want = JSON.parse(fs.readFileSync(lock, 'utf8'));
-    if (!fs.existsSync(bin)) {
-      say(false, 'G6 pty.node 锁', 'lock 在而产物缺：' + bin);
-    } else {
-      const sha = createHash('sha256').update(fs.readFileSync(bin)).digest('hex');
-      say(sha === want.sha256, 'G6 pty.node sha256 锁（路线 A）', `${sha.slice(0, 16)}… / ${want.version}`);
-    }
-  }
+  const res = spawnSync(process.execPath, [path.join(HERE, 'verify-pty.mjs')], { encoding: 'utf8' });
+  say(res.status === 0, 'G6 pty 原生件锁（verify-pty）', (res.stdout + res.stderr).trim().split('\n').pop() ?? '');
 }
 
 // G5 端上 engine-facts（可选：--facts 指向 run-as 拉回的 engine-facts.json）
@@ -114,7 +106,7 @@ if (factsArg) {
       const escapeOk = intl.propertyEscapeCompile?.scriptGreek === true && intl.propertyEscapeCompile?.idStart === true;
       say(escapeOk, 'G5 端上 Intl 探针：属性转义可编译（small-icu 判据）', JSON.stringify(intl.propertyEscapeCompile));
       say(boot.intl?.present === true, 'G5 端上 Intl 探针：Intl 存在', `node=${boot.node}`);
-      say(String(boot.node ?? '').startsWith('v24.22.1'), 'G5 端上引擎版本口径（lock active）', `node=${boot.node}`);
+      say(String(boot.node ?? '').startsWith('v26.13.0'), 'G5 端上引擎版本口径（lock active）', `node=${boot.node}`);
       const wasm = boot.wasm ?? {};
       say(wasm.available === true && wasm.validateOk === true, 'G5 端上 WASM 探针（O1 口径）', JSON.stringify(wasm));
     }

@@ -92,5 +92,10 @@ dependencies {
     // Next16 compiled 产物 Unicode 属性转义在编译期 SyntaxError（O2 实测），且翻译层模拟器引导 SEGV。
     runtimeOnly(libs.node.runtime)
 
+    // PTY 原生件 libpty_node.so（node-pty AAR；node-pty@1.1.0 交叉编译，DT_NEEDED libnode.so）：
+    // 与 node-runtime 逐字同版本（NODE_MODULE_VERSION 147 配对）⇔ 配对纪律见 specs/111-pty-integration。
+    // verify-pty.mjs 门禁 SHA-256 + ELF（含 DT_NEEDED libnode.so）。
+    runtimeOnly(libs.node.pty)
+
     implementation(libs.kotlinx.coroutines.android)
 }

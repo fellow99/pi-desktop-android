@@ -5,9 +5,10 @@
  * 为什么不用 Maven 的 io.github.fellow99:node-runtime:24.2.0：
  *   该构建为 --with-intl=none ⇒ Intl 全缺 ⇒ Next16 compiled 产物的 Unicode 属性转义在**编译期**
  *   SyntaxError ⇒ 进程内 Next 必炸（O2 ⚠️ / Phase 1 E2E 实测）；且翻译层模拟器上引导期 SEGV。
- *   参考工程（dsh-desktop-android docs/010 阶段2）同墙同解：上游 aosp-node-runtime 重编
- *   `--with-intl=small-icu` 的 v24.22.1（runtime.lock.json active，sha256 be1d16414a1e…），
- *   同一模拟器（x86_64+ARM 转译）DeepSeek 对话/看图全通。
+ *   ⚠️ 主路径已改 Maven AAR io.github.fellow99:node-runtime:26.13.0（small-icu，锁 `--with-intl=small-icu`）
+ *   ⇔ 111-pty-integration；本脚本退化为**零网兑底**：当 Central AAR 不可达/未缓存时，从本机
+ *   aosp-node-runtime 目录投放同版本 jniLibs。注意 aosp-node-runtime 仓锁 active 需与工程根
+ *   runtime.lock.json active.node 对齐（当前 26.13.0）。
  *
  * 事实源：<runtime-dir>/runtime.lock.json（active.release）。校验：sha256+size 完全一致，不符 exit 2。
  * 二进制不入库（.gitignore）；`node scripts/provision-engine.mjs --check` 校验当前状态。

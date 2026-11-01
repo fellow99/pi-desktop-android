@@ -149,10 +149,11 @@ export const CROP_RULES = [
     keep: [],
     expectOverlapWith: ['node-pty-prebuilds'],
     reason:
-      'PTY 本平台暂缓（补丁 0001 结构化 unsupported）⇒ 整包裁掉最干净（prebuilds 由前一条先计数）。',
+      'PTY 运行期 JS 由 assemble-payload overlay node-pty **1.1.0**（vendored，与 libpty_node.so 配对）；'
+      + '这里裁掉 pi-web 声明的 node_modules/node-pty（1.2.0-beta.15，wrong N-API 配对）——见 111-pty-integration。',
     expectedFiles: 33,
     expectedSavingBytes: 3699358,
-    evidence: '✅ ark 实测 / ✅ 本工程 PTY 暂缓',
+    evidence: '✅ 本工程 PTY 产品化（111-pty-integration，2026-11-01）；overlay 1.1.0 取代',
     planRef: 'docs/000-工程规划.md §7.2 · §8 #16',
     prepareRef: 'pi-desktop-ark/scripts/crop-rules.mjs node-pty',
     safeByDefault: true
