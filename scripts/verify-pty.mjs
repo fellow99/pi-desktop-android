@@ -130,7 +130,6 @@ function parseElf(buf) {
     return out
   }
   elf.neededLibs = () => {
-    const dynSeg = null
     let dyOff = null, dySize = null
     // 定位 PT_DYNAMIC
     for (let i = 0; i < elf.phnum; i++) {
