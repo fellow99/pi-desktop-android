@@ -14,8 +14,12 @@ const req = createRequire(import.meta.url);
 
 // node-pty 单例：首次 require 即命中启动期种子（原生已装载）。绝不缓存失败态——每次工具调用
 // 都尝试装载，若原生缺失则 throw（execute 把它结构化上报给模型）。
+// 装载路径：优先用启动期注入的绝对包路径 `PI_PTY_PKG_ABS`（=<payloadRoot>/node_modules/node-pty，
+// 命中 ensurePtyNative 种子过的同一副本，node-pty 内部 require build/Release/pty.node 会命中
+// dlopen 的 libpty_node.so）；未设置则回到按名解析 `node-pty`（终端面 payload 内消费场景）。
 function loadPty() {
-  return req("node-pty");
+  const abs = process.env.PI_PTY_PKG_ABS;
+  return abs ? req(abs) : req("node-pty");
 }
 
 const MAX_OUTPUT_BYTES = 256 * 1024;
@@ -80,20 +84,17 @@ function runPtyCommand(command, cwd, timeoutMs, signal) {
 }
 
 function ptyBashSchema() {
-  return [
-    {
-      name: "command",
-      type: "string",
-      description: "The shell command to run.",
-      required: true,
+  // SDK registerTool 要求 **object 参数 schema**（`parameters` 必须是对象、而非数组；
+  // 数组会在 `loader.js#registerTool` 抛 "must define an object parameter schema"，
+  // 导致整个 android-pty 扩展加载失败——ptyBash 工具与 pty-test 命令双双缺席）。
+  return {
+    type: "object",
+    properties: {
+      command: { type: "string", description: "The shell command to run." },
+      timeout: { type: "number", description: "Timeout in milliseconds (default 120000)." },
     },
-    {
-      name: "timeout",
-      type: "number",
-      description: "Timeout in milliseconds (default 120000).",
-      required: false,
-    },
-  ];
+    required: ["command"],
+  };
 }
 
 export default function register(pi) {

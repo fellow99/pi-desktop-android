@@ -1267,6 +1267,27 @@ async function main() {
   const entryHint = process.env.NODE_BRIDGE_ENTRY || '';
   const payloadRoot = resolvePayloadRoot(entryHint);
 
+  // 111-pty-integration：把载荷的 node_modules 加入 NODE_PATH，使**任意** `require("node-pty")`
+  // （包括从 <agentDir>/extensions 物化加载的 android-pty 扩展）都回落到 启动期 ensurePtyNative
+  // 种子过的**同一副本**（payload/node_modules/node-pty，require.cache 命中 dlopen 的 libpty_node.so）。
+  // 背景：SDK 从物化目录加载扩展，其 createRequire(import.meta.url) 只沿 <agentDir> 向上解析，
+  // 够不着 payload/node_modules（分离树）⇒ `require("node-pty")` MODULE_NOT_FOUND。
+  // （终端面 terminal-manager 本就在 payload 树内，不受影响。）
+  try {
+    const payloadNodeModules = path.join(payloadRoot, 'node_modules');
+    // 绝对路径 env：android-pty 扩展（从 <agentDir>/extensions 物化加载，与载荷分离树）
+    // 直接 require 该绝对包路径，绕开一切模块解析歧义（NODE_PATH 对 jiti 转译的 ESM 扩展不可靠），
+    // 且命中启动期 ensurePtyNative 种子过的**同一节点**（node-pty 内部 require build/Release/pty.node
+    // 会解析回被种子 absolute nativePath，命中 dlopen 的 libpty_node.so）。
+    process.env.PI_PTY_PKG_ABS = path.join(payloadNodeModules, 'node-pty');
+    process.env.NODE_PATH = process.env.NODE_PATH
+      ? process.env.NODE_PATH + path.delimiter + payloadNodeModules
+      : payloadNodeModules;
+    require('node:module').Module._initPaths(); // 让当前进程立即采用新的 NODE_PATH
+  } catch (err) {
+    logWarn(`NODE_PATH/PI_PTY_PKG_ABS 注入失败（继续启动，android-pty 扩展可能因找不到 node-pty 而不可用）：${describeError(err)}`);
+  }
+
   // 应用语义环境（唯一事实源：./env.js）。库负责 HOME/TMPDIR/NODE_ENV/NODE_OPTIONS，
   // 这里**只补应用语义**，并把最终值写进日志（错了才查得动）。
   const desired = envContract.buildEnv(process.env, { route: 'loopback', warn: (msg) => logWarn(msg) });
