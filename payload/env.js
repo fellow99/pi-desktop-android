@@ -161,6 +161,12 @@ function buildEnv(base, options) {
   env[KEYS.skipVersionCheck] = read(source, KEYS.skipVersionCheck) || '1';
   env[KEYS.appName] = read(source, KEYS.appName) || 'Pi Desktop';
 
+  // 111-pty-integration（plan §5）：upstream terminal-manager 的 shell 取
+  // `process.env.SHELL || "/bin/sh"`，而 Android 无 `/bin`，仅 `/system/bin/sh`(mksh)。
+  // 这里注入 SHELL 到应用语义环境（buildEnv 结果会合并回 process.env），否则终端面板 spawn 必挂
+  // `execvp(/bin/sh) ENOENT`。未设则给上游回退值同名的 Android 事实路径。
+  env.SHELL = read(source, 'SHELL') || '/system/bin/sh';
+
   if (route === 'lan') {
     const password = read(source, KEYS.webPassword);
     if (password === undefined) {
