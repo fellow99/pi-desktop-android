@@ -17,7 +17,7 @@
 | notify.show | 真实通知（POST_NOTIFICATIONS 未授权⇒结构化 permission 错误，指路 perm.request）；点击回应用（PendingIntent）；BigText | ✅（Phase 2 增强点击行为） |
 | shell.openExternal | http(s) only → Intent 系统浏览器；其余 bad-arg；dryRun 支持 | ✅ |
 | log.hilog | 追加 host.log 审计 | ✅ |
-| terminal.pty | 结构化 unsupported（PTY 暂缓） | ✅ |
+| terminal.pty | 结构化能力翻转：`supported` 仅当启动期 dlopen `libpty_node.so`（node-pty 1.1.0 Maven AAR）成功；失败结构化 unsupported、不静默降级（111-pty-integration） | ✅ Phase 2 + 111 真机 |
 | 注册面完整性 | NAMES 全注册（含增量 keepAlive），缺一即 check 失败 | ✅ |
 
 ## Phase 2 异步契约（bridge 0.2.0 适配，重要）

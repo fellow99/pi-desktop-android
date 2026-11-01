@@ -57,10 +57,11 @@ const row = (g, name, state, detail = '') => {
   row(2, '无浏览器语义（无 BROWSABLE 深链）', browsable ? 'FAIL' : 'PASS', browsable ? 'Manifest 声明了 BROWSABLE' : 'Manifest 无 BROWSABLE');
 }
 
-// G3 无动态下发可执行代码（.so 清单 = 引擎+桥+libc++；JS 载荷为唯一运行期解包物）
+// G3 无动态下发可执行代码（.so 清单 = 引擎+桥+库；JS 载荷为唯一运行期解包物）
 {
   const sos = [...new Set(apkList.split('\n').map((l) => (l.match(/lib\/[^/]+\/(lib[^/]+\.so)/) || [])[1]).filter(Boolean))].sort();
-  const allowed = (s) => /^(libnode\.so|libc\+\+_shared\.so|libnode_bridge\.so|libnode_host_client\.so)$/.test(s);
+  // 111-pty-integration：白名单补 libpty_node.so（node-pty AAR 随包进 nativeLibraryDir）。
+  const allowed = (s) => /^(libnode\.so|libc\+\+_shared\.so|libnode_bridge\.so|libnode_host_client\.so|libpty_node\.so)$/.test(s);
   const unexpected = sos.filter((s) => !allowed(s));
   row(3, '无动态下发可执行代码', unexpected.length === 0 ? 'PASS' : 'FAIL',
     sos.length ? `so=${sos.join(',')}` : '未列出 .so（unzip 输出异常？）');

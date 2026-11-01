@@ -59,7 +59,7 @@ Requirements are organized under `specs/1NN-<name>/` (mirroring the ark numberin
 | `101-runtime-integration` | [`specs/101-runtime-integration-launch-orchestration/`](specs/101-runtime-integration-launch-orchestration/) | Maven bridge wiring, archive provisioning, launch/readiness/marker state machine |
 | `102-payload-pipeline` | [`specs/102-payload-pipeline-assembly-crop/`](specs/102-payload-pipeline-assembly-crop/) | Patch → build → crop → tar.gz payload pipeline (74.5 MiB archive) |
 | `103-webview-shell` | [`specs/103-webview-shell-render-pages/`](specs/103-webview-shell-render-pages/) | WebView config, boot/error pages, navigation fence, history clearing, Chrome-94 polyfills |
-| `104-host-capabilities` | [`specs/104-host-capabilities-kotlin-impl/`](specs/104-host-capabilities-kotlin-impl/) | Kotlin host bridge: facts, permissions, SAF pickers, notifications, external links, keep-alive, structured `terminal.pty=unsupported` |
+| `104-host-capabilities` | [`specs/104-host-capabilities-kotlin-impl/`](specs/104-host-capabilities-kotlin-impl/) | Kotlin host bridge: facts, permissions, SAF pickers, notifications, external links, keep-alive, `terminal.pty` capability (node-pty 1.1.0) |
 | `105-auth` | [`specs/105-auth-loopback-no-password/`](specs/105-auth-loopback-no-password/) | Loopback-only bind + no password (WebView and Node share one process; unlike Electron there is no loopback isolation) |
 | `106-tools-extensions` | [`specs/106-tools-extensions-same-name-overrides/`](specs/106-tools-extensions-same-name-overrides/) | Same-name extension overrides (`bash` / `find` / `grep`) |
 | `107-compliance` | [`specs/107-compliance-and-security/`](specs/107-compliance-and-security/) | Store-compliance checklist G1–G11 (manifest minimality, 16 KB alignment, debug-only diagnostics, AI-content label, privacy draft) |
@@ -99,7 +99,7 @@ pi-desktop-android/
 │   │   ├── android-saf.js                   # SAF bridge (content://, persistable permissions)
 │   │   ├── android-git/                     # 21 git_* tools + git_credentials (isomorphic-git 1.44.2)
 │   │   ├── android-pnpm/                    # vendored pnpm 9.15.9, in-process, --ignore-scripts
-│   │   └── android-pty/                     # evaluation-only node-pty harness (not productized; see Limitations)
+│   │   └── android-pty/                     # node-pty 1.1.0 (Maven AAR) + always-on loader + ptyBash tool + /pty-test
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # pure-JS compatibility layer, activated only if WebAssembly is absent
@@ -192,7 +192,7 @@ Device verification so far (see [`docs/002-真机验证记录.md`](docs/002-真�
 | File lookup / content search (`find` / `grep`) | ✅ on device | Replaced by `android-search.js`: pure-JS walk, zero `fd`/`rg`, zero child processes; 512 KiB per-file cap |
 | Git operations | 🔧 implemented, device verification pending | `android-git` ships 21 `git_*` tools + `git_credentials` via pure-JS isomorphic-git 1.44.2 (no system git binary needed). Out of scope: `rebase`, `blame`, SSH remotes, SHA-256 repositories |
 | Package management (pnpm) | 🔧 implemented, device verification pending | `android-pnpm` runs vendored pnpm 9.15.9 **in-process**; lifecycle scripts are always disabled (`--ignore-scripts`), write operations are refused structurally when offline, and projects must lie inside declared workspace roots |
-| Terminal panel / PTY | ❌ not in v1 (deferred decision) | Patch 0001 + the host bridge expose a structured `terminal.pty = unsupported`. `payload/extensions/android-pty/` is an **evaluation-only** harness (`/pty-test`); its native piece is deliberately not provisioned into `jniLibs` yet, so its self-check fails structurally without affecting the product |
+| Terminal panel / PTY | ✅ on device (node 26.13.0) | node-pty 1.1.0 ships in the APK (`libpty_node.so` + vendored JS) and is dlopen'd by an always-on boot loader (`pty.ready` boot-fact). Upstream `terminal-manager` runs a real mksh PTY (`/api/terminal` + SSE); `android-pty` also registers a simplest `ptyBash` tool (onExit true exit codes) and `/pty-test`. Verified E2E on real device Xiaomi MIX: tty→`/dev/pts/0`, echo+ANSI, resize (`COLUMNS/LINES`), Ctrl-C (SIGINT rc=130, shell alive), exit-close; `ptyBash echo ok;tty`→rc0, `exit 3`→rc3 |
 | Code-mode (QuickJS sandbox) | ⬜ not yet verified | Android runs **JIT by default** (no HarmonyOS-style W^X ACL gate) and WebAssembly validates on the probes, so code-mode is expected to work; it is simply not verified end-to-end yet. The `jitless/` layer is a fallback installed only when `WebAssembly` is missing |
 | MCP stdio servers | ⚠️ transport only | The spawn event-ordering blocker that existed on HarmonyOS is moot under Android (`exit`/`close` are delivered), but no real MCP server has been attached yet; shipped `mcp.json` is empty |
 | Workspace / user files | ✅ app-specific external storage (no permission) + SAF | The mainline workspace lives under `Android/data/<pkg>/files/workspace`; additional trees are added via the Storage Access Framework (`content://` URIs with persisted permissions), which are not POSIX paths and are exposed through the `android-saf` bridge |
@@ -213,7 +213,7 @@ is restored to pristine afterwards):
 
 | Patch | Purpose |
 |---|---|
-| `0001-terminal-capability-unsupported` | Surface the missing PTY as a structured capability flag instead of a native-module load error |
+| `0001-terminal-capability-unsupported` | Surface PTY as a structured capability flag — `supported` only once `libpty_node.so` is real-loaded at boot (no silent degradation into a fake terminal) |
 | `0002-cwd-sandbox-root-from-android-roots` | Resolve the working directory / browser roots from `PI_ANDROID_ROOTS` |
 | `0003-cwd-adb-path-alias-normalize` | Normalize adb/host-style path aliases to sandbox-relative paths |
 | `0004-session-export-runtime-identity-guard` | Route session export through the in-process fallback when the runtime identity (`app_process`) cannot spawn Node |
