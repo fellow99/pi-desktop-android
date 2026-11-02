@@ -158,7 +158,7 @@ jobs:
           test -f "$APK"
           echo "── .so 清单（G3 白名单）──"
           unzip -l "$APK" | grep -E '\.so$' || true
-          if unzip -l "$APK" | grep -E '\.so$' | awk -F/ '{print $NF}' | grep -vE '^(libnode\.so|libc\+\+_shared\.so|libnode_bridge\.so|libnode_host_client\.so)$'; then
+          if unzip -l "$APK" | grep -E '\.so$' | awk -F/ '{print $NF}' | grep -vE '^(libnode\.so|libc\+\+_shared\.so|libnode_bridge\.so|libnode_host_client\.so|libpty_node\.so)$'; then
             echo "::error::APK 出现 G3 白名单外的 .so"; exit 1
           fi
           echo "── 16KB 页对齐（G5）──"
