@@ -1,0 +1,576 @@
+diff --git a/app/api/cwd/browse/route.ts b/app/api/cwd/browse/route.ts
+index 381c14a..41b2493 100644
+--- a/app/api/cwd/browse/route.ts
++++ b/app/api/cwd/browse/route.ts
+@@ -3,17 +3,35 @@ import { stat } from "fs/promises";
+ import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
+ import { describePathForms, normalizeAndroidSandboxPath } from "@/lib/android-sandbox-path";
+ import {
+-  createDirectory,
++  createDirectoryAuto,
++  findEnclosingPickerRoot,
+   findWorkspaceRoot,
+   getBrowseStartDirectory,
+   getParentDirectory,
++  getPickerRoots,
+   getWorkspaceRoots,
+-  listDirectories,
++  listDirectoriesLimited,
+   listWindowsDrives,
++  MAX_DIRECTORY_ENTRIES,
++  PICKER_CONTRACT_MARKER,
+   resolveDirectory,
+   shouldShowWindowsDrivePicker,
+ } from "@/lib/directory-browser";
+ 
++/**
++ * 每次 `GET` 都带回的「选择器契约」头（FR-203-005/009）：Tab 根清单 + 条目上限 + 契约标记。
++ *
++ * 根清单只在这里出现 —— 前端不得硬编码任何路径，Tab 就是 `roots` 的渲染；条目上限也
++ * 只由服务端给，提示文案里的「500」不必在客户端再写一遍。
++ */
++function pickerContract() {
++  return {
++    contract: PICKER_CONTRACT_MARKER,
++    roots: getPickerRoots().map((root) => ({ id: root.id, label: root.label })),
++    entryLimit: MAX_DIRECTORY_ENTRIES,
++  };
++}
++
+ /**
+  * 宿主声明的某个主目录（`?root=<id>`）的入口。
+  *
+@@ -27,7 +45,12 @@ async function browseDeclaredRoot(rootId: string): Promise<NextResponse> {
+   const root = findWorkspaceRoot(rootId);
+   if (!root) {
+     return NextResponse.json(
+-      { error: "Unknown workspace root", rootId, declared: getWorkspaceRoots().map((entry) => entry.id) },
++      {
++        error: "Unknown workspace root",
++        rootId,
++        declared: getWorkspaceRoots().map((entry) => entry.id),
++        ...pickerContract(),
++      },
+       { status: 400 },
+     );
+   }
+@@ -36,21 +59,37 @@ async function browseDeclaredRoot(rootId: string): Promise<NextResponse> {
+     resolved = await resolveDirectory(root.path);
+   } catch {
+     // 已声明但不存在：把「是谁声明的、声明成什么」一起回给调用方（宿主应建它）。
++    // Tab 清单照旧带回 —— 否则某个根（如尚未授权的「桌面」）一 404，整行 Tab 就没了。
+     return NextResponse.json(
+-      { error: "Directory does not exist", code: "ENOENT", rootId: root.id, rootPath: root.path },
++      {
++        error: "Directory does not exist",
++        code: "ENOENT",
++        rootId: root.id,
++        rootPath: root.path,
++        ...pickerContract(),
++      },
+       { status: 404 },
+     );
+   }
+   const rootStat = await stat(resolved);
+   if (!rootStat.isDirectory()) {
+-    return NextResponse.json({ error: "Path is not a directory", rootId: root.id, rootPath: resolved }, { status: 400 });
++    return NextResponse.json(
++      { error: "Path is not a directory", rootId: root.id, rootPath: resolved, ...pickerContract() },
++      { status: 400 },
++    );
+   }
++  const listing = await listDirectoriesLimited(resolved);
+   return NextResponse.json({
+     rootId: root.id,
+     rootPath: resolved,
+     path: resolved,
+-    parentPath: getParentDirectory(resolved),
+-    directories: await listDirectories(resolved),
++    // 主目录根就是围栏的底（FR-203-008）：到根时父目录为 null，且由**服务端**给出，
++    // 前端只是照着渲染，不靠藏按钮。
++    parentPath: null,
++    directories: listing.directories,
++    truncated: listing.truncated,
++    total: listing.total,
++    ...pickerContract(),
+   });
+ }
+ 
+@@ -70,6 +109,7 @@ export async function GET(request: NextRequest) {
+         parentPath: null,
+         drives: await listWindowsDrives(),
+         directories: [],
++        ...pickerContract(),
+       });
+     }
+ 
+@@ -90,12 +130,22 @@ export async function GET(request: NextRequest) {
+       return NextResponse.json({ error: "Path is not a directory" }, { status: 400 });
+     }
+ 
+-    const directories = await listDirectories(resolved);
++    const listing = await listDirectoriesLimited(resolved);
++
++    // 围栏（FR-203-008）：这个路径若落在某个主目录根之内，父目录不许越过该根；
++    // 正好停在根上时父目录为 null。判断在服务端做，前端只渲染 `parentPath`。
++    const fence = await findEnclosingPickerRoot(resolved);
++    const parentPath = fence?.exact ? null : getParentDirectory(resolved);
+ 
+     return NextResponse.json({
+       path: resolved,
+-      parentPath: getParentDirectory(resolved),
+-      directories,
++      parentPath,
++      directories: listing.directories,
++      truncated: listing.truncated,
++      total: listing.total,
++      rootId: fence?.id ?? null,
++      rootPath: fence?.path ?? null,
++      ...pickerContract(),
+     });
+   } catch (error) {
+     return NextResponse.json({ error: String(error) }, { status: 500 });
+@@ -126,7 +176,9 @@ export async function POST(request: Request) {
+       return NextResponse.json({ error: "Directory name is required" }, { status: 400 });
+     }
+ 
+-    const createdPath = await createDirectory(parentPath, name);
++    // FR-203-011/012：默认名（`未命名文件夹` / `Untitled folder`）同级重名时自动去重为
++    // `… 2`、`… 3`…；其它名字保持上游语义（重名 → EEXIST → 409，前端在 Modal 内提示并保留输入态）。
++    const createdPath = await createDirectoryAuto(parentPath, name);
+     return NextResponse.json({ success: true, path: createdPath });
+   } catch (error) {
+     const code = error && typeof error === "object" && "code" in error
+diff --git a/components/DirectoryPicker.tsx b/components/DirectoryPicker.tsx
+index 433cd89..eca0474 100644
+--- a/components/DirectoryPicker.tsx
++++ b/components/DirectoryPicker.tsx
+@@ -9,11 +9,25 @@ interface DirectoryEntry {
+   path: string;
+ }
+ 
++interface DirectoryRoot {
++  id: string;
++  label: string;
++}
++
+ interface BrowseResponse {
+   path?: string;
+   parentPath?: string | null;
+   directories?: DirectoryEntry[];
+   drives?: DirectoryEntry[];
++  /** 主目录 Tab 的根清单（服务端下发；前端不硬编码任何路径）。 */
++  roots?: DirectoryRoot[];
++  /** 当前目录落在哪个主目录根里（服务端围栏的结果；不在任何根内为 null）。 */
++  rootId?: string | null;
++  rootPath?: string | null;
++  /** 条目超过服务端上限被截断（FR-203-009）。 */
++  truncated?: boolean;
++  entryLimit?: number;
++  total?: number;
+   error?: string;
+ }
+ 
+@@ -64,14 +78,42 @@ const secondaryActionStyle: CSSProperties = {
+   color: "var(--text-muted)",
+ };
+ 
+-async function loadDirectories(directory?: string): Promise<BrowseResponse> {
+-  const query = directory ? `?path=${encodeURIComponent(directory)}` : "";
+-  const response = await fetch(`/api/cwd/browse${query}`);
++/**
++ * 读一次目录。
++ * `path` 与 `root` 二选一：带 `root` 时列宿主声明的主目录（Tab），否则按路径浏览。
++ */
++async function loadDirectories(directory?: string, rootId?: string): Promise<BrowseResponse> {
++  const params = new URLSearchParams();
++  if (directory) params.set("path", directory);
++  else if (rootId) params.set("root", rootId);
++  const query = params.toString();
++  const response = await fetch(`/api/cwd/browse${query ? `?${query}` : ""}`);
+   const data = await response.json() as BrowseResponse;
+   if (!response.ok || data.error) throw new Error(data.error ?? `HTTP ${response.status}`);
+   return data;
+ }
+ 
++/** 主目录 Tab 的持久化 key：只存根 **id**（FR-203-018）—— 路径由宿主每次启动重算。 */
++const ROOT_STORAGE_KEY = "pi-hos-picker-root";
++
++function readStoredRootId(): string | null {
++  try {
++    const stored = window.localStorage.getItem(ROOT_STORAGE_KEY);
++    return stored && stored.length > 0 ? stored : null;
++  } catch {
++    return null;   // 存储不可用（隐私模式）：当作没记过，不阻塞选择器
++  }
++}
++
++function writeStoredRootId(rootId: string | null): void {
++  try {
++    if (rootId) window.localStorage.setItem(ROOT_STORAGE_KEY, rootId);
++    else window.localStorage.removeItem(ROOT_STORAGE_KEY);
++  } catch {
++    // 写不进去只影响下次恢复，不影响本次选择。
++  }
++}
++
+ async function createDirectory(parentPath: string, name: string): Promise<string> {
+   const response = await fetch("/api/cwd/browse", {
+     method: "POST",
+@@ -129,20 +171,30 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+   const [directoryName, setDirectoryName] = useState("");
+   const [createError, setCreateError] = useState<string | null>(null);
+   const [creating, setCreating] = useState(false);
++  const [roots, setRoots] = useState<DirectoryRoot[]>([]);
++  const [activeRootId, setActiveRootId] = useState<string | null>(null);
++  const [truncated, setTruncated] = useState(false);
++  const [entryLimit, setEntryLimit] = useState<number | null>(null);
+ 
+-  const navigateTo = useCallback(async (directory?: string) => {
++  const navigateTo = useCallback(async (directory?: string, rootId?: string): Promise<boolean> => {
+     setLoading(true);
+     setLoadError(null);
+     try {
+-      const data = await loadDirectories(directory);
++      const data = await loadDirectories(directory, rootId);
+       const nextPath = data.path ?? directory ?? "/";
+       setCurrentPath(nextPath);
+       setParentDirectory(data.parentPath ?? null);
+       setPathInput(nextPath);
+       setDirectories(data.directories ?? []);
+       setDrives(data.drives ?? null);
++      setRoots(data.roots ?? []);
++      setActiveRootId(data.rootId ?? null);
++      setEntryLimit(data.entryLimit ?? null);
++      setTruncated(data.truncated === true);
++      return true;
+     } catch (cause) {
+       setLoadError(cause instanceof Error ? cause.message : String(cause));
++      return false;
+     } finally {
+       setLoading(false);
+     }
+@@ -150,7 +202,18 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+ 
+   useEffect(() => {
+     setPortalTarget(document.body);
+-    void navigateTo(initialPath || undefined);
++    void (async () => {
++      if (initialPath) {
++        await navigateTo(initialPath);
++        return;
++      }
++      // FR-203-018：刷新后回到上次的主目录 Tab（只记 id；根清单仍由服务端核对）。
++      const storedRootId = readStoredRootId();
++      if (storedRootId && await navigateTo(undefined, storedRootId)) return;
++      // 记下的 id 已不在宿主声明的清单里（升级 / 卸载授权）：清掉脏值，回落默认起点。
++      if (storedRootId) writeStoredRootId(null);
++      await navigateTo();
++    })();
+   }, [initialPath, navigateTo]);
+ 
+   const handlePathSubmit = (event: FormEvent<HTMLFormElement>) => {
+@@ -180,12 +243,19 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+       setDirectoryName("");
+       await navigateTo(createdPath);
+     } catch (cause) {
++      // FR-203-013：失败时保留输入框内容、不关 Modal，错误就显示在 Modal 里。
+       setCreateError(cause instanceof Error ? cause.message : String(cause));
+     } finally {
+       setCreating(false);
+     }
+   };
+ 
++  // FR-203-018：切 Tab 时只把根 **id** 写进 localStorage，路径一律由服务端重算。
++  const selectRoot = (rootId: string) => {
++    writeStoredRootId(rootId);
++    void navigateTo(undefined, rootId);
++  };
++
+   const hasUncommittedPath = pathInput.trim() !== currentPath;
+   const canSelect = Boolean(currentPath) && !hasUncommittedPath && !busy;
+   const canCreate = canSelect && !loading;
+@@ -224,6 +294,29 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+           </button>
+         </div>
+ 
++        {roots.length > 0 && (
++          <div className="directory-picker-roots" role="tablist" aria-label={t("directoryPicker.rootsLabel")} style={{ display: "flex", flexWrap: "wrap", gap: 6, flexShrink: 0, padding: "10px 14px 0" }}>
++            {roots.map((root) => {
++              const active = root.id === activeRootId;
++              return (
++                <button
++                  key={root.id}
++                  className="directory-picker-root"
++                  type="button"
++                  role="tab"
++                  aria-selected={active}
++                  data-root-id={root.id}
++                  onClick={() => selectRoot(root.id)}
++                  disabled={loading}
++                  style={{ padding: "5px 12px", border: "1px solid var(--border)", borderRadius: 999, background: active ? "var(--accent)" : "none", color: active ? "var(--accent-contrast)" : "var(--text-muted)", fontSize: 12, fontWeight: active ? 600 : 500, cursor: loading ? "default" : "pointer", opacity: loading ? 0.7 : 1 }}
++                >
++                  {root.label}
++                </button>
++              );
++            })}
++          </div>
++        )}
++
+         <form onSubmit={handlePathSubmit} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+           <button className="directory-picker-back" type="button" onClick={() => void navigateTo(parentDirectory ?? undefined)} disabled={loading || !canNavigateUp} title={t("directoryPicker.goToParent")} aria-label={t("directoryPicker.goToParent")} style={{ width: 36, height: 36, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-hover)", color: "var(--text-muted)", cursor: canNavigateUp ? "pointer" : "default", opacity: canNavigateUp ? 1 : 0.45 }}>
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+@@ -299,6 +392,11 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+           ) : (
+             <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 11 }}>{t("directoryPicker.noSubdirectories")}</div>
+           )}
++          {truncated && entryLimit !== null && drives === null && (
++            <div className="directory-picker-truncated" style={{ padding: "6px 8px", color: "var(--text-dim)", fontSize: 11 }}>
++              {t("directoryPicker.truncatedNotice", { count: entryLimit })}
++            </div>
++          )}
+           {(loadError || error) && <div style={{ padding: "8px", color: "#dc2626", fontSize: 11 }}>{loadError ?? error}</div>}
+         </div>
+ 
+@@ -309,6 +407,9 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+             onClick={() => {
+               setCreateOpen(true);
+               setCreateError(null);
++              // FR-203-011：默认名走 i18n（zh = 未命名文件夹，en = Untitled folder），可改名；
++              // 同级重名由服务端追加序号（未命名文件夹 2、3…）。
++              setDirectoryName(t("directoryPicker.defaultDirectoryName"));
+             }}
+             disabled={!canCreate}
+             style={{ ...secondaryActionStyle, marginRight: "auto", opacity: canCreate ? 1 : 0.6, cursor: canCreate ? "pointer" : "default" }}
+diff --git a/lib/directory-browser.ts b/lib/directory-browser.ts
+index de37afc..f96cb07 100644
+--- a/lib/directory-browser.ts
++++ b/lib/directory-browser.ts
+@@ -61,6 +61,101 @@ export function findWorkspaceRoot(rootId: string): WorkspaceRoot | null {
+   return getWorkspaceRoots().find((root) => root.id === rootId) ?? null;
+ }
+ 
++/**
++ * 编译产物里的稳定标记（E14 选择器交互契约）。`scripts/assemble-payload.mjs` 的
++ * `PI_WEB_PATCH_MARKERS` 用它断言这条补丁真的进了
++ * `.next/server/app/api/cwd/browse/route.js` —— 本模块被 Next 内联进该 bundle，
++ * 所以字面量随路由一起编译；前端组件里的字面量**不进**这个 bundle，故标记放这里。
++ */
++export const PICKER_CONTRACT_MARKER = "pi-hos-picker-contract";
++
++/**
++ * 选择器顶部 Tab 的契约：**恰好四个**主目录，顺序即 Tab 顺序（FR-203-005）。
++ * 与 `payload/extensions/harmony-workspace-roots.js#EXPECTED_IDS` 同一张表。
++ */
++export const PICKER_ROOT_IDS = ["sandbox", "desktop", "documents", "download"] as const;
++
++/** 四个契约 id 的标签（宿主声明了 label 就用宿主的；缺省或与 id 等值时用这张表）。 */
++const PICKER_ROOT_LABELS: Record<(typeof PICKER_ROOT_IDS)[number], string> = {
++  sandbox: "沙箱",
++  desktop: "桌面",
++  documents: "文档",
++  download: "下载",
++};
++
++/** 目录条目上限：超过即截断并给 `truncated`（FR-203-009）。 */
++export const MAX_DIRECTORY_ENTRIES = 500;
++
++export interface PickerRoot {
++  id: string;
++  label: string;
++  path: string;
++}
++
++/**
++ * Tab 根清单的**服务端**唯一出口。
++ *
++ * 只消费宿主声明的根（`PI_ANDROID_ROOTS`）：未声明的不补（不猜路径），未知 id 不显示
++ * （Tab 恰好四个）。顺序固定为 `PICKER_ROOT_IDS`，与宿主声明顺序无关 —— 否则
++ * Tab 顺序会随宿主实现漂移。
++ */
++export function getPickerRoots(): PickerRoot[] {
++  const declared = getWorkspaceRoots();
++  const roots: PickerRoot[] = [];
++  for (const id of PICKER_ROOT_IDS) {
++    const root = declared.find((entry) => entry.id === id);
++    if (!root) continue;
++    const label = root.label && root.label !== id ? root.label : PICKER_ROOT_LABELS[id];
++    roots.push({ id, label, path: root.path });
++  }
++  return roots;
++}
++
++/** 两个路径是否指同一目录（Windows 盘符形态大小写不敏感，其余逐字节比较）。 */
++function samePath(left: string, right: string): boolean {
++  if (/^[a-zA-Z]:[\\/]/.test(left)) return left.toLowerCase() === right.toLowerCase();
++  return left === right;
++}
++
++/** `parent` 是否就是 `child` 或它的祖先（按路径段比较，不是裸字符串前缀）。 */
++function isSameOrAncestorPath(parent: string, child: string): boolean {
++  const base = parent.replace(/[\\/]+$/, "");
++  if (base.length === 0) return false;
++  if (samePath(base, child)) return true;
++  return child.startsWith(`${base}/`) || child.startsWith(`${base}\\`);
++}
++
++export interface EnclosingPickerRoot {
++  id: string;
++  /** 该根 realpath 后的路径（与 GET 响应里的 `path` 同口径，可直接比较）。 */
++  path: string;
++  /** 目标是否正好停在这个根上（此时父目录必须为 null）。 */
++  exact: boolean;
++}
++
++/**
++ * 找出已经把 `resolvedPath` 围住的主目录根（FR-203-008 的**服务端**一半）。
++ *
++ * 为什么围栏必须在服务端：前端只负责渲染响应里的 `parentPath`。一旦服务端把
++ * `…/Desktop` 的父目录回成 `…/currentUser`，面包屑就能越过主目录根去浏览整个
++ * 用户区 —— 既是权限面的错位，也让「我在哪个根里」无从判断；靠前端藏按钮既
++ * 不可靠，也没法被别的客户端复用。
++ */
++export async function findEnclosingPickerRoot(resolvedPath: string): Promise<EnclosingPickerRoot | null> {
++  for (const root of getPickerRoots()) {
++    let rootPath: string;
++    try {
++      rootPath = await resolveDirectory(root.path);
++    } catch {
++      continue;   /* 声明了但不存在：围不住任何东西 */
++    }
++    if (isSameOrAncestorPath(rootPath, resolvedPath)) {
++      return { id: root.id, path: rootPath, exact: samePath(rootPath, resolvedPath) };
++    }
++  }
++  return null;
++}
++
+ /**
+  * 裸打开（没有 `path`）时的起点。
+  *
+@@ -135,6 +230,56 @@ export async function createDirectory(parentDirectory: string, name: string): Pr
+   return realpath(createdPath);
+ }
+ 
++/**
++ * 新建文件夹的**默认名家族**（FR-203-011/012）：简体「未命名文件夹」、繁体
++ * 「未命名文件夾」、英文「Untitled folder」—— 与三套 i18n 的
++ * `directoryPicker.defaultDirectoryName` 同一份词表（服务端去重要认得出前端给的默认名）。
++ */
++export const UNTITLED_DIRECTORY_NAMES = ["未命名文件夹", "未命名文件夾", "Untitled folder"] as const;
++
++/** 默认名 + 可选序号（`未命名文件夹 2`）。只有这一族名字参与自动去重。 */
++const UNTITLED_DIRECTORY_PATTERN = /^(?:未命名文件夹|未命名文件夾|Untitled folder)(?: \d+)?$/;
++
++async function pathPresent(target: string): Promise<boolean> {
++  try {
++    await stat(target);
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++/**
++ * 建目录 + 默认名自动去重（FR-203-012）。
++ *
++ * 规则刻意**只覆盖默认名家族**：用户自己打了 `project` 而同级已有同名，仍走上游的
++ * EEXIST → 409（「重名要在 Modal 内提示、保留输入态」，FR-203-013）；只有「用户没改名，
++ * 就用默认名」这一种才悄悄换成 `未命名文件夹 2`、`未命名文件夹 3`…
++ * 序号从 2 起、跳过已存在者 ⇒ 同一目录状态下可复现（同样的调用得到同样的名字）。
++ */
++export async function createDirectoryAuto(parentDirectory: string, name: string): Promise<string> {
++  const requested = name.trim() || UNTITLED_DIRECTORY_NAMES[0];
++  if (!UNTITLED_DIRECTORY_PATTERN.test(requested)) return createDirectory(parentDirectory, requested);
++
++  const resolvedParent = await resolveDirectory(parentDirectory);
++  const parentStat = await stat(resolvedParent);
++  if (!parentStat.isDirectory()) throw new Error("Parent path is not a directory");
++
++  const base = UNTITLED_DIRECTORY_NAMES.find((candidate) => requested.startsWith(candidate)) ?? UNTITLED_DIRECTORY_NAMES[0];
++  for (let index = 1; index <= MAX_DIRECTORY_ENTRIES; index += 1) {
++    const candidate = index === 1 ? base : `${base} ${index}`;
++    if (await pathPresent(path.join(resolvedParent, candidate))) continue;
++    try {
++      return await createDirectory(resolvedParent, candidate);
++    } catch (error) {
++      // 并发建同名：换个序号再来，不让一次竞态变成 500。
++      if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") continue;
++      throw error;
++    }
++  }
++  throw new Error("Untitled directory name exhausted");
++}
++
+ export async function listDirectories(directory: string): Promise<BrowsableDirectory[]> {
+   const entries = await readdir(directory, { withFileTypes: true });
+   // 忽略损坏、不可访问或不指向目录的符号链接。
+@@ -159,3 +304,26 @@ export async function listDirectories(directory: string): Promise<BrowsableDirec
+     .filter((entry): entry is BrowsableDirectory => entry !== null)
+     .sort((left, right) => left.name.localeCompare(right.name));
+ }
++
++export interface DirectoryListing {
++  directories: BrowsableDirectory[];
++  /** 条目总数超过 `MAX_DIRECTORY_ENTRIES` ⇒ true（FR-203-009）。 */
++  truncated: boolean;
++  /** 截断前的真实条目数（提示文案里的数字由服务端给，前端不硬编码）。 */
++  total: number;
++}
++
++/**
++ * 列目录 + 截断信息。
++ *
++ * 先按既有规则排序、再取前 `limit` 项 ⇒ 截断结果永远是**确定性前缀**（同一目录状态
++ * 永远得到同一批名字），不会因为 `readdir` 的返回顺序而漂移。
++ */
++export async function listDirectoriesLimited(
++  directory: string,
++  limit: number = MAX_DIRECTORY_ENTRIES,
++): Promise<DirectoryListing> {
++  const all = await listDirectories(directory);
++  if (all.length <= limit) return { directories: all, truncated: false, total: all.length };
++  return { directories: all.slice(0, limit), truncated: true, total: all.length };
++}
+diff --git a/lib/i18n/messages/en.ts b/lib/i18n/messages/en.ts
+index cd39a31..c48e8e2 100644
+--- a/lib/i18n/messages/en.ts
++++ b/lib/i18n/messages/en.ts
+@@ -302,6 +302,9 @@ export const enLocale: LocalePlugin = {
+     "directoryPicker.directoryNamePlaceholder": "Enter a directory name",
+     "directoryPicker.create": "Create",
+     "directoryPicker.creating": "Creating…",
++    "directoryPicker.rootsLabel": "Root folders",
++    "directoryPicker.truncatedNotice": "Showing the first {count} entries only",
++    "directoryPicker.defaultDirectoryName": "Untitled folder",
+     "sidebar.checking": "Checking…",
+     "sidebar.open": "Open",
+     "sidebar.cancel": "Cancel",
+diff --git a/lib/i18n/messages/zh-CN.ts b/lib/i18n/messages/zh-CN.ts
+index 96c75c3..168474e 100644
+--- a/lib/i18n/messages/zh-CN.ts
++++ b/lib/i18n/messages/zh-CN.ts
+@@ -302,6 +302,9 @@ export const zhCNLocale: LocalePlugin = {
+     "directoryPicker.directoryNamePlaceholder": "请输入目录名",
+     "directoryPicker.create": "创建",
+     "directoryPicker.creating": "正在创建…",
++    "directoryPicker.rootsLabel": "主目录",
++    "directoryPicker.truncatedNotice": "仅显示前 {count} 项",
++    "directoryPicker.defaultDirectoryName": "未命名文件夹",
+     "sidebar.checking": "检查中…",
+     "sidebar.open": "打开",
+     "sidebar.cancel": "取消",
+diff --git a/lib/i18n/messages/zh-TW.ts b/lib/i18n/messages/zh-TW.ts
+index d8b6d41..f1b37b6 100644
+--- a/lib/i18n/messages/zh-TW.ts
++++ b/lib/i18n/messages/zh-TW.ts
+@@ -302,6 +302,9 @@ export const zhTWLocale: LocalePlugin = {
+     "directoryPicker.directoryNamePlaceholder": "請輸入目錄名稱",
+     "directoryPicker.create": "建立",
+     "directoryPicker.creating": "正在建立…",
++    "directoryPicker.rootsLabel": "主目錄",
++    "directoryPicker.truncatedNotice": "僅顯示前 {count} 項",
++    "directoryPicker.defaultDirectoryName": "未命名文件夾",
+     "sidebar.checking": "檢查中…",
+     "sidebar.open": "開啟",
+     "sidebar.cancel": "取消",

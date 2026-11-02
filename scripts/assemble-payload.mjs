@@ -3,7 +3,7 @@
  * assemble-payload.mjs —— pi-desktop-android 的载荷组装流水线（宿主机 Node 运行）。
  *
  * 与 pi-desktop-ark 的同名脚本同构（移植 + Android 化），流水线：
- *   ① 幂等应用 patches/v0.12.1/*.patch 到 ../pi-web 工作树（--reverse --check 命中即跳；冲突即 exit 2，绝不 --3way）
+ *   ① 幂等应用 patches/v0.13.0/*.patch 到 ../pi-web 工作树（--reverse --check 命中即跳；冲突即 exit 2，绝不 --3way）
  *   ② 组装/刷新 PI_DIST（build/pi-dist：package.json + next.config.ts + public/ + node_modules/ + .next/）
  *   ③ 补丁标记断言（缺标记 ⇒ 用打了补丁的源码重编 `next build --webpack` 并镜像 .next；重编后仍缺 ⇒ exit 2）
  *   ④ 裁剪复制 PI_DIST → build/payload-stage/pi-web（crop-rules：nft.json / win32 原生 SWC / sharp / node-pty / *.node）
@@ -31,7 +31,7 @@ import { CROP_RULES, ruleMatchesFile, ruleMatchesDir, firstMatchingRule, assertK
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(HERE, '..');
 const DEFAULT_PI_WEB = path.resolve(PROJECT_ROOT, '..', 'pi-web');
-const PI_WEB_PATCH_TAG = 'v0.12.1';
+const PI_WEB_PATCH_TAG = 'v0.13.0';
 const DEFAULT_PATCH_DIR = path.join(PROJECT_ROOT, 'patches', PI_WEB_PATCH_TAG);
 const DEFAULT_PI_DIST = path.join(PROJECT_ROOT, 'build', 'pi-dist');
 const DEFAULT_STAGE = path.join(PROJECT_ROOT, 'build', 'payload-stage');

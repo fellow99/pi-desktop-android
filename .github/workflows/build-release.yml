@@ -32,8 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90   # pi-web 首次全量 next build，60min 可能吃紧（参考工程 opencode 亦需全量构建）
     env:
-      PI_WEB_TAG: v0.12.1
-      PDA_NODE_RUNTIME_VER: 24.22.1
+      PI_WEB_TAG: v0.13.0
+      PDA_NODE_RUNTIME_VER: 26.13.0
     steps:
       # ── 检出 ────────────────────────────────────────────────────────────────
       - name: 检出本仓库

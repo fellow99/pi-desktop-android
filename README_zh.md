@@ -15,9 +15,9 @@
 | --- | --- |
 | 版别 | **Android Edition**（`pi-desktop-android`） |
 | 应用显示名 / 应用 ID | **Pi Desktop** / `org.fellow99.pi.PiDesktopAndroid`（2026-10-24 定稿；显示名与 `pi-desktop` / `…Ark` 品牌口径一致，仅包名带 Android） |
-| 版本 / versionCode | **`0.1.0` / `1`**（预发布；第 0 级真机验证已完成） |
-| 上游基线 | `pi` **v1.2.0** + `pi-web` **v0.12.1**（`patches/v0.12.1/` 下 6 条幂等可反向补丁） |
-| 后端 | `io.github.fellow99:node-bridge` **0.2.0**（JNI 直调宿主桥）+ **投放制** aosp-node-runtime 引擎 `libnode.so` **v24.22.1**（`--with-intl=small-icu`，见下方「引擎说明」），进程内 `dlopen` + `node::Start` |
+| 版本 / versionCode | **`0.13.0` / `1300`**（v0.13.0 发布版） |
+| 上游基线 | `pi` **v1.4.0** + `pi-web` **v0.13.0**（`patches/v0.13.0/` 下 6 条幂等可反向补丁） |
+| 后端 | `io.github.fellow99:node-bridge` **0.2.0**（JNI 直调宿主桥）+ **投放制** aosp-node-runtime 引擎 `libnode.so` **v26.13.0**（`--with-intl=small-icu`，见下方「引擎说明」），进程内 `dlopen` + `node::Start` |
 | 前端 | 系统 WebView 加载 `http://127.0.0.1:<随机端口>/`（同源 HTTP + SSE；loopback 即安全上下文） |
 | ABI | **仅 `arm64-v8a`**（引擎只出单 ABI） |
 | minSdk / targetSdk / compileSdk | **24** / **36** / **36** |
@@ -26,7 +26,7 @@
 
 > **引擎说明**：Maven 上的 `io.github.fellow99:node-runtime:24.2.0` 以 `--with-intl=none`
 > 构建（完全没有 `Intl`，会使 Next 16 编译产物中的 Unicode 属性转义在解析期直接失败）。
-> 因此本工程用 `scripts/provision-engine.mjs` 把 **aosp-node-runtime v24.22.1（small-ICU）**
+> 因此本工程用 `scripts/provision-engine.mjs` 把 **aosp-node-runtime v26.13.0（small-ICU）**
 > 投放到 `app/src/main/jniLibs/`，SHA-256 由 `runtime.lock.json` 锁定；该二进制**刻意不入库**。
 
 ---
@@ -98,7 +98,7 @@ pi-desktop-android/
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # 纯 JS 兼容层，仅当 WebAssembly 不存在时启用
-├── patches/v0.12.1/                         # 6 条幂等 pi-web 补丁（0001–0006）
+├── patches/v0.13.0/                         # 6 条幂等 pi-web 补丁（0001–0006）
 ├── scripts/                                 # assemble-payload · crop-rules · provision-engine/pty · devtest · sync
 ├── docs/                                    # 000 规划 · 能力清单 · 真机记录 · 隐私草稿
 ├── specs/                                   # 1NN 模块规格
@@ -144,7 +144,7 @@ node scripts/assemble-payload.mjs --apply      # -> app/src/main/assets/pi-web/p
 
 注意载荷暂存为零拷贝**硬链接**，品牌化采用「临时文件 + rename」/「先 unlink 再写」替换暂存目录项，
 而不是写穿共享 inode；已验证 `build/pi-dist` 源仍保持上游品牌。详见
-[`docs/安卓环境能力清单-0.12.1.md`](docs/安卓环境能力清单-0.12.1.md) §H REV-1。
+[`docs/安卓环境能力清单-0.13.0.md`](docs/安卓环境能力清单-0.13.0.md) §H REV-1。
 
 ## 安装与运行
 
@@ -189,7 +189,7 @@ adb shell am start -n org.fellow99.pi.PiDesktopAndroid/.MainActivity
 
 详见 [`payload/skills/android-runtime-capabilities/SKILL.md`](payload/skills/android-runtime-capabilities/SKILL.md)
 （给模型看的能力摘要）与权威 as-built 清单
-[`docs/安卓环境能力清单-0.12.1.md`](docs/安卓环境能力清单-0.12.1.md)。
+[`docs/安卓环境能力清单-0.13.0.md`](docs/安卓环境能力清单-0.13.0.md)。
 
 ## 对上游 pi-web 的补丁
 
@@ -218,7 +218,7 @@ adb shell am start -n org.fellow99.pi.PiDesktopAndroid/.MainActivity
 | 文档 | 内容 |
 |---|---|
 | [`docs/000-工程规划.md`](docs/000-工程规划.md) | 工程规划、决策、能力矩阵、分期（规划口径权威，v0.2） |
-| [`docs/安卓环境能力清单-0.12.1.md`](docs/安卓环境能力清单-0.12.1.md) | **as-built 权威能力清单**：对标 ark，附证据与根因分层 |
+| [`docs/安卓环境能力清单-0.13.0.md`](docs/安卓环境能力清单-0.13.0.md) | **as-built 权威能力清单**：对标 ark，附证据与根因分层 |
 | [`docs/002-真机验证记录.md`](docs/002-真机验证记录.md) | Phase 0 探针记录、模拟器翻译层结论、真机 A1–A8 证据 |
 | [`docs/隐私政策与AI标识-G8G9.md`](docs/隐私政策与AI标识-G8G9.md) | 上架用隐私政策与 AI 标识材料草稿 |
 | [`specs/`](specs/) | 模块规格（`101`–`107`）、架构、宪法、总体测试用例 |
