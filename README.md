@@ -16,8 +16,8 @@
 | --- | --- |
 | Edition | **Android Edition** (`pi-desktop-android`) |
 | Display name / application ID | **Pi Desktop** / `org.fellow99.pi.PiDesktopAndroid` (finalized 2026-10-24; the display name matches the `pi-desktop` / `…Ark` brand — only the package name carries "Android") |
-| Version / versionCode | **`0.13.0` / `1300`** (v0.13.0 release) |
-| Upstream baseline | `pi` **v1.4.0** + `pi-web` **v0.13.0** (six idempotent, reversible patches under `patches/v0.13.0/`) |
+| Version / versionCode | **`0.14.1` / `1401`** (v0.14.1 release) |
+| Upstream baseline | `pi` **v1.4.0** + `pi-web` **v0.14.1** (six idempotent, reversible patches under `patches/v0.14.1/`) |
 | Backend | `io.github.fellow99:node-bridge` **0.2.0** (JNI direct-call host bridge) + a **provisioned** aosp-node-runtime engine `libnode.so` **v26.13.0** (`--with-intl=small-icu`; see *Engine note* below), in-process via `dlopen` + `node::Start` |
 | Frontend | System WebView loading `http://127.0.0.1:<random-port>/` (same-origin HTTP + SSE; loopback is a secure context) |
 | ABI | **`arm64-v8a` only** (the engine ships a single ABI) |
@@ -103,7 +103,7 @@ pi-desktop-android/
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # pure-JS compatibility layer, activated only if WebAssembly is absent
-├── patches/v0.13.0/                         # six idempotent pi-web patches (0001–0006)
+├── patches/v0.14.1/                         # six idempotent pi-web patches (0001–0006)
 ├── scripts/                                 # assemble-payload · crop-rules · provision-engine/pty · devtest · sync
 ├── docs/                                    # 000 plan · capability inventory · device records · privacy draft
 ├── specs/                                   # 1NN module specs
@@ -154,7 +154,7 @@ drawn by hand, and a missing/invalid asset is a hard failure.
 Note the payload stage is hard-linked for zero-copy speed, so branding replaces each staged entry
 (temp-file + rename / unlink-before-write) rather than writing through the shared inode; the
 `build/pi-dist` source is verified to remain upstream-branded. See
-[`docs/安卓环境能力清单-0.13.0.md`](docs/安卓环境能力清单-0.13.0.md) §H REV-1.
+[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md) §H REV-1.
 
 ## Install and run
 
@@ -204,7 +204,7 @@ Device verification so far (see [`docs/002-真机验证记录.md`](docs/002-真�
 
 See [`skills/android-runtime-capabilities/SKILL.md`](payload/skills/android-runtime-capabilities/SKILL.md)
 (the capability digest presented to the model) and the authoritative as-built inventory
-[`docs/安卓环境能力清单-0.13.0.md`](docs/安卓环境能力清单-0.13.0.md).
+[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md).
 
 ## Patches to upstream pi-web
 
@@ -236,7 +236,7 @@ is restored to pristine afterwards):
 | Document | Contents |
 |---|---|
 | [`docs/000-工程规划.md`](docs/000-工程规划.md) | Engineering plan, decisions, capability matrix, phases (planning source of truth, v0.2) |
-| [`docs/安卓环境能力清单-0.13.0.md`](docs/安卓环境能力清单-0.13.0.md) | **Authoritative as-built capability inventory** vs. ark, with evidence and root-cause layers |
+| [`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md) | **Authoritative as-built capability inventory** vs. ark, with evidence and root-cause layers |
 | [`docs/002-真机验证记录.md`](docs/002-真机验证记录.md) | Phase 0 probe records, emulator translation-layer findings, real-device A1–A8 evidence |
 | [`docs/隐私政策与AI标识-G8G9.md`](docs/隐私政策与AI标识-G8G9.md) | Privacy-policy and AI-labeling draft for store submission |
 | [`specs/`](specs/) | Module specs (`101`–`107`), architecture, constitution, overall test cases |
