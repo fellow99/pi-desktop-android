@@ -24,8 +24,8 @@ android {
         applicationId = "org.fellow99.pi.PiDesktopAndroid"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1401
-        versionName = "0.14.1"
+        versionCode = 1402
+        versionName = "0.14.2"
         // 引擎矩阵：libnode.so 只出 arm64-v8a（runtime.lock.json#matrix，规划 §12）
         ndk {
             abiFilters += listOf("arm64-v8a")

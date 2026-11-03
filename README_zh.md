@@ -15,8 +15,8 @@
 | --- | --- |
 | 版别 | **Android Edition**（`pi-desktop-android`） |
 | 应用显示名 / 应用 ID | **Pi Desktop** / `org.fellow99.pi.PiDesktopAndroid`（2026-10-24 定稿；显示名与 `pi-desktop` / `…Ark` 品牌口径一致，仅包名带 Android） |
-| 版本 / versionCode | **`0.14.1` / `1401`**（v0.14.1 发布版） |
-| 上游基线 | `pi` **v1.4.0** + `pi-web` **v0.14.1**（`patches/v0.14.1/` 下 6 条幂等可反向补丁） |
+| 版本 / versionCode | **`0.14.2` / `1402`**（v0.14.2 发布版；本轮真机验证：进程内 Node v26.13.0 启动、loopback 免密、文本对话 + 视觉图片对话、bash/read/write/grep/ls + git init/add/commit/log） |
+| 上游基线 | `pi` **v1.5.0** + `pi-web` **v0.14.2**（`patches/v0.14.2/` 下 6 条幂等可反向补丁） |
 | 后端 | `io.github.fellow99:node-bridge` **0.2.0**（JNI 直调宿主桥）+ **投放制** aosp-node-runtime 引擎 `libnode.so` **v26.13.0**（`--with-intl=small-icu`，见下方「引擎说明」），进程内 `dlopen` + `node::Start` |
 | 前端 | 系统 WebView 加载 `http://127.0.0.1:<随机端口>/`（同源 HTTP + SSE；loopback 即安全上下文） |
 | ABI | **仅 `arm64-v8a`**（引擎只出单 ABI） |
@@ -98,7 +98,7 @@ pi-desktop-android/
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # 纯 JS 兼容层，仅当 WebAssembly 不存在时启用
-├── patches/v0.14.1/                         # 6 条幂等 pi-web 补丁（0001–0006）
+├── patches/v0.14.2/                         # 6 条幂等 pi-web 补丁（0001–0006）
 ├── scripts/                                 # assemble-payload · crop-rules · provision-engine/pty · devtest · sync
 ├── docs/                                    # 000 规划 · 能力清单 · 真机记录 · 隐私草稿
 ├── specs/                                   # 1NN 模块规格
