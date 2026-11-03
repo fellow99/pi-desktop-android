@@ -144,7 +144,7 @@ node scripts/assemble-payload.mjs --apply      # -> app/src/main/assets/pi-web/p
 
 注意载荷暂存为零拷贝**硬链接**，品牌化采用「临时文件 + rename」/「先 unlink 再写」替换暂存目录项，
 而不是写穿共享 inode；已验证 `build/pi-dist` 源仍保持上游品牌。详见
-[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md) §H REV-1。
+[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.14.1.md) §H REV-1。
 
 ## 安装与运行
 
@@ -189,7 +189,7 @@ adb shell am start -n org.fellow99.pi.PiDesktopAndroid/.MainActivity
 
 详见 [`payload/skills/android-runtime-capabilities/SKILL.md`](payload/skills/android-runtime-capabilities/SKILL.md)
 （给模型看的能力摘要）与权威 as-built 清单
-[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md)。
+[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.14.1.md)。
 
 ## 对上游 pi-web 的补丁
 
@@ -218,7 +218,7 @@ adb shell am start -n org.fellow99.pi.PiDesktopAndroid/.MainActivity
 | 文档 | 内容 |
 |---|---|
 | [`docs/000-工程规划.md`](docs/000-工程规划.md) | 工程规划、决策、能力矩阵、分期（规划口径权威，v0.2） |
-| [`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md) | **as-built 权威能力清单**：对标 ark，附证据与根因分层 |
+| [`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.14.1.md) | **as-built 权威能力清单**：对标 ark，附证据与根因分层 |
 | [`docs/002-真机验证记录.md`](docs/002-真机验证记录.md) | Phase 0 探针记录、模拟器翻译层结论、真机 A1–A8 证据 |
 | [`docs/隐私政策与AI标识-G8G9.md`](docs/隐私政策与AI标识-G8G9.md) | 上架用隐私政策与 AI 标识材料草稿 |
 | [`specs/`](specs/) | 模块规格（`101`–`107`）、架构、宪法、总体测试用例 |

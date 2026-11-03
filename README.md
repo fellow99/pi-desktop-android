@@ -154,7 +154,7 @@ drawn by hand, and a missing/invalid asset is a hard failure.
 Note the payload stage is hard-linked for zero-copy speed, so branding replaces each staged entry
 (temp-file + rename / unlink-before-write) rather than writing through the shared inode; the
 `build/pi-dist` source is verified to remain upstream-branded. See
-[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md) §H REV-1.
+[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.14.1.md) §H REV-1.
 
 ## Install and run
 
@@ -204,7 +204,7 @@ Device verification so far (see [`docs/002-真机验证记录.md`](docs/002-真�
 
 See [`skills/android-runtime-capabilities/SKILL.md`](payload/skills/android-runtime-capabilities/SKILL.md)
 (the capability digest presented to the model) and the authoritative as-built inventory
-[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md).
+[`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.14.1.md).
 
 ## Patches to upstream pi-web
 
@@ -236,7 +236,7 @@ is restored to pristine afterwards):
 | Document | Contents |
 |---|---|
 | [`docs/000-工程规划.md`](docs/000-工程规划.md) | Engineering plan, decisions, capability matrix, phases (planning source of truth, v0.2) |
-| [`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.12.1.md) | **Authoritative as-built capability inventory** vs. ark, with evidence and root-cause layers |
+| [`docs/安卓环境能力清单-0.14.1.md`](docs/安卓环境能力清单-0.14.1.md) | **Authoritative as-built capability inventory** vs. ark, with evidence and root-cause layers |
 | [`docs/002-真机验证记录.md`](docs/002-真机验证记录.md) | Phase 0 probe records, emulator translation-layer findings, real-device A1–A8 evidence |
 | [`docs/隐私政策与AI标识-G8G9.md`](docs/隐私政策与AI标识-G8G9.md) | Privacy-policy and AI-labeling draft for store submission |
 | [`specs/`](specs/) | Module specs (`101`–`107`), architecture, constitution, overall test cases |
