@@ -3,16 +3,21 @@
  * generate-icons.mjs — G10：把品牌 logo 物化为 Android 应用图标（幂等可重建）。
  *
  * 输入（仓库外共享资产，三端同一品牌源）：
- *   ../assets/logo-1024-with-bg.png  1024×1024 带底色满版图 → legacy 方形/圆形
- *   ../assets/logo.png               200×200 透明底标志     → adaptive 前景
+ *   ../assets/logo-1024-with-bg.png  1024×1024 带底色满版图 → adaptive 背景色（取左上像素）
+ *   ../assets/logo.png               200×200 透明底标志     → legacy 白底图标 + adaptive 前景
  *
  * 产出：
- *   res/mipmap-<density>/ic_launcher.png       legacy 方形（48dp 基准 × 密度）
- *   res/mipmap-<density>/ic_launcher_round.png legacy 圆形（同图裁圆）
+ *   res/mipmap-<density>/ic_launcher.png       legacy 方形（48dp 基准 × 密度；白底 + 居中 logo 86%）
+ *   res/mipmap-<density>/ic_launcher_round.png legacy 圆形（同图裁圆，透明角）
  *   res/mipmap-<density>/ic_launcher_foreground.png adaptive 前景（108dp 画布，
  *                                                  内容居中收进 72/108 安全区）
  *   res/values/ic_launcher_colors.xml          adaptive 背景色（取满版图左上像素）
  *   res/mipmap-anydpi-v26/ic_launcher{,_round}.xml  adaptive 引用（API26+）
+ *
+ * legacy 图标的画法对齐参考工程（dsh-desktop-android / oc-desktop-android 同一品牌源）：
+ *   白色不透明底 + 透明 logo 居中缩放 86% —— 不用带底色的 logo-1024-with-bg 满版铺开
+ *   （满版会把 logo 顶到画布边缘，在 MIUI 等走 legacy 图标的启动器上显得图标更大、贴边；
+ *   2026-11-03 对齐修，见 vs dsh/oc 的像素 bbox 分析）。
  *
  * 依赖：Python + Pillow（不引入 Node 图像库）。
  * 用法：node scripts/generate-icons.mjs          生成
@@ -64,12 +69,15 @@ j=json.loads(sys.stdin.read())
 full=Image.open(j["full"]).convert("RGBA")
 mark=Image.open(j["mark"]).convert("RGBA")
 def dirmk(p): os.makedirs(os.path.dirname(p),exist_ok=True)
+# legacy：白色不透明底 + 透明 logo 居中 86%（对齐参考工程 dsh/oc；满版 logo-1024 已弃用）
 for it in j["legacy"]:
-    s=it["size"]
-    dirmk(it["square"]); full.resize((s,s),Image.LANCZOS).save(it["square"],"PNG")
-    base=full.resize((s,s),Image.LANCZOS)
+    s=it["size"]; inner=int(round(s*0.86))
+    canvas=Image.new("RGBA",(s,s),(255,255,255,255))
+    m=mark.resize((inner,inner),Image.LANCZOS)
+    canvas.alpha_composite(m,((s-inner)//2,(s-inner)//2))
+    dirmk(it["square"]); canvas.convert("RGB").save(it["square"],"PNG")
     mask=Image.new("L",(s,s),0); ImageDraw.Draw(mask).ellipse((0,0,s-1,s-1),fill=255)
-    out=Image.new("RGBA",(s,s),(0,0,0,0)); out.paste(base,(0,0),mask)
+    out=Image.new("RGBA",(s,s),(0,0,0,0)); out.paste(canvas,(0,0),mask)
     dirmk(it["round"]); out.save(it["round"],"PNG")
 # adaptive 前景：108dp 画布，标志居中收进 72/108 安全区
 for it in j["fg"]:
