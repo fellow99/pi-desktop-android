@@ -206,7 +206,7 @@ function splitUstarName(name) {
   return null
 }
 
-function ustarHeader(name, size, typeflag) {
+function ustarHeader(name, size, typeflag, mode = 0o644) {
   const buf = Buffer.alloc(512, 0)
   const write = (text, offset, length) => {
     Buffer.from(text, 'utf8').copy(buf, offset, 0, length)
@@ -214,7 +214,10 @@ function ustarHeader(name, size, typeflag) {
   const plan = splitUstarName(name)
   if (plan === null) throw new Error(`ustar 头容纳不下该条目名（需要 GNU 'L' 长名条目）：${name}`)
   write(plan.headerName, 0, 100)
-  write('0000644\0', 100, 8)   // mode
+  // 目录必须带可执行位（0755）：Android toybox tar 严格按头 mode 落盘，
+  // 若目录写 0644 会解出 drw-r--r--，无法进入 → 后续条目全部 Permission denied/bad symlink。
+  // 普通文件与 GNU L 长名块用 0644。GNU tar 会智能补位，显式写对两端都确定。
+  write(mode.toString(8).padStart(7, '0') + '\0', 100, 8)   // mode
   write('0000000\0', 108, 8)  // uid
   write('0000000\0', 116, 8)  // gid
   write(size.toString(8).padStart(11, '0') + '\0', 124, 12) // size
@@ -265,9 +268,9 @@ export function buildTarGz(entries) {
       push(ustarHeader('././@LongLink', longBlock.length, 'L'))
       push(longBlock)
       push(Buffer.alloc(padTo512(longBlock.length)))
-      push(ustarHeader(truncateUtf8Bytes(name, 100), isDir ? 0 : data.length, isDir ? '5' : '0'))
+      push(ustarHeader(truncateUtf8Bytes(name, 100), isDir ? 0 : data.length, isDir ? '5' : '0', isDir ? 0o755 : 0o644))
     } else {
-      push(ustarHeader(name, isDir ? 0 : data.length, isDir ? '5' : '0'))
+      push(ustarHeader(name, isDir ? 0 : data.length, isDir ? '5' : '0', isDir ? 0o755 : 0o644))
     }
     if (!isDir && data.length > 0) {
       push(data)
