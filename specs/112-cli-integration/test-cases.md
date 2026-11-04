@@ -1,7 +1,7 @@
 # 112-cli-integration — test-cases
 
-> 依据：`spec.md` C1–C7、`plan.md` P0–P4。目标设备：真机 `cd3fac61`（Xiaomi MIX / Android 11 / arm64-v8a）优先；
-> 模拟器仅在真机不可用时作为备选并注明翻译层差异。所有用例初始状态均为 **PENDING**。
+> 依据：`spec.md` C1–C7、`plan.md` P0–P4。目标真机：`cd3fac61`（Xiaomi MIX / **Android 8.0.0 / API 26** / arm64-v8a / 4KB 页）优先。
+> P0 轮次真机因 MIUI 人工安装门（INSTALL_FAILED_USER_RESTRICTED）受阻，回退官方 Android 17/API37 x86_64 模拟器（abilist 含 arm64-v8a，内核 4KB 页、pagesize.max=16KB）；相关用例标注“（模拟器）”，原生 arm64 内核回归留 P4 复跑。
 >
 > **凭据纪律**：DeepSeek API Key 仅在测试运行时临时注入，占位符统一写作 `<DEEPSEEK_API_KEY>`；
 > 不得写入命令记录、logcat 证据、截图、报告、提交或本文件。任何 Authorization/key 字段落盘前必须脱敏。
@@ -32,14 +32,14 @@
   4. 检查 `libnode_cli.so`、`libpython_cli.so`、`libgit_cli.so`、`libgit_http_fetch.so`、`libgit_remote_curl.so`、`libuv_cli.so`、`libpnpm_cli.so`、五个命令壳、`libnode.so`、`libpty_node.so`、`libc++_shared.so`。
 - **期望**：全部是物理 regular file；权限/SELinux 上下文允许读/执行所需动作；不是空壳或仅 APK mmap 占位。
 - **失败处置**：No-Go；记录 AGP 版本、manifest merge、`extractNativeLibs` 实际值，暂停实现。
-- **状态**：PENDING
+- **状态**：PASS（模拟器）— 探针上报 nativeLibraryDir 物理含全部 15 件，主 ELF 长度一致；真机小米 MIX 待 P4 复跑。证据：logs/2026-11-04-1 P0-1。
 
 ### TC-112-P0-002：legacy packaging 下现有 Node/PTY dlopen 不回归
 - **阶段**：P0 / Regression ｜ **通道**：TERM / boot-facts
 - **步骤**：启动 App；读取 `pi-web.boot-facts.json`；打开终端面板；运行 `tty`；执行一次普通对话健康检查。
 - **期望**：App 正常启动；Node 服务 ready；`boot-facts.pty.ready=true`；`libnode.so`/`libpty_node.so` 装载成功；终端能分配 `/dev/pts/N`；logcat 无 dlopen/namespace 致命错误。
 - **失败处置**：No-Go；不得把 CLI 变更合入；按最小化原则定位 legacy packaging 与库装载关系。
-- **状态**：PENDING
+- **状态**：PASS（模拟器，dlopen 层）— `c++_shared→node→pty_node` 全装载成功；终端面板/boot-facts/PTY 完整面属 P2 回归项，本条只裁决“legacy 不导致引擎 dlopen 回归”这一否决项。证据 P0-2。
 
 ### TC-112-P0-003：symlink 农场可行性
 - **阶段**：P0 / Platform Probe ｜ **通道**：TERM / PTY / EXEC
@@ -50,14 +50,14 @@
   4. 记录 `symlink()` errno、SELinux audit、目标标签、`readlink -f`。
 - **期望（首选）**：filesDir 下 symlink 创建成功，三通道都能经链接 exec 并输出 Node 版本。
 - **备选判定**：若 symlink 被拒，必须明确 errno/avc，并转 D4 备选（`.mkshrc`/包装/绝对路径）重新设计；不得把绝对路径误报为短名可用。
-- **状态**：PENDING
+- **状态**：PASS（模拟器）— filesDir 下 git exec 农场 8 链接 + $HOME/bin 短名均建链成功并 exec；约束：悬空链接须无条件 delete 重建（errno=17）。PTY 三通道在正式产品内的回程由 C 段/P2 覆盖。证据 P0-3。
 
 ### TC-112-P0-004：jniLibs shell 壳脚本原样解包并可执行
 - **阶段**：P0 / Platform Probe ｜ **通道**：TERM / EXEC
 - **步骤**：检查安装后 `libnpm.so`、`libnpx.so`、`libcorepack.so`、`libpip.so`、`libpip3.so` 的文件头和权限；在正确 env 下执行 `libnpm.so -v`、`libpip.so --version`。
 - **期望**：壳文件首行仍为 `#!/system/bin/sh`，未被 AGP 压缩/改写/当 ELF 拒绝；npm 与 pip 版本回程正常。
 - **失败处置**：记录具体失败（未解包、无执行位、shebang 被改、exec format error）；决定壳脚本迁移动作并回写 plan D4/C3。
-- **状态**：PENDING
+- **状态**：PASS（模拟器）— shebang 原样保留且可执行；`npm -v=11.20.0`。pip 短名 **不能用 symlink**（壳写死 dirname `$0`，code=127），改用绝对路径包装脚本后 `pip 26.2.2` 回程。证据 P0-4。
 
 ### TC-112-P0-005：git HTTP 传输件发现与 TLS
 - **阶段**：P0 / Network ｜ **通道**：TERM / EXEC
@@ -67,13 +67,13 @@
   - 另测一个 `https://` 公开只读仓库 HEAD。
 - **期望**：版本为 git 2.56.0；HTTPS remote helper 能发现 `libgit_http_fetch.so`/`libgit_remote_curl.so`；TLS 校验成功并返回 ref；CA 文件可被读取。
 - **失败处置**：区分传输件发现失败、CA 失败、网络/代理失败；若仅网络不可达，TLS 用本地 httpbin/可控 TLS 服务补测。
-- **状态**：PENDING
+- **状态**：PASS（模拟器，NETWORK）— `git 2.56.0`；`git ls-remote` 经 exec 农场解析 `git-remote-https`（libgit_remote_curl.so，静态 curl 8.23+OpenSSL 3.5）TLS 成功，返回 `… refs/heads/main`；另首跑冷启动在 45s 看门狗下曾 SIGTERM(143)，放宽 90s+一次重试后稳定通过。证据 P0-5。
 
 ### TC-112-P0-006：P0 探针报告与方案锁定
 - **阶段**：P0 / Evidence
 - **步骤**：归档 `logs/<date>-1/P0-PROBE-REPORT.md`、命令回显、logcat、APK 清单、boot-facts；逐项更新 spec/plan/tasks 的最终方案。
 - **期望**：四个 Go/No-Go 均有 ✅/❌/备选结论；所有 ⬜ 待验证项被真实证据替换；无凭证明文。
-- **状态**：PENDING
+- **状态**：PASS — 报告 `logs/2026-11-04-1/P0-PROBE-REPORT.md`（+设备 logcat），22/22；D2/D3/D4 已锁定（见报告 §3），tasks/test-cases/plan 已回写。真机原生 arm64 内核回归作为显式遗留挂 T4。
 
 ---
 

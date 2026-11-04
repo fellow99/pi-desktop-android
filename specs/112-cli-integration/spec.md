@@ -81,9 +81,8 @@ isomorphic-git 结构化工具集。
   现有 dlopen 库（libnode/libpty）在该设置下仍正常（dlopen 绝对路径 / namespace 解析）。
 - **C4**：shell 壳脚本（`libnpm.so` 等，内容为 `#!/system/bin/sh`）需与二进制同处可执行目录；AGP 对
   jniLibs 中的非 ELF「.so」是否原样解包/通过校验，需真机核验。
-- 命令短名（`git`/`node`/…）经 **`$HOME/bin` symlink 农场**指向 nativeLibraryDir 实体（设计 §4.3）；
-  但 111 时期 `pi-web-launch.js#listFilesDeep` 有「平台禁止 symlink（应用域 EACCES）」的历史记录——
-  **symlink 农场可行性必须真机探针定分晓**，不可行则启用 plan 中的备选（不静默降级）。
+- 命令短名经 **`$HOME/bin` symlink + pip 包装脚本 + filesDir/gitexec 农场**暴露（P0 已在 App 私有 filesDir 实证可建可执行，
+  111 时期「应用域 EACCES 禁 symlink」的历史记录在本布局下不成立）；pip/pip3 因壳写死 `dirname "$0"` 必须用绝对路径包装脚本。
 - **生态边界（必须如实上报，非缺陷）**：设备无 gcc/make/toolchain ——
   npm 装带原生扩展的包无法 `node-gyp`；pip 装 sdist 无法本地编译；可行域 = 纯 JS / 纯 Python 包 + 预置原生件。
 
@@ -125,10 +124,10 @@ isomorphic-git 结构化工具集。
 | 项 | 行为 | 验收（真机） |
 |---|---|---|
 | PATH | Node 启动早期（任何 spawn/终端之前）设 `PATH=<nativeLibraryDir>:<HOME>/bin:<原 PATH 或 /system/bin>`；`HOME`/`TMPDIR` 指 filesDir | 终端与 bash 工具内 `echo $PATH` 含两段 |
-| symlink 农场 | `$HOME/bin/{node,npm,npx,corepack,python,pip,pip3,git,uv,pnpm}` → 对应 nativeLibraryDir 实体（P0 探针确认可建） | 建链成功且经链 exec 回程 |
+| 短名暴露（P0 已证实） | 纯 PIE（node/python/git/uv/pnpm）与 node 壳（npm/npx/corepack，读 `NODE_NATIVE_DIR` 兜底）用 `$HOME/bin` **symlink**；pip/pip3 壳写死 `dirname "$0"` 不读 env，须生成绝对路径**包装脚本**并 chmod755；另建 `filesDir/gitexec` 8 链接农场。重建须无条件 delete（悬空链接 `exists()=false`） | 建链/脚本成功且经链与包装 exec 回程（含 pip 26.2.2） |
 | node 系 env | `NODE_NATIVE_DIR=<nativeLibraryDir>`、`NODE_TOOLS_DIR=<root>/node`（壳脚本依赖） | `node -v`=v26.13.0、`npm -v`=11.20.0、`npx -v`、`corepack --version` |
-| python 系 env | `PYTHONHOME=<root>/python`、`PYTHONPATH=<root>/python/lib/python3.14`、`SSL_CERT_FILE=<root>/python/cacert.pem` | `python -V`、`pip --version`、`python -c "import ssl;print(ssl.OPENSSL_VERSION)"` |
-| git 系 env | `GIT_CONFIG_GLOBAL=$HOME/.gitconfig`、`GIT_TEMPLATE_DIR=<root>/git/templates`、http 传输件可发现（`GIT_EXEC_PATH` 或同目录约定，按 gitexec-manifest）、`SSL_CERT_FILE=<root>/git/cacert.pem` | `git --version`=2.56.0；本地 init/add/commit/log；`git ls-remote https://…` TLS 成功 |
+| python 系 env | **`PYTHONHOME=<root>/python-bridge-tools`（其下 lib/python3.14 + site-packages），不设 PYTHONPATH**、`LD_LIBRARY_PATH=<nativeLibraryDir>`、`SSL_CERT_FILE=<root>/python-bridge-tools/cacert.pem` | `python -V`=3.14.10、`pip --version`=26.2.2、`python -c "import ssl,sqlite3,zlib,hashlib"` 无 prefix 警告；`_bz2/_lzma/_zstd/_ctypes` ImportError 为已知裁剪边界 |
+| git 系 env | `GIT_CONFIG_GLOBAL=$HOME/.gitconfig`、`GIT_TEMPLATE_DIR=<root>/git-bridge-tools/templates`、**`GIT_EXEC_PATH=<filesDir>/gitexec`（P0 已验必需，农场按 gitexec-manifest 8 名）**、`GIT_SSL_CAINFO=<root>/git-bridge-tools/cacert.pem` | `git --version`=2.56.0；本地 init/add/commit/log；`git ls-remote https://…` TLS 成功（静态 curl+OpenSSL） |
 | uv | 单文件 + 自带根证书；`UV_*` 缓存/数据目录落 filesDir（可写） | `uv --version`、`uv venv`（离线/网络据实记录） |
 | pnpm | `pnpm` 在 PATH 且能找到同 PATH 的 `node`（lifecycle scripts） | `pnpm --version`=12.16.1；最小 `pnpm install`（纯 JS 包） |
 | boot-facts | 启动事实新增 `cli:{node,python,git,uv,pnpm:{present,version,probeOk}}`；任一缺失/失败**结构化标记 unsupported，绝不伪报可用**（宪法 A6） | boot-facts 落盘，五件真值 |

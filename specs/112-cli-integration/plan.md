@@ -44,12 +44,13 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
   marker 失配面；独立资产 + 独立 digest marker，可单独演进，第二轮换 Maven 时只改获取侧。
 - `app/build.gradle.kts`：`androidResources.noCompress += "gz"`（已在）；jniLibs 沿用 gitignored 目录。
 
-### D2 useLegacyPackaging：false → true（P0 真机 Go/No-Go 1）
+### D2 useLegacyPackaging：false → true —— ✅ P0 已实证安全（GO）
 - exec 件必须物理落盘 nativeLibraryDir（设计 C3），AGP 侧唯一干净开关是
   `packaging { jniLibs { useLegacyPackaging = true } }`（全局，影响 libnode/libpty）。
-- **必须真机验证回归**：legacy=true 后（a）全部 CLI/引擎 `.so` 物理存在；（b）`process.dlopen(libpty_node.so)`
-  与 libnode 桥装载仍正常（ensurePtyNative 走绝对路径存在分支，namespace 同目录族）；（c）boot-facts.pty.ready=true、终端与对话不回归。
-- 若 dlopen 回归：不硬上。回退评估「split/按库无法分别设 legacy」→ 记录并与用户确认（可能需等消费侧 AAR 方案）。
+- **P0 结论（2026-11-04，报告 logs/2026-11-04-1）**：legacy=true 后（a）全部 15 件 `.so`/壳物理存在且长度一致；
+  （b）按序 `System.loadLibrary("c++_shared"→"node"→"pty_node")` 全成功（引擎无 JNI_OnLoad，等价纯 dlopen，
+  libpty 的 NEEDED libnode/libc++ 链解析正常）——**否决项未触发**。APK 内 lib 仍 DEFLATED，安装期解压。
+- 遗留：终端面板/boot-facts/PTY 的端到端不回归在 P2 正式接线后验；原生 arm64 真机（小米 MIX）在 P4 复跑。
 
 ### D3 首启 tools 物化：Kotlin 侧解包（早于 Node，env 一次到位）
 - 在 `PiDesktopRuntime.runBoot` 注入 env **之前**，新增 `CliTools.materialize(context)`：
@@ -59,28 +60,31 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
   Kotlin 侧先就位可避免「首启 env 指向空目录、需重启」竞态；tar 解包可复用新增的极简 tar 读取（无 gzip 原生 API，
   可用 java.util.zip.GZIPInputStream + ustar 解析；或放 Node 首启物化 + 首轮写 marker、env 指向稳定路径后
   由壳脚本惰性自检——**以 P0 探针后实现最简且无竞态者为准，二选一在 tasks 落定**）。
-
-### D4 命令短名暴露：symlink 农场（P0 真机 Go/No-Go 2），备选用绝对入口
-- 首选：建 `$HOME/bin/`，为每条命令建符号链接到 nativeLibraryDir 实体；PATH 前置该目录。
-  - node/python/pip/git/uv/pnpm 链到各自 `lib<tool>[_cli].so`；npm/npx/corepack 链到同名壳 `libnpm.so` 等。
-  - SELinux 对 symlink 只查**目标**标签（apk_data_file 域放行，设计 §4.3）；但本工程历史记录「应用域禁 symlink」，
-    故必须先探针（filesDir 与 nativeLibraryDir 两处都试）。
-- **备选（探针否决 symlink 时）**，按可行性排序：
-  1. mksh `~/.mkshrc` 函数/别名（仅交互终端与 android-exec 常驻 mksh 生效；ptyBash 的 `sh -c` 非交互不读 rc ——
-     需在 ptyBash 用 `sh -lc` 或显式 source，评估对 111 已验证路径的最小改动）；
-  2. 引导层把「命令名 → 绝对 ELF 路径」映射下发给 ptyBash/android-exec（Node 侧包装），终端交互则依赖 .mkshrc；
-  3. 都不成立则只暴露绝对路径 `lib*_cli.so`（体验降级，最后手段，需用户确认）。
-- 探针在开发最前期产出结论；C5 命令暴露以探针结论为准，**不得伪造命令可用**（宪法 A6）。
+### D4 命令短名暴露 —— ✅ P0 已锁定：纯 PIE 用 symlink，壳类（pip）用包装脚本
+- 已证 `android.system.Os.symlink` 在 App 私有 filesDir 可用（无 SELinux 拒绝），建两层：
+  1. `$HOME/bin/`（PATH 前置）：`node`/`python`/`git-cli`/`uv`/`pnpm-bin` 直接 symlink 到 nativeLibraryDir 的纯 PIE 主件；
+     `npm`/`npx`/`corepack` 可 symlink（壳读 `NODE_NATIVE_DIR` 兜底，已验 `npm=11.20.0`）。
+  2. `filesDir/gitexec/`：严格按 `assets/git-bridge-tools/gitexec-manifest.json#farm` 建 8 链接（git* → libgit_cli/libgit_remote_curl），`GIT_EXEC_PATH` 指向它。
+- **硬约束（P0 实测 code=127）**：`libpip.so` 壳写死 `exec "$(dirname "$0")/libpython_cli.so" -m pip "$@"`，**不读 env**；
+  经 `$HOME/bin/pip` symlink 调用时 `$0` 落在链接目录 ⇒ 找不到主件。故 `pip`/`pip3`（以及任何 dirname 相对定位的壳）
+  短名必须由 Kotlin **生成绝对路径包装脚本**并 `chmod 755`（已验 `pip 26.2.2`）。纯 PIE 主件无此问题。
+- **幂等**：重装后 nativeLibraryDir 路径变化会使旧链接悬空，`File.exists()` 对 dangling link 返回 false；
+  必须对每个短名/农场名**无条件 `delete()` 后重建**（`File.delete()` 删链接本身，不跟随目标），否则 `Os.symlink errno=17 EEXIST`。
+- 备选（.mkshrc / Node 侧命令映射 / 仅绝对路径）经 P0 判定**不需要**，留作未来某机型 SELinux 收紧时的退路，不在本期实现。
+- 纪律：C5 命令暴露以 P0 实证为准，**不得伪造命令可用**（宪法 A6）。
 
 ### D5 环境变量契约（进程级注入，三通道全覆盖）
 - 注入点：Kotlin `PiDesktopRuntime.runBoot` 的 `env`（D3 物化之后），Node 侧 `pi-web-launch.js` 早期再做
   PATH 合并与 `$HOME/bin` 农场（若 D4 由 Node 建）。terminal-manager/ptyBash/android-exec 均继承，无需逐通道改。
-- 变量集（值见 spec C5）：`PATH`、`HOME`、`TMPDIR`（已有，保留）、`NODE_NATIVE_DIR`、`NODE_TOOLS_DIR`、
-  `PYTHONHOME`、`PYTHONPATH`、`SSL_CERT_FILE`（python/git 各自 cacert；取 python 一份供 git 亦可，分别设置更稳）、
-  `GIT_CONFIG_GLOBAL`、`GIT_TEMPLATE_DIR`、`GIT_EXEC_PATH`（按 gitexec-manifest 实测）、
-  `UV_CACHE_DIR`/`XDG_CACHE_HOME`（指 filesDir）、pnpm store（可写 filesDir）。
-- git 传输件发现：`libgit_http_fetch.so`/`libgit_remote_curl.so` 与主件同目录（nativeLibraryDir），
-  git 经 exec-path/同目录约定发现子命令与 remote-helper；P0 用 `git ls-remote https://…` 实证，必要时补 `GIT_EXEC_PATH`。
+- 变量集（P0 校准，值见 spec C5）：`PATH`（`$HOME/bin` 前置）、`HOME`、`TMPDIR`（已有，保留）、
+  `NODE_NATIVE_DIR=<nativeDir>`、`NODE_TOOLS_DIR=<tools>/node-bridge-tools`、
+  **`PYTHONHOME=<tools>/python-bridge-tools`（其下标准布局 lib/python3.14 + site-packages），不设 PYTHONPATH**、
+  `LD_LIBRARY_PATH=<nativeDir>`、`SSL_CERT_FILE=<tools>/python-bridge-tools/cacert.pem`、
+  `GIT_SSL_CAINFO=<tools>/git-bridge-tools/cacert.pem`、`GIT_TEMPLATE_DIR=<tools>/git-bridge-tools/templates`、
+  **`GIT_EXEC_PATH=<filesDir>/gitexec`（已验必需，农场 8 链接）**、
+  `GIT_CONFIG_GLOBAL`（指 filesDir）、`UV_CACHE_DIR`/`XDG_CACHE_HOME`（指 filesDir；uv 用 rustls 自带根证书，不依赖 SSL_CERT_FILE）、pnpm store（可写 filesDir）。
+- P0 实测：仅设 PYTHONPATH 会令 python 报 “Could not find platform independent libraries <prefix>”（虽 exit 0）；
+  设 PYTHONHOME 后 `ssl/sqlite3/zlib/hashlib` 干净可用（OpenSSL 3.5.9 / sqlite 3.54.1）。git 传输件经 GIT_EXEC_PATH 农场解析，`ls-remote` TLS 成功。
 
 ### D6 boot-facts 与能力面
 - `pi-web-launch.js#writeBootFacts` 增 `cli` 块：对五件做「present（文件在）+ version（`--version` 回程，带超时）」探针；
@@ -129,9 +133,10 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
 
 ## 分阶段（里程碑）
 
-- **P0 探针（Go/No-Go，先于一切改动落代码）**：用最小测试 APK/现有包在真机验证
-  ① legacyPackaging=true 物理落盘 + dlopen 不回归；② filesDir/nativeLibraryDir symlink 可建且经链 exec；
-  ③ 壳脚本 shebang 在 nativeLibraryDir 可执行；④ git http 传输件发现 + TLS。产出探针报告 → 定 D2/D3/D4 走向。
+- **P0 探针（Go/No-Go）—— ✅ 已完成（2026-11-04），结论 GO（22/22）**：模拟器（Android17/API37 x86_64+arm64 翻译）实测
+  ① legacyPackaging=true 物理落盘 + 引擎 dlopen 不回归；② filesDir symlink 可建且经链 exec（纯 PIE）；
+  ③ 壳 shebang 原样可执行（pip 短名须包装脚本）；④ git exec-path 农场 + HTTPS/TLS 成功。报告 `logs/2026-11-04-1/`。
+  遗留：真机 cd3fac61（MIUI 人工安装门）原生 arm64 内核回归并入 P4。
 - **P1 获取/门禁/随包**：cli.lock + provision-cli + verify-cli + jniLibs/assets 投放 → assembleDebug 过 + 门禁绿。
 - **P2 运行期引导**：D3 物化 + D5 env + D4 命令暴露 + D6 boot-facts；真机 `--version` 五命令 + git 本地/https 工作流。
 - **P3 移除纯 JS**：D7 删除/清理/CI/合规；回归四件套（终端、对话、载荷组装、合规）。
@@ -140,10 +145,10 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
 ## 风险与兜底
 | 风险 | 等级 | 兜底 |
 |---|---|---|
-| legacyPackaging=true 致 libnode/libpty dlopen 回归 | 高 | P0 先验；不过则暂停并与用户确认，不带病推进 |
-| 应用域禁止 symlink | 中高 | P0 探针；D4 备选 .mkshrc/包装/绝对路径 |
-| AGP 拒识/不原样解包 sh 壳「.so」 | 中 | P0 验；必要时壳放 node/python 各自 tools 树但需可执行位（受 C1 限制）→ 以实测定 |
-| git 远程子命令/CA 发现失败 | 中 | 实证 GIT_EXEC_PATH/SSL_CERT_FILE；https 不过先保本地，远程如实标 ⬜ |
-| APK 体积 ~150–170MB | 中 | 记录；动态分发留 M4 |
-| python stdlib 数万文件拖慢物化 | 中 | 独立 tar + digest 幂等；实测首启时延，必要时延后到首次使用 |
+| ~~legacyPackaging=true 致 libnode/libpty dlopen 回归~~ | ~~高~~ | ✅ P0 已证不回归（c++→node→pty 顺序装载成功） |
+| ~~应用域禁止 symlink~~ | ~~中高~~ | ✅ P0 已证 filesDir 可 symlink；pip 壳改用绝对路径包装脚本；备选保留 |
+| ~~AGP 不原样解包 sh 壳 `.so`~~ | ~~中~~ | ✅ P0 已证 shebang 保留、可执行；须覆写 ignoreAssetsPattern 保 dot 文件 |
+| ~~git 远程子命令/CA 发现失败~~ | ~~中~~ | ✅ P0 已证 GIT_EXEC_PATH 农场 + GIT_SSL_CAINFO，ls-remote TLS 成功 |
+| APK 体积 ~150–170MB（探针 debug APK 已达 ~140MB） | 中 | 记录；动态分发留后续 |
+| ~~python stdlib 数万文件拖慢物化~~ | ~~中~~ | ✅ 实测 2710 文件约 4.5s；digest marker 幂等，二启跳过 |
 | 移除 JS 扩展影响旧会话/旧物化 | 低 | 启动清残留 + 版本化 agentDir |

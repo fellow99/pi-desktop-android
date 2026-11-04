@@ -1,0 +1,30 @@
+===== P0 CLI PROBE =====
+device=sdk_gphone64_x86_64 android=17 sdk=37 abi=x86_64
+nativeLibraryDir=/data/app/~~N5PGo0SGyq5pMy_QQr_uOQ==/org.fellow99.p0probe-WhXkNReUGm1LwOvYwKTu9w==/lib/arm64
+filesDir=/data/user/0/org.fellow99.p0probe/files
+[PASS] P0-1 legacy physical extraction — libnode.so=81491624B libnode_cli.so=62155912B
+[PASS] P0-1b exec bit on PIE .so — setExecutable=false canExecute=true path=true
+[PASS] P0-2 dlopen libc++_shared.so — loaded from legacy nativeLibraryDir
+[PASS] P0-2 dlopen libnode.so — loaded from legacy nativeLibraryDir
+[PASS] P0-2 dlopen libpty_node.so — loaded from legacy nativeLibraryDir
+[PASS] materialize assets → filesDir — 2710 files in 4518ms → /data/user/0/org.fellow99.p0probe/files/cli-tools
+[PASS] P0-3a Os.symlink gitexec farm — 8 names in /data/user/0/org.fellow99.p0probe/files/gitexec
+[PASS] P0-3b $HOME/bin short names (symlink + pip wrapper) — node/uv/pnpm/git/python/npm symlink + pip/pip3 wrapper 
+[PASS] P0-4a shim shebang preserved — head="#!/system/bin/sh # libnpm.so —"
+[PASS] P0-4b shim executable bit — npm.canExecute=true pip.canExecute=true
+[PASS] P0-4c exec npm shim → node — code=0 out=11.20.0
+[PASS] P0-4d exec pip wrapper → python — code=0 out=pip 26.2.2 from /data/user/0/org.fellow99.p0probe/files/cli-tools/python-bridge-tools/lib/python3.14/site-packages/pip (python 3.14)
+[PASS] P0-5a git --version via exec-path farm — code=0 out=git version 2.56.0
+    git --exec-path=/data/user/0/org.fellow99.p0probe/files/gitexec
+[PASS] P0-5b git ls-remote HTTPS/TLS (curl+openssl static) — code=0 bytes=57 head=<sha>	refs/heads/main
+----- five-CLI smoke -----
+[PASS] smoke node --version — v26.13.0
+[PASS] smoke python built-in stdlib (ssl/sqlite/zlib/hashlib), PYTHONHOME clean — code=0 PYOK 3.14.10 OpenSSL 3.5.9 29 Sep 2026 3.54.1
+[PASS] boundary pruned _bz2 ModuleNotFoundError — code=1
+[PASS] boundary _ctypes unavailable (static-first, no libffi shim) — code=1 Traceback (most recent call last):
+[PASS] smoke uv --version — uv 0.13.6 (aarch64-linux-android)
+[PASS] smoke pnpm --version (node on PATH) — code=0 12.16.1
+[PASS] smoke git --version — git version 2.56.0
+[PASS] smoke npm --version — 11.20.0
+===== SUMMARY pass=22 fail=0 warn=0 =====
+report written: /data/user/0/org.fellow99.p0probe/files/P0-PROBE-REPORT.txt

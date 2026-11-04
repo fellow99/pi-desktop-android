@@ -5,13 +5,12 @@
 
 ## P0 真机探针（Go/No-Go）
 
-- [ ] T0.1 用五个已下载 tarball + 现有引擎件，做**最小探针 APK/调试通道**，在真机 `cd3fac61`（Android 11）验证：
-  `useLegacyPackaging=true` 后 `nativeLibraryDir` 物理含全部 `lib*.so`（`run-as ls`/代码上报）。验收：文件齐。
-- [ ] T0.2 同设置下回归 dlopen：App 正常启动、终端面板可开、`boot-facts.pty.ready=true`、`libnode.so/libpty_node.so` 装载正常。验收：111 能力不回归（**否决项**）。
-- [ ] T0.3 symlink 农场探针：filesDir 与（可能的）nativeLibraryDir 下建 `$HOME/bin/node → …/libnode_cli.so`，经 PTY 与非 PTY sh 各执行一次。验收：建链成功且 `node -v` 回程；失败则记录 errno，转 plan D4 备选。
-- [ ] T0.4 shell 壳探针：`libnpm.so`/`libpip.so`（shebang 脚本）随 jniLibs 落盘后，在设好 `NODE_TOOLS_DIR/NODE_NATIVE_DIR` 下经 sh 执行。验收：`npm -v`/`pip --version` 回程（AGP 是否原样保留 shebang）。
-- [ ] T0.5 git 远程探针：设 `GIT_TEMPLATE_DIR/SSL_CERT_FILE` 后 `git --version` 与 `git ls-remote https://github.com/…`。验收：版本回程；https TLS 成功（决定是否需 `GIT_EXEC_PATH`/传输件路径）。
-- [ ] T0.6 产出 `logs/<date>-1/P0-PROBE-REPORT.md`：逐项 ✅/❌ + 证据（logcat/命令回显），据结论锁定 D2/D3/D4 最终方案。
+- [x] T0.1 最小探针验证 legacy 物理落盘：`useLegacyPackaging=true` 后 `nativeLibraryDir/…/lib/arm64` 物理含全部 `lib*.so`（含壳）。✅ 见报告 P0-1（2026-11-04，Android17/API37 x86_64+arm64 翻译模拟器；真机小米 MIX Android 8/API26 因 MIUI 人工安装门未完成）。
+- [x] T0.2 同设置下 dlopen 回归：按序 `c++_shared→node→pty_node` System.loadLibrary 全成功（引擎无 JNI_OnLoad，等价纯 dlopen；pty NEEDED node+c++ 链解析正常）。✅ 报告 P0-2，**否决项未触发**。
+- [x] T0.3 symlink 农场探针：`android.system.Os.symlink` 在 filesDir 可用（git exec 农场 8 名 + `$HOME/bin` 短名），短名直链 PIE 执行回程。✅ 报告 P0-3。约束：幂等重建须无条件 `delete()`（悬空链接 `exists()=false`，否则 errno=17）。
+- [x] T0.4 shell 壳探针：shebang 原样保留、可执行；`npm -v → 11.20.0`。✅ 报告 P0-4。**关键约束**：pip 壳写死 `dirname "$0"` 不读 env，短名 symlink 会 code=127 ⇒ pip/pip3 必须生成绝对路径**包装脚本**（`pip --version → 26.2.2` 验证）。
+- [x] T0.5 git 远程探针：`GIT_EXEC_PATH` 指农场 + 8 链接，`git --version=2.56.0`；`git ls-remote https://github.com/fellow99/aosp-python-cli.git` TLS 成功（静态 curl+OpenSSL）。✅ 报告 P0-5。
+- [x] T0.6 产出 `logs/2026-11-04-1/P0-PROBE-REPORT.md`（+ 设备 logcat 存档）。结论 **GO**，锁定：PYTHONHOME（非 PYTHONPATH）+`LD_LIBRARY_PATH`、pip 包装脚本、git exec 农场、aapt dot 保留、悬空链接幂等。**遗留**：真机 cd3fac61 原生 arm64 内核回归并入 T4.x（MIUI 人工门解除后复跑 A 段）。
 
 ## P1 获取 / 门禁 / 随包
 
