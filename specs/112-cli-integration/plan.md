@@ -10,10 +10,10 @@ GitHub Release tarball ──(provision-cli.mjs, 锁 cli.lock.json, sha256/ELF �
                                                                                   │ jniLibs/arm64-v8a/lib*_cli.so + 壳 lib*.so（不入库）
                                                                                   ▼
 Gradle assembleDebug ├─ jniLibs(legacyPackaging=true, 物理落盘 nativeLibraryDir) ─┤
-                     └─ assets/cli-tools/<tool>.tar.gz（noCompress gz，独立于 pi-web.tar.gz）
+                     └─ assets/cli-tools/<tool>.tar（gzip 内容，noCompress；独立于 pi-web.tar.gz）
                                                                                   │
 App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                                ▼
-  Kotlin: 解 assets/cli-tools/*.tar.gz → filesDir/node-bridge/cli-tools/<tool>（digest marker 幂等）
+  Kotlin: 解 assets/cli-tools/*.tar（gzip 输入）→ filesDir/node-bridge/cli-tools/<tool>（digest marker 幂等）
         + 建 $HOME/bin symlink 农场（Go/No-Go 探针；备选见 D4）                    │
   Node(package/pi-web-launch): PATH/NATIVE/TOOLS/PYTHON/GIT/SSL env 进程级注入 ────┤
                                                                                   ▼
@@ -34,15 +34,15 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
   - 输入：`--from <dir>`（已下载 tarball 目录，CI/本机）或 `--download`（按 lock URL 拉取，零仓内二进制）；
   - 解包后按 **AAR 内布局**投放：
     - jni：`*.so`（`lib*_cli.so` + 壳）→ `app/src/main/jniLibs/arm64-v8a/`（git 的两个传输件一并）；
-    - assets 工具树：各 `<tool>-bridge-tools/` → 打成 `app/src/main/assets/cli-tools/<tool>.tar.gz`
-      （确定性 ustar，复用 assemble-payload 的确定性写法）；
+    - assets 工具树：各 `<tool>-bridge-tools/` → 打成 `app/src/main/assets/cli-tools/<tool>.tar`
+      （gzip 压缩的确定性 ustar；使用 `.tar` 后缀规避 AGP noCompress `.tar.gz→.tar` 改名的不确定性）；
   - `--check`：校验 jniLibs 中 CLI ELF 的 sha/size/门禁 + assets/cli-tools 存在且 digest 一致。
 - 新增 `scripts/verify-cli.mjs`：exec 型 ELF 门禁（见 spec C2），独立于 verify-runtime/verify-pty 的 dlopen profile；
   16KB 判据按 ELF 装载规则检查每个 PT_LOAD 的 `p_offset ≡ p_vaddr (mod 16KB)` 与 `p_align ≤ 16KB`，不能误判文件大小。
-- 为什么 tools 树走独立 `assets/cli-tools/*.tar.gz` 而非并入 pi-web.tar.gz：
+- 为什么 tools 树走独立 `assets/cli-tools/*.tar` 而非并入 pi-web.tar.gz：
   pi-web 载荷已 27k 文件/首启解包 20–40s；CLI 树（npm 依赖、python stdlib 数万文件）并入会再放大首启时延与
   marker 失配面；独立资产 + 独立 digest marker，可单独演进，第二轮换 Maven 时只改获取侧。
-- `app/build.gradle.kts`：`androidResources.noCompress += "gz"`（已在）；jniLibs 沿用 gitignored 目录。
+- `app/build.gradle.kts`：`androidResources.noCompress += "tar"`；jniLibs 沿用 gitignored 目录，并清空默认 assets ignore 规则以保留 dotfile。
 
 ### D2 useLegacyPackaging：false → true —— ✅ P0 已实证安全（GO）
 - exec 件必须物理落盘 nativeLibraryDir（设计 C3），AGP 侧唯一干净开关是
@@ -54,7 +54,7 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
 
 ### D3 首启 tools 物化：Kotlin 侧解包（早于 Node，env 一次到位）
 - 在 `PiDesktopRuntime.runBoot` 注入 env **之前**，新增 `CliTools.materialize(context)`：
-  从 `assets/cli-tools/<tool>.tar.gz` 解到 `filesDir/node-bridge/cli-tools/<tool>/`，
+  从 `assets/cli-tools/<tool>.tar`（gzip 输入）解到 `filesDir/node-bridge/cli-tools/<tool>/`，
   以 tarball sha256 为 marker（与 PayloadArchive 同纪律：内容比对、原子落盘、损坏重建）。
 - 选择 Kotlin 而非 Node 启动期物化：env（NODE_TOOLS_DIR/PYTHONHOME/…）要在 `rt.start(env)` 时一次性给准，
   Kotlin 侧先就位可避免「首启 env 指向空目录、需重启」竞态；tar 解包可复用新增的极简 tar 读取（无 gzip 原生 API，
@@ -117,7 +117,7 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
 | `scripts/verify-cli.mjs` | A | exec ELF 门禁（ET_DYN/PT_INTERP/NEEDED 白名单/16KB/sha） |
 | `app/build.gradle.kts` | M | `useLegacyPackaging=true`（P0 回归后）；注释说明 |
 | `app/src/main/jniLibs/arm64-v8a/lib*_cli.so`+壳 | A(gitignored) | provision 投放，不入库 |
-| `app/src/main/assets/cli-tools/{node,python,git}.tar.gz` | A(gitignored) | provision 生成，不入库 |
+| `app/src/main/assets/cli-tools/{node,python,git}.tar` | A(gitignored) | provision 生成，不入库；gzip 内容，noCompress |
 | `app/.../payload/CliTools.kt`（新）或 Node 物化 | A | assets/cli-tools → filesDir digest 幂等物化（D3 二选一） |
 | `app/.../runtime/PiDesktopRuntime.kt` | M | 调物化；注入 CLI env（PATH/NATIVE/TOOLS/PYTHON/GIT/SSL/UV） |
 | `payload/pi-web-launch.js` | M | PATH 合并 + symlink 农场（D4）+ boot-facts.cli；删 git/pnpm selftest；清旧扩展残留 |
@@ -135,7 +135,8 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
 
 - **P0 探针（Go/No-Go）—— ✅ 已完成（2026-11-04），结论 GO（22/22）**：模拟器（Android17/API37 x86_64+arm64 翻译）实测
   ① legacyPackaging=true 物理落盘 + 引擎 dlopen 不回归；② filesDir symlink 可建且经链 exec（纯 PIE）；
-  ③ 壳 shebang 原样可执行（pip 短名须包装脚本）；④ git exec-path 农场 + HTTPS/TLS 成功。报告 `logs/2026-11-04-1/`。
+  ③ 壳 shebang 原样可执行（pip 短名须包装脚本）；④ git exec-path 农场 + HTTPS/TLS 成功。
+  报告 `P0-PROBE-REPORT.md`、设备 logcat `P0-PROBE-REPORT-device.txt`、离线门禁 `P0-ELF-GATE.json` 均在 `logs/2026-11-04-1/`。
   遗留：真机 cd3fac61（MIUI 人工安装门）原生 arm64 内核回归并入 P4。
 - **P1 获取/门禁/随包**：cli.lock + provision-cli + verify-cli + jniLibs/assets 投放 → assembleDebug 过 + 门禁绿。
 - **P2 运行期引导**：D3 物化 + D5 env + D4 命令暴露 + D6 boot-facts；真机 `--version` 五命令 + git 本地/https 工作流。
@@ -149,6 +150,6 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
 | ~~应用域禁止 symlink~~ | ~~中高~~ | ✅ P0 已证 filesDir 可 symlink；pip 壳改用绝对路径包装脚本；备选保留 |
 | ~~AGP 不原样解包 sh 壳 `.so`~~ | ~~中~~ | ✅ P0 已证 shebang 保留、可执行；须覆写 ignoreAssetsPattern 保 dot 文件 |
 | ~~git 远程子命令/CA 发现失败~~ | ~~中~~ | ✅ P0 已证 GIT_EXEC_PATH 农场 + GIT_SSL_CAINFO，ls-remote TLS 成功 |
-| APK 体积 ~150–170MB（探针 debug APK 已达 ~140MB） | 中 | 记录；动态分发留后续 |
-| ~~python stdlib 数万文件拖慢物化~~ | ~~中~~ | ✅ 实测 2710 文件约 4.5s；digest marker 幂等，二启跳过 |
+| APK 体积：探针 debug APK 实测 121,695,971B（约 116MiB），最终产品增量以 P1 assembleDebug 对比为准 | 中 | 记录；动态分发留后续 |
+| ~~python/stdlib 工具树拖慢物化~~ | ~~中~~ | ✅ 实测 2710 文件，最终设备端耗时 1,797ms（历史轮次 922–4,518ms，受翻译层/调度影响）；digest marker 幂等，二启跳过 |
 | 移除 JS 扩展影响旧会话/旧物化 | 低 | 启动清残留 + 版本化 agentDir |

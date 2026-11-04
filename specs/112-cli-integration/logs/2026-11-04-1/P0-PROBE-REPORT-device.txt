@@ -1,30 +1,27 @@
-===== P0 CLI PROBE =====
-device=sdk_gphone64_x86_64 android=17 sdk=37 abi=x86_64
-nativeLibraryDir=/data/app/~~N5PGo0SGyq5pMy_QQr_uOQ==/org.fellow99.p0probe-WhXkNReUGm1LwOvYwKTu9w==/lib/arm64
-filesDir=/data/user/0/org.fellow99.p0probe/files
-[PASS] P0-1 legacy physical extraction — libnode.so=81491624B libnode_cli.so=62155912B
-[PASS] P0-1b exec bit on PIE .so — setExecutable=false canExecute=true path=true
-[PASS] P0-2 dlopen libc++_shared.so — loaded from legacy nativeLibraryDir
-[PASS] P0-2 dlopen libnode.so — loaded from legacy nativeLibraryDir
-[PASS] P0-2 dlopen libpty_node.so — loaded from legacy nativeLibraryDir
-[PASS] materialize assets → filesDir — 2710 files in 4518ms → /data/user/0/org.fellow99.p0probe/files/cli-tools
-[PASS] P0-3a Os.symlink gitexec farm — 8 names in /data/user/0/org.fellow99.p0probe/files/gitexec
-[PASS] P0-3b $HOME/bin short names (symlink + pip wrapper) — node/uv/pnpm/git/python/npm symlink + pip/pip3 wrapper 
-[PASS] P0-4a shim shebang preserved — head="#!/system/bin/sh # libnpm.so —"
-[PASS] P0-4b shim executable bit — npm.canExecute=true pip.canExecute=true
-[PASS] P0-4c exec npm shim → node — code=0 out=11.20.0
-[PASS] P0-4d exec pip wrapper → python — code=0 out=pip 26.2.2 from /data/user/0/org.fellow99.p0probe/files/cli-tools/python-bridge-tools/lib/python3.14/site-packages/pip (python 3.14)
-[PASS] P0-5a git --version via exec-path farm — code=0 out=git version 2.56.0
-    git --exec-path=/data/user/0/org.fellow99.p0probe/files/gitexec
-[PASS] P0-5b git ls-remote HTTPS/TLS (curl+openssl static) — code=0 bytes=57 head=<sha>	refs/heads/main
------ five-CLI smoke -----
-[PASS] smoke node --version — v26.13.0
-[PASS] smoke python built-in stdlib (ssl/sqlite/zlib/hashlib), PYTHONHOME clean — code=0 PYOK 3.14.10 OpenSSL 3.5.9 29 Sep 2026 3.54.1
-[PASS] boundary pruned _bz2 ModuleNotFoundError — code=1
-[PASS] boundary _ctypes unavailable (static-first, no libffi shim) — code=1 Traceback (most recent call last):
-[PASS] smoke uv --version — uv 0.13.6 (aarch64-linux-android)
-[PASS] smoke pnpm --version (node on PATH) — code=0 12.16.1
-[PASS] smoke git --version — git version 2.56.0
-[PASS] smoke npm --version — 11.20.0
-===== SUMMARY pass=22 fail=0 warn=0 =====
-report written: /data/user/0/org.fellow99.p0probe/files/P0-PROBE-REPORT.txt
+--------- beginning of main
+11-04 16:31:33.446  8710  8736 I P0PROBE : device=sdk_gphone64_x86_64 sdk=37 abi=x86_64 page=4096
+11-04 16:31:33.462  8710  8736 I P0PROBE : nativeLibraryDir=/data/app/~~5QO9ckJKGsOzOozcB5mrcQ==/org.fellow99.p0probe-XgAT794Tq1Ri9JNtp1CXXg==/lib/arm64
+11-04 16:31:33.463  8710  8736 I P0PROBE : filesDir=/data/user/0/org.fellow99.p0probe/files
+11-04 16:31:33.466  8710  8736 I P0PROBE : [PASS] P0-1 useLegacyPackaging physical executable files — expected=15 missing=[] notExecutable=[]
+11-04 16:31:34.367  8710  8736 I P0PROBE : [PASS] P0-2 engine dlopen chain c++_shared->node->pty_node — loaded
+11-04 16:31:36.165  8710  8736 I P0PROBE : [PASS] P0-3 assets tar materialization — files=2710 elapsedMs=1797
+11-04 16:31:36.167  8710  8736 I P0PROBE : [PASS] P0-4 dotfile preserved + shell shim shebang retained — dot=true shebang=#!/system/bin/sh
+11-04 16:31:36.179  8710  8736 I P0PROBE : [PASS] P0-5 symlink farm + absolute pip wrappers — gitexec=[git, git-upload-pack, git-receive-pack, git-upload-archive, git-remote-http, git-remote-https, git-remote-ftp, git-remote-ftps] bin=[node, npm, npx, corepack, python, git, uv, pnpm, pip, pip3]
+11-04 16:31:36.179  8710  8736 I P0PROBE : [PASS] P0-6 git farm manifest names — names=[git, git-upload-pack, git-receive-pack, git-upload-archive, git-remote-http, git-remote-https, git-remote-ftp, git-remote-ftps]
+11-04 16:31:36.517  8710  8736 I P0PROBE : [PASS] node --version — exit=0 output=v26.13.0
+11-04 16:31:48.559  8710  8736 I P0PROBE : [PASS] npm --version — exit=0 output=11.20.0
+11-04 16:32:09.462  8710  8736 I P0PROBE : [PASS] npx --version — exit=0 output=11.20.0
+11-04 16:32:19.475  8710  8736 I P0PROBE : [PASS] corepack --version — exit=0 output=0.36.0
+11-04 16:32:19.794  8710  8736 I P0PROBE : [PASS] python --version — exit=0 output=Python 3.14.10
+11-04 16:32:24.378  8710  8736 I P0PROBE : [PASS] python ssl/sqlite3/zlib — exit=0 output=OpenSSL 3.5.9 29 Sep 2026 3.54.1
+11-04 16:32:26.299  8710  8736 I P0PROBE : [PASS] python sqlite3/zlib version suffix — exit=0 output=3.54.1
+11-04 16:32:41.726  8710  8736 I P0PROBE : [PASS] pip --version — exit=0 output=pip 26.2.2 from /data/user/0/org.fellow99.p0probe/files/cli-tools/python-bridge-tools/lib/python3.14/site-packages/pip (python 3.14)
+11-04 16:32:42.687  8710  8736 I P0PROBE : [PASS] uv --version — exit=0 output=uv 0.13.6 (aarch64-linux-android)
+11-04 16:32:43.976  8710  8736 I P0PROBE : [PASS] pnpm --version — exit=0 output=12.16.1
+11-04 16:32:44.215  8710  8736 I P0PROBE : [PASS] git --version — exit=0 output=git version 2.56.0
+11-04 16:32:44.590  8710  8736 I P0PROBE : [PASS] git init — exit=0 output=
+11-04 16:32:44.915  8710  8736 I P0PROBE : [PASS] git add — exit=0 output=
+11-04 16:32:45.578  8710  8736 I P0PROBE : [PASS] git commit — exit=0 output=
+11-04 16:32:45.903  8710  8736 I P0PROBE : [PASS] git commit visible — exit=0 output=556139c p0
+11-04 16:32:48.283  8710  8736 I P0PROBE : [PASS] git HTTPS ls-remote — exit=0 output=459b4f18fcf95aa54eb5716e27f9f1c75173ed0a	refs/heads/main
+11-04 16:32:48.285  8710  8736 I P0PROBE : SUMMARY failures=0

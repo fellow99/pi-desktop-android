@@ -1,0 +1,220 @@
+[
+  {
+    "name": "libc++_shared.so",
+    "size": 1253544,
+    "sha256": "cd61762848882a16c8244c964a6f396c0caa0b440588a210ce9cc4ab0e6d9f0c",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [],
+    "needed": [
+      "libc.so",
+      "libm.so",
+      "libdl.so"
+    ],
+    "soname": "libc++_shared.so",
+    "jni_onload": false,
+    "load_count": 4,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libgit_cli.so",
+    "size": 3993328,
+    "sha256": "171716839caf1f2c4767c28792b9abb4cf79a6d71cc4155aa1f53cbc81ae8bab",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [
+      "/system/bin/linker64"
+    ],
+    "needed": [
+      "libdl.so",
+      "libc.so"
+    ],
+    "soname": null,
+    "jni_onload": false,
+    "load_count": 4,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libgit_http_fetch.so",
+    "size": 8437504,
+    "sha256": "cf0fcc2aaecf134314284189434f5ee43186e1c96a5af546b4f60c04734f35d0",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [
+      "/system/bin/linker64"
+    ],
+    "needed": [
+      "libdl.so",
+      "libc.so"
+    ],
+    "soname": null,
+    "jni_onload": false,
+    "load_count": 4,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libgit_remote_curl.so",
+    "size": 8450536,
+    "sha256": "fc25b57e645b5ff04d307818583232657be13b9f0fa3e15d822917b5286afe27",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [
+      "/system/bin/linker64"
+    ],
+    "needed": [
+      "libdl.so",
+      "libc.so"
+    ],
+    "soname": null,
+    "jni_onload": false,
+    "load_count": 4,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libnode.so",
+    "size": 81491624,
+    "sha256": "be1d16414a1e68983f27ac16e287395b71e4f4f5a79d78a78a741b583472397e",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [],
+    "needed": [
+      "libm.so",
+      "libdl.so",
+      "liblog.so",
+      "libc++_shared.so",
+      "libc.so"
+    ],
+    "soname": "libnode.so",
+    "jni_onload": false,
+    "load_count": 4,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libnode_cli.so",
+    "size": 62155912,
+    "sha256": "eb51b439d2a8164bc2e4be233b9a363b6def736a000feb432ce72702ee28b86c",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [
+      "/system/bin/linker64"
+    ],
+    "needed": [
+      "libm.so",
+      "libdl.so",
+      "liblog.so",
+      "libc.so"
+    ],
+    "soname": null,
+    "jni_onload": false,
+    "load_count": 3,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libpnpm_cli.so",
+    "size": 47317088,
+    "sha256": "e5378cfacefa35b117ee7a54ebf6160ebf0e8c0a96ace4d5673ffcc2913d98dd",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [
+      "/system/bin/linker64"
+    ],
+    "needed": [
+      "libdl.so",
+      "libm.so",
+      "libc.so"
+    ],
+    "soname": null,
+    "jni_onload": false,
+    "load_count": 4,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libpty_node.so",
+    "size": 90816,
+    "sha256": "b965c62d8ab066d8d5b290c34c924b597699aaaa94ea4dabb6eedad414077a93",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [],
+    "needed": [
+      "libnode.so",
+      "libc++_shared.so",
+      "libm.so",
+      "libdl.so",
+      "libc.so"
+    ],
+    "soname": null,
+    "jni_onload": false,
+    "load_count": 4,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libpython_cli.so",
+    "size": 15754472,
+    "sha256": "1112574a9dceca5c2cf7878a08ebc1fc5eca4914e892c73a10b49d87f6ebb0d6",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [
+      "/system/bin/linker64"
+    ],
+    "needed": [
+      "libm.so",
+      "libdl.so",
+      "liblog.so",
+      "libz.so",
+      "libc.so"
+    ],
+    "soname": null,
+    "jni_onload": false,
+    "load_count": 3,
+    "align16k_bad": [],
+    "align16k_ok": true
+  },
+  {
+    "name": "libuv_cli.so",
+    "size": 34979336,
+    "sha256": "c6d9edfd1642e03fde1308b91ad4f57382a1925f38f0b83da0063b4ddaabcfb1",
+    "e_type": 3,
+    "e_machine": 183,
+    "is_et_dyn": true,
+    "is_aarch64": true,
+    "interps": [
+      "/system/bin/linker64"
+    ],
+    "needed": [
+      "libdl.so",
+      "libm.so",
+      "libc.so"
+    ],
+    "soname": null,
+    "jni_onload": false,
+    "load_count": 4,
+    "align16k_bad": [],
+    "align16k_ok": true
+  }
+]

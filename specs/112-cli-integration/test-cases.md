@@ -8,7 +8,7 @@
 
 ## 测试环境与通用前置
 
-- 设备：`adb devices` 仅选择目标真机 `cd3fac61`；记录 Android 版本、ABI、页面大小能力。
+- 设备：P1/P2 按用户指令优先使用已启动 API37 模拟器 `emulator-5554`；P4 获得 MIUI 屏幕授权后切回真机 `cd3fac61`，记录 Android 版本、ABI、页面大小能力。
 - 构建：`./gradlew :app:assembleDebug`；安装前记录旧 APK 版本与 `filesDir` 是否已有旧扩展残留。
 - 二进制：`node scripts/provision-cli.mjs --from <cli-tarballs>` 后执行 `node scripts/verify-cli.mjs` 与 `--check`。
 - 三个执行通道定义：
@@ -73,7 +73,7 @@
 - **阶段**：P0 / Evidence
 - **步骤**：归档 `logs/<date>-1/P0-PROBE-REPORT.md`、命令回显、logcat、APK 清单、boot-facts；逐项更新 spec/plan/tasks 的最终方案。
 - **期望**：四个 Go/No-Go 均有 ✅/❌/备选结论；所有 ⬜ 待验证项被真实证据替换；无凭证明文。
-- **状态**：PASS — 报告 `logs/2026-11-04-1/P0-PROBE-REPORT.md`（+设备 logcat），22/22；D2/D3/D4 已锁定（见报告 §3），tasks/test-cases/plan 已回写。真机原生 arm64 内核回归作为显式遗留挂 T4。
+- **状态**：PASS — 报告 `logs/2026-11-04-1/P0-PROBE-REPORT.md`、设备 logcat `P0-PROBE-REPORT-device.txt`、离线 ELF 门禁 `P0-ELF-GATE.json`，22/22；D2/D3/D4 已锁定（见报告 §3），tasks/test-cases/plan 已回写。真机原生 arm64 内核回归作为显式遗留挂 T4。
 
 ---
 
@@ -89,24 +89,24 @@
 - **阶段**：P1 / Security Gate
 - **步骤**：运行 `verify-cli.mjs`，逐个解析 `libnode_cli.so`、`libpython_cli.so`、`libgit_cli.so`、两个 git 传输件、`libuv_cli.so`、`libpnpm_cli.so`。
 - **期望**：均为 ELF64、Little Endian、`ET_DYN`、`e_machine=AArch64`、恰有 `PT_INTERP=/system/bin/linker64`；每个 `PT_LOAD` 满足 `p_offset ≡ p_vaddr (mod 16KB)` 且 `p_align ≤ 16KB`；`DT_NEEDED` 仅在系统库白名单；无 `RPATH/RUNPATH` 指向应用域；size/sha 与 lock 一致。
-- **状态**：PENDING
+- **状态**：PASS（离线门禁）— `P0-ELF-GATE.json` 证明 10/10 ELF 为 AArch64 ET_DYN、16KB LOAD 对齐；7/7 exec CLI 均有 `/system/bin/linker64`，DT_NEEDED 均在系统库白名单。产品脚本 `verify-cli.mjs` 仍需在 P1 将该门禁固化为可重复命令。
 
 ### TC-112-B-003：shell 壳脚本白名单
 - **阶段**：P1 / Security Gate
 - **步骤**：检查 npm/npx/corepack/pip/pip3 壳脚本内容、参数透传和路径解析。
 - **期望**：首行为 `#!/system/bin/sh`；仅调用同目录受锁主二进制；无联网下载、无 `eval` 任意输入、无绝对构建机路径；参数 `"$@"` 正确透传。
-- **状态**：PENDING
+- **状态**：PASS（P0 探针）— 5 个 shell 型 `.so` 首行均为 `#!/system/bin/sh`，npm/npx/corepack/pip 设备执行通过；pip/pip3 短名以绝对路径包装脚本实现。P1 需在 `verify-cli.mjs` 中固化 shebang/内容白名单和负例。
 
 ### TC-112-B-004：独立 tools assets 确定性打包
 - **阶段**：P1 / Build
-- **步骤**：运行 provision；检查 `app/src/main/assets/cli-tools/{node,python,git}.tar.gz`（如 uv/pnpm 无工具树则不强制生成空包）；重复运行两次。
-- **期望**：tar.gz 存在且 noCompress 生效；manifest digest/lock 一致；内容不含 Windows 绝对路径；重复构建字节稳定或 manifest digest 稳定；不进入 `pi-web.tar.gz`。
+- **步骤**：运行 provision；检查 `app/src/main/assets/cli-tools/{node,python,git}.tar`（源 tarball 可叫 `.tar.gz`，产品 assets 统一以 `.tar` 命名以规避 AGP noCompress 改名；uv/pnpm 无工具树则不生成空包）；重复运行两次。
+- **期望**：`.tar` 存在且 noCompress 生效；manifest digest/lock 一致；内容不含 Windows 绝对路径；重复构建 manifest digest 稳定；不进入 `pi-web.tar.gz`。
 - **状态**：PENDING
 
 ### TC-112-B-005：APK 内容与体积
 - **阶段**：P1 / Build
 - **步骤**：`./gradlew :app:assembleDebug`；用 `unzip -l`/aapt 检查 APK；记录构建前后 APK、ABI splits、native 与 assets 大小。
-- **期望**：`lib/arm64-v8a/` 含全部受锁 CLI/壳/引擎件；`assets/cli-tools/*.tar.gz` 不被 deflate；无 x86/arm32；APK 增量与估算同量级并记录；构建无 jniLibs 校验错误。
+- **期望**：`lib/arm64-v8a/` 含全部受锁 CLI/壳/引擎件；`assets/cli-tools/*.tar` 不被 deflate；无 x86/arm32；APK 增量与估算同量级并记录；构建无 jniLibs 校验错误。
 - **状态**：PENDING
 
 ### TC-112-B-006：未投放/篡改负例

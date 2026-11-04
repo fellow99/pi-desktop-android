@@ -10,17 +10,17 @@
 - [x] T0.3 symlink 农场探针：`android.system.Os.symlink` 在 filesDir 可用（git exec 农场 8 名 + `$HOME/bin` 短名），短名直链 PIE 执行回程。✅ 报告 P0-3。约束：幂等重建须无条件 `delete()`（悬空链接 `exists()=false`，否则 errno=17）。
 - [x] T0.4 shell 壳探针：shebang 原样保留、可执行；`npm -v → 11.20.0`。✅ 报告 P0-4。**关键约束**：pip 壳写死 `dirname "$0"` 不读 env，短名 symlink 会 code=127 ⇒ pip/pip3 必须生成绝对路径**包装脚本**（`pip --version → 26.2.2` 验证）。
 - [x] T0.5 git 远程探针：`GIT_EXEC_PATH` 指农场 + 8 链接，`git --version=2.56.0`；`git ls-remote https://github.com/fellow99/aosp-python-cli.git` TLS 成功（静态 curl+OpenSSL）。✅ 报告 P0-5。
-- [x] T0.6 产出 `logs/2026-11-04-1/P0-PROBE-REPORT.md`（+ 设备 logcat 存档）。结论 **GO**，锁定：PYTHONHOME（非 PYTHONPATH）+`LD_LIBRARY_PATH`、pip 包装脚本、git exec 农场、aapt dot 保留、悬空链接幂等。**遗留**：真机 cd3fac61 原生 arm64 内核回归并入 T4.x（MIUI 人工门解除后复跑 A 段）。
+- [x] T0.6 产出 `logs/2026-11-04-1/P0-PROBE-REPORT.md`、设备 logcat `P0-PROBE-REPORT-device.txt` 与离线 ELF 门禁 `P0-ELF-GATE.json`。结论 **GO（22/22）**，锁定：PYTHONHOME（非 PYTHONPATH）+`LD_LIBRARY_PATH`、pip 包装脚本、git exec 农场、aapt dot 保留、悬空链接幂等、AGP `.tar.gz→.tar` 条目口径。**遗留**：真机 cd3fac61 原生 arm64 内核回归并入 T4.x（MIUI 人工门解除后复跑 A 段）。
 
 ## P1 获取 / 门禁 / 随包
 
 - [ ] T1.1 建 `cli.lock.json`：五仓 tag/tarball URL/tarball sha256、各 ELF sha256+size、tools manifest digest、门禁期望（PT_INTERP、NEEDED 白名单、16KB）。Python 已核实：tarball 24,288,587B / `b4b90341…57571c`，ELF 15,754,472B / `1112574a…bb0d6`，manifest `95d3e330…4361`。
 - [ ] T1.2 `scripts/verify-cli.mjs`：exec 型 ELF 门禁（ET_DYN=PIE、e_machine=AArch64、PT_INTERP=/system/bin/linker64、NEEDED 白名单、每个 PT_LOAD 满足 `p_offset ≡ p_vaddr mod 16KB` 且 `p_align ≤ 16KB`、sha/size 比对）；壳脚本单独白名单（shebang 校验，不做 ELF）。
-- [ ] T1.3 `scripts/provision-cli.mjs`：`--from <dir>`/`--download`/`--check`；解包五 tarball → jniLibs 投放 `lib*_cli.so`+壳+git 传输件；把 `<tool>-bridge-tools/` 确定性打成 `assets/cli-tools/<tool>.tar.gz`。
+- [ ] T1.3 `scripts/provision-cli.mjs`：`--from <dir>`/`--download`/`--check`；解包五 tarball → jniLibs 投放 `lib*_cli.so`+壳+git 传输件；把 `<tool>-bridge-tools/` 确定性打成 `assets/cli-tools/<tool>.tar`（规避 AGP noCompress `.tar.gz→.tar` 改名的不确定性）。
 - [ ] T1.4 `.gitignore` 复核：`jniLibs/`（已忽略）覆盖新增 CLI 件；新增忽略 `app/src/main/assets/cli-tools/`（派生产物）。
 - [ ] T1.5 `app/build.gradle.kts`：依 T0.2 结论切 `useLegacyPackaging=true`（加注释：exec 件需落盘，dlopen 回归已由 T0.2 证实安全）。
 - [ ] T1.6 本机 `node scripts/provision-cli.mjs --from <scratch>` → `verify-cli --check`/`provision-cli --check` 全绿。
-- [ ] T1.7 `./gradlew assembleDebug` 构建过；`unzip -l` 校验 APK：jni 齐件 + `assets/cli-tools/{node,python,git}.tar.gz`；记录 APK 体积增量。
+- [ ] T1.7 `./gradlew assembleDebug` 构建过；`unzip -l` 校验 APK：jni 齐件 + `assets/cli-tools/{node,python,git}.tar`；记录 APK 体积增量。
 
 ## P2 运行期引导 / 命令暴露
 

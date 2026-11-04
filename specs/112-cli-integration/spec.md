@@ -35,7 +35,7 @@ isomorphic-git 结构化工具集。
 
 ## 背景事实（已勘察，2026-11-04）
 
-- 设备：已连真机 `cd3fac61`（Xiaomi MIX / lithium / Android 11 / arm64）；模拟器备选 `Medium_Phone_API_37.0`。
+- 设备：真机 `cd3fac61` 实测为 Xiaomi MIX / lithium / **Android 8.0.0 / API 26** / arm64-v8a / 4KB 页；当前 MIUI 侧载需人工授权，P0/P1/P2 先用 `Medium_Phone_API_37.0`（x86_64 + arm64 翻译），P4 回真机原生 arm64 复跑。
 - 三个命令执行通道**全部继承 Node 进程环境**，故**进程级 `PATH` 注入一处即全覆盖**：
   - 终端面板：`pi-web/lib/terminal-manager.ts#shellEnvironment()` 复制 `process.env`，spawn `/system/bin/sh -l`；
   - `ptyBash`：`payload/extensions/android-pty/index.js` spawn 时显式 `env: process.env`；
@@ -110,7 +110,7 @@ isomorphic-git 结构化工具集。
 |---|---|---|
 | legacy packaging | `packaging.jniLibs.useLegacyPackaging=true`（exec 件必须落盘） | 装机后 `nativeLibraryDir` **物理存在**全部 `lib*.so` |
 | 回归 dlopen | 同设置下 libnode/libpty 仍可装载 | 终端面板可用、`boot-facts.pty.ready=true`、对话正常 |
-| tools 资产 | CLI 的 `-bridge-tools/` 经独立 `app/src/main/assets/cli-tools/<tool>.tar.gz`（noCompress gz）随包，**不**并入 27k 文件的 pi-web.tar.gz | `unzip -l apk` 见 assets/cli-tools/*.gz |
+| tools 资产 | CLI 的 `-bridge-tools/` 经独立 `app/src/main/assets/cli-tools/<tool>.tar` 随包；源构建产物可保留 `.tar.gz`，但 AGP 对 noCompress `.tar.gz` 会剥离为 `.tar`，产品侧以确定性 `.tar` 条目为准，**不**并入 pi-web.tar.gz | APK 清单见 `assets/cli-tools/*.tar`，消费端不硬编码 `.tar.gz` |
 | 壳脚本解包 | `libnpm.so`/`libpip.so` 等 sh 壳原样落盘可经 shebang 执行 | 真机 `npm -v`/`pip --version` 回程 |
 | APK 体积 | 增量约 150–170MB（node 62 + python 16 + git 21 + uv 35 + pnpm 47，含未压缩对齐） | 记录实测增量；动态特性分发留 M4，不在本期 |
 
