@@ -16,8 +16,8 @@
 | --- | --- |
 | Edition | **Android Edition** (`pi-desktop-android`) |
 | Display name / application ID | **Pi Desktop** / `org.fellow99.pi.PiDesktopAndroid` (finalized 2026-10-24; the display name matches the `pi-desktop` / `…Ark` brand — only the package name carries "Android") |
-| Version / versionCode | **`0.14.2` / `1402`** (v0.14.2 release; device-verified this round: in-process Node v26.13.0 boot, loopback no-password, text chat + vision image chat, bash/read/write/grep/ls + git init/add/commit/log) |
-| Upstream baseline | `pi` **v1.5.0** + `pi-web` **v0.14.2** (six idempotent, reversible patches under `patches/v0.14.2/`) |
+| Version / versionCode | **`0.15.0` / `1500`** (v0.15.0 release; APK built this round, on-device testing deferred) |
+| Upstream baseline | `pi` **v1.5.0** + `pi-web` **v0.15.0** (six idempotent, reversible patches under `patches/v0.15.0/`) |
 | Backend | `io.github.fellow99:node-bridge` **0.2.0** (JNI direct-call host bridge) + a **provisioned** aosp-node-runtime engine `libnode.so` **v26.13.0** (`--with-intl=small-icu`; see *Engine note* below), in-process via `dlopen` + `node::Start` |
 | Frontend | System WebView loading `http://127.0.0.1:<random-port>/` (same-origin HTTP + SSE; loopback is a secure context) |
 | ABI | **`arm64-v8a` only** (the engine ships a single ABI) |
@@ -103,7 +103,7 @@ pi-desktop-android/
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # pure-JS compatibility layer, activated only if WebAssembly is absent
-├── patches/v0.14.2/                         # six idempotent pi-web patches (0001–0006)
+├── patches/v0.15.0/                         # six idempotent pi-web patches (0001–0006)
 ├── scripts/                                 # assemble-payload · crop-rules · provision-engine/pty · devtest · sync
 ├── docs/                                    # 000 plan · capability inventory · device records · privacy draft
 ├── specs/                                   # 1NN module specs

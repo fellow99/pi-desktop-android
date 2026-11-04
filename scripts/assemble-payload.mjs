@@ -31,7 +31,7 @@ import { CROP_RULES, ruleMatchesFile, ruleMatchesDir, firstMatchingRule, assertK
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(HERE, '..');
 const DEFAULT_PI_WEB = path.resolve(PROJECT_ROOT, '..', 'pi-web');
-const PI_WEB_PATCH_TAG = 'v0.14.2';
+const PI_WEB_PATCH_TAG = 'v0.15.0';
 const DEFAULT_PATCH_DIR = path.join(PROJECT_ROOT, 'patches', PI_WEB_PATCH_TAG);
 const DEFAULT_PI_DIST = path.join(PROJECT_ROOT, 'build', 'pi-dist');
 const DEFAULT_STAGE = path.join(PROJECT_ROOT, 'build', 'payload-stage');
