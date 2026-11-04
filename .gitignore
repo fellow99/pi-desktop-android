@@ -15,6 +15,9 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.aab
+
+# 112：五个 CLI 的确定性工具树 tar 是派生产物（provision-cli.mjs 生成，摘要锁在 cli.lock.json）
+app/src/main/assets/cli-tools/
 *.apk
 output-metadata.json
 

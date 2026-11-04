@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "abi": "arm64-v8a",
+  "androidApi": 24,
+  "systemNeededWhitelist": [
+    "libc.so",
+    "libdl.so",
+    "liblog.so",
+    "libm.so",
+    "libz.so"
+  ],
+  "releases": {
+    "node": {
+      "version": "26.13.0",
+      "tag": "v26.13.0",
+      "repository": "fellow99/aosp-node-cli",
+      "tarball": "node-cli-v26.13.0-android-arm64-v8a.tar.gz",
+      "url": "https://github.com/fellow99/aosp-node-cli/releases/download/v26.13.0/node-cli-v26.13.0-android-arm64-v8a.tar.gz",
+      "sha256": "60d7d89919f93bcb279411ad872ca4babbe023a080a3de4e21c50057d682803f",
+      "size": 46531153
+    },
+    "python": {
+      "version": "3.14.10",
+      "tag": "v3.14.10",
+      "repository": "fellow99/aosp-python-cli",
+      "tarball": "python-cli-v3.14.10-android-arm64-v8a.tar.gz",
+      "url": "https://github.com/fellow99/aosp-python-cli/releases/download/v3.14.10/python-cli-v3.14.10-android-arm64-v8a.tar.gz",
+      "sha256": "b4b90341bfad6bf2e423842fe7bafb49b27d5f0b9585c3581d36b6567757571c",
+      "size": 24288587
+    },
+    "git": {
+      "version": "2.56.0",
+      "tag": "v2.56.0",
+      "repository": "fellow99/aosp-git-cli",
+      "tarball": "git-cli-v2.56.0-android-arm64-v8a.tar.gz",
+      "url": "https://github.com/fellow99/aosp-git-cli/releases/download/v2.56.0/git-cli-v2.56.0-android-arm64-v8a.tar.gz",
+      "sha256": "001aae771e11ad50d2298bd3c55f5ce072f08cd2d0abd012cd964745ade0e349",
+      "size": 80651789
+    },
+    "uv": {
+      "version": "0.13.6",
+      "tag": "v0.13.6",
+      "repository": "fellow99/aosp-uv-cli",
+      "tarball": "uv-cli-v0.13.6-android-arm64-v8a.tar.gz",
+      "url": "https://github.com/fellow99/aosp-uv-cli/releases/download/v0.13.6/uv-cli-v0.13.6-android-arm64-v8a.tar.gz",
+      "sha256": "d3bfc4d30b3e950c23aab33d7ba5bded21b7a4fe5d99a73f68a8cedf2cb85b52",
+      "size": 16146767
+    },
+    "pnpm": {
+      "version": "12.16.1",
+      "tag": "v12.16.1",
+      "repository": "fellow99/aosp-pnpm-cli",
+      "tarball": "pnpm-cli-v12.16.1-android-arm64-v8a.tar.gz",
+      "url": "https://github.com/fellow99/aosp-pnpm-cli/releases/download/v12.16.1/pnpm-cli-v12.16.1-android-arm64-v8a.tar.gz",
+      "sha256": "cbd6f3481362afec5626b6f43e3a11c0eafc2bc0ac3454193eb7d407dbf085b6",
+      "size": 22719556
+    }
+  },
+  "elf": [
+    {
+      "tool": "node",
+      "path": "libnode_cli.so",
+      "profile": "exec",
+      "size": 62155912,
+      "sha256": "eb51b439d2a8164bc2e4be233b9a363b6def736a000feb432ce72702ee28b86c"
+    },
+    {
+      "tool": "python",
+      "path": "libpython_cli.so",
+      "profile": "exec",
+      "size": 15754472,
+      "sha256": "1112574a9dceca5c2cf7878a08ebc1fc5eca4914e892c73a10b49d87f6ebb0d6"
+    },
+    {
+      "tool": "git",
+      "path": "libgit_cli.so",
+      "profile": "exec",
+      "size": 3993328,
+      "sha256": "171716839caf1f2c4767c28792b9abb4cf79a6d71cc4155aa1f53cbc81ae8bab"
+    },
+    {
+      "tool": "git",
+      "path": "libgit_http_fetch.so",
+      "profile": "exec",
+      "size": 8437504,
+      "sha256": "cf0fcc2aaecf134314284189434f5ee43186e1c96a5af546b4f60c04734f35d0"
+    },
+    {
+      "tool": "git",
+      "path": "libgit_remote_curl.so",
+      "profile": "exec",
+      "size": 8450536,
+      "sha256": "fc25b57e645b5ff04d307818583232657be13b9f0fa3e15d822917b5286afe27"
+    },
+    {
+      "tool": "uv",
+      "path": "libuv_cli.so",
+      "profile": "exec",
+      "size": 34979336,
+      "sha256": "c6d9edfd1642e03fde1308b91ad4f57382a1925f38f0b83da0063b4ddaabcfb1"
+    },
+    {
+      "tool": "pnpm",
+      "path": "libpnpm_cli.so",
+      "profile": "exec",
+      "size": 47317088,
+      "sha256": "e5378cfacefa35b117ee7a54ebf6160ebf0e8c0a96ace4d5673ffcc2913d98dd"
+    }
+  ],
+  "shells": [
+    {
+      "tool": "node",
+      "path": "libnpm.so",
+      "size": 358,
+      "sha256": "4600e57f7c5b9b8dbb1aba95208be9716edf17c0375e1e8dff435d4d945fe236",
+      "mustContain": [
+        "#!/system/bin/sh",
+        "libnode_cli.so",
+        "npm/bin/npm-cli.js",
+        "\"$@\""
+      ]
+    },
+    {
+      "tool": "node",
+      "path": "libnpx.so",
+      "size": 358,
+      "sha256": "4ec571e9488a7e0287c19248606e0b666a2fe48f028dd9f4339ac8729a431255",
+      "mustContain": [
+        "#!/system/bin/sh",
+        "libnode_cli.so",
+        "npm/bin/npx-cli.js",
+        "\"$@\""
+      ]
+    },
+    {
+      "tool": "node",
+      "path": "libcorepack.so",
+      "size": 382,
+      "sha256": "4f90c5c2103325e68e2986e877f98144830e1f36075b46af22bd4b4122dcbcab",
+      "mustContain": [
+        "#!/system/bin/sh",
+        "libnode_cli.so",
+        "corepack/dist/corepack.js",
+        "\"$@\""
+      ]
+    },
+    {
+      "tool": "python",
+      "path": "libpip.so",
+      "size": 153,
+      "sha256": "fb2723e2a0c37641ef12a754e7239fa13575b2bdb16e7f42333c80b9a2e3a93a",
+      "mustContain": [
+        "#!/system/bin/sh",
+        "libpython_cli.so",
+        "-m pip",
+        "\"$@\""
+      ]
+    },
+    {
+      "tool": "python",
+      "path": "libpip3.so",
+      "size": 153,
+      "sha256": "fb2723e2a0c37641ef12a754e7239fa13575b2bdb16e7f42333c80b9a2e3a93a",
+      "mustContain": [
+        "#!/system/bin/sh",
+        "libpython_cli.so",
+        "-m pip",
+        "\"$@\""
+      ]
+    }
+  ],
+  "toolArchives": {
+    "node": {
+      "archive": "node.tar",
+      "root": "node-bridge-tools",
+      "manifest": "manifest.json",
+      "manifestSha256": "1fcebf7bdc30f888bb028e3cdc5f80b413860ac7d6ae6a62bdee2d0479d9c75a",
+      "manifestFileCount": 1591,
+      "manifestTotalSha256": "124c54c0d3e6fd2a8748d7383979c211cee96efe13512a0092d58edbbd39053b",
+      "archiveSha256": "d18abfb35e5fcd5fbdf0f8c339768ca06b79a7b2a172e31ce5f99c8d8590756c",
+      "archiveSize": 2507001
+    },
+    "git": {
+      "archive": "git.tar",
+      "root": "git-bridge-tools",
+      "manifest": "gitexec-manifest.json",
+      "manifestSha256": "8fa241f904a305fbfb50da95193b6c13b39f6d7795f23dded4cfb9eaf8c77b3d",
+      "farmSize": 8,
+      "archiveSha256": "a21ae3e545b88a988bc9acc31d1007a7ea2d84638e464d18ad5ba3e4df365a47",
+      "archiveSize": 136070
+    },
+    "python": {
+      "archive": "python.tar",
+      "root": "python-bridge-tools",
+      "manifest": "manifest.json",
+      "manifestSha256": "95d3e3305585949974d2788c54ffb3a66b9074ef79477aae3c8c4ff524244361",
+      "manifestFileCount": 1078,
+      "manifestTotalSha256": "e82f1973c8caa04904acf0a434d0df53b8bca6c83c2bc2d94bc95e41b56a60dc",
+      "archiveSha256": "f8a0280f36fba5682e9199c242b2ac1aa13ec6ed6d23f60efe7b0029f8760a4a",
+      "archiveSize": 6084221
+    }
+  },
+  "gates": {
+    "elfClass": 2,
+    "elfData": 1,
+    "eTypeDyn": 3,
+    "eMachineAArch64": 183,
+    "pageSize": 16384,
+    "expectedInterpreter": "/system/bin/linker64"
+  }
+}

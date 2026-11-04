@@ -65,8 +65,9 @@ android {
 
     packaging {
         jniLibs {
-            // 16 KB 对齐门禁（G5）：uncompressed + page-aligned 由 AGP 保序
-            useLegacyPackaging = false
+            // 16 KB 对齐门禁（G5）+ 112 D2：exec 型 .so 必须物理解压到 nativeLibraryDir
+            // 才能被 dlopen/直接 exec（引擎 libnode + 五个 CLI），故 extractNativeLibs=true。
+            useLegacyPackaging = true
         }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -74,8 +75,9 @@ android {
     }
 
     androidResources {
-        // .tar.gz 已压缩：禁止 aapt 二次压缩，利于库以 fd 直读（规划 §7.1 🔶 bridge §5.5）
-        noCompress += "gz"
+        // .tar.gz 与 112 独立工具包 *.tar（gzip 内容）均禁止 aapt 二次压缩，保持 stored
+        // 利于库以 fd 直读；tar 内 dotfile（npm/.npmrc 等）作为单个 blob 天然保留。
+        noCompress += listOf("gz", "tar")
     }
 }
 
