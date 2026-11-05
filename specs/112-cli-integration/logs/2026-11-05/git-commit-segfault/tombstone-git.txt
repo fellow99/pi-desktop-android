@@ -1,0 +1,162 @@
+11-05 01:19:37.723   699 19303 D NativeLibraryHelper: Punching extracted elf file libgit_cli.so on fs:61267
+11-05 01:19:38.719   488   488 I Zygote  : Process 18832 exited due to signal 9 (Killed)
+11-05 01:19:43.290   488   488 I Zygote  : Process 17985 exited due to signal 9 (Killed)
+11-05 01:20:27.419 19587 19587 E libsigchain:   #00 pc 0000663c  /apex/com.android.art/lib64/libsigchain.so (LogStack()+252) (BuildId: fa0a531db0f5fdf51ff2b10cc8a6ceff)
+11-05 01:20:27.420 19587 19587 E libsigchain:   #01 pc 00007105  /apex/com.android.art/lib64/libsigchain.so (sigaction+197) (BuildId: fa0a531db0f5fdf51ff2b10cc8a6ceff)
+11-05 01:20:27.420 19587 19587 E libsigchain:   #02 pc 003a3306  /system/lib64/libndk_translation.so (berberis::GuestSignalAction::Change(int, berberis::Guest_sigaction const*, void (*)(int, siginfo*, void*), berberis::Guest_sigaction*, int*)+310) (BuildId: 125abe4474cee6c228658bad2f793726)
+11-05 01:20:27.420 19587 19587 E libsigchain:   #03 pc 003a42c4  /system/lib64/libndk_translation.so (berberis::SetGuestSignalHandler(int, berberis::Guest_sigaction const*, berberis::Guest_sigaction*, int*)+212) (BuildId: 125abe4474cee6c228658bad2f793726)
+11-05 01:20:27.420 19587 19587 E libsigchain:   #04 pc 007a7433  /system/lib64/libndk_translation.so (berberis::RunGuestSyscall___NR_rt_sigaction(long, long, long, long)+99) (BuildId: 125abe4474cee6c228658bad2f793726)
+11-05 01:20:27.420 19587 19587 E libsigchain:   #05 pc 007a5ef1  /system/lib64/libndk_translation.so (berberis::RunKernelSyscall(berberis::ThreadState*)+81) (BuildId: 125abe4474cee6c228658bad2f793726)
+11-05 01:20:27.420 19587 19587 E libsigchain:   #06 pc 00028c24  /memfd:exec (deleted) (+0) (BuildId: )
+11-05 01:21:09.341 19746 19746 E libsigchain:   #00 pc 0000663c  /apex/com.android.art/lib64/libsigchain.so (LogStack()+252) (BuildId: fa0a531db0f5fdf51ff2b10cc8a6ceff)
+11-05 01:21:09.341 19746 19746 E libsigchain:   #01 pc 00007105  /apex/com.android.art/lib64/libsigchain.so (sigaction+197) (BuildId: fa0a531db0f5fdf51ff2b10cc8a6ceff)
+11-05 01:21:09.341 19746 19746 E libsigchain:   #02 pc 003a3306  /system/lib64/libndk_translation.so (berberis::GuestSignalAction::Change(int, berberis::Guest_sigaction const*, void (*)(int, siginfo*, void*), berberis::Guest_sigaction*, int*)+310) (BuildId: 125abe4474cee6c228658bad2f793726)
+11-05 01:21:09.341 19746 19746 E libsigchain:   #03 pc 003a42c4  /system/lib64/libndk_translation.so (berberis::SetGuestSignalHandler(int, berberis::Guest_sigaction const*, berberis::Guest_sigaction*, int*)+212) (BuildId: 125abe4474cee6c228658bad2f793726)
+11-05 01:21:09.341 19746 19746 E libsigchain:   #04 pc 007a7433  /system/lib64/libndk_translation.so (berberis::RunGuestSyscall___NR_rt_sigaction(long, long, long, long)+99) (BuildId: 125abe4474cee6c228658bad2f793726)
+11-05 01:21:09.342 19746 19746 E libsigchain:   #05 pc 007a5ef1  /system/lib64/libndk_translation.so (berberis::RunKernelSyscall(berberis::ThreadState*)+81) (BuildId: 125abe4474cee6c228658bad2f793726)
+11-05 01:21:09.342 19746 19746 E libsigchain:   #06 pc 00028c24  /memfd:exec (deleted) (+0) (BuildId: )
+11-05 01:21:09.900 19759 19759 W libgit_cli.so: type=1400 audit(0.0:1008): avc:  denied  { link } for  name="tmp_obj_kkHVYo" dev="dm-6" ino=109064 scontext=u:r:untrusted_app_34:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:21:10.111 19765 19765 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 19765 (libgit_cli.so), pid 19765 (libgit_cli.so)
+11-05 01:21:10.104 19765 19765 W libgit_cli.so: type=1400 audit(0.0:1009): avc:  denied  { link } for  name="tmp_obj_00bhFj" dev="dm-6" ino=109067 scontext=u:r:untrusted_app_34:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:21:10.136 19768 19768 F DEBUG   : Cmdline: /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so commit -m pi cli smoke
+11-05 01:21:10.136 19768 19768 F DEBUG   : pid: 19765, ppid: 19746, tid: 19765, name: libgit_cli.so  >>> /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 <<<
+11-05 01:21:10.136 19768 19768 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+11-05 01:21:10.138 19768 19768 F DEBUG   : backtrace:
+11-05 01:21:10.138 19768 19768 F DEBUG   :       #00 pc 00000000002ca1aa  /memfd:exec (deleted)
+11-05 01:21:10.140 19768 19768 F DEBUG   : backtrace:
+11-05 01:21:10.140 19768 19768 F DEBUG   :       #00 pc 0000000000271868  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:21:10.140 19768 19768 F DEBUG   :       #01 pc 0000000000272190  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:21:10.140 19768 19768 F DEBUG   :       #02 pc 000000000012f338  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:21:10.140 19768 19768 F DEBUG   :       #03 pc 0000000000109af8  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:21:10.140 19768 19768 F DEBUG   :       #04 pc 0000000000108cc0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:21:10.140 19768 19768 F DEBUG   :       #05 pc 0000000000108768  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:21:10.140 19768 19768 F DEBUG   :       #06 pc 00000000001db6e0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:21:10.140 19768 19768 F DEBUG   :       #07 pc 0000000000058198  /system/lib64/arm64/libc.so (__libc_init+120) (BuildId: c5c43713cd9681d690d172caf219e57d)
+11-05 01:23:38.672 19929 19929 W libgit_cli.so: type=1400 audit(0.0:1018): avc:  denied  { link } for  name="tmp_obj_TBvMpI" dev="dm-6" ino=109063 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:38.843 19933 19933 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 19933 (libgit_cli.so), pid 19933 (libgit_cli.so)
+11-05 01:23:38.840 19933 19933 W libgit_cli.so: type=1400 audit(0.0:1019): avc:  denied  { link } for  name="tmp_obj_5E4d8L" dev="dm-6" ino=109066 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:38.867 19936 19936 F DEBUG   : Cmdline: /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so commit -q -m smoke
+11-05 01:23:38.867 19936 19936 F DEBUG   : pid: 19933, ppid: 19916, tid: 19933, name: libgit_cli.so  >>> /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 <<<
+11-05 01:23:38.867 19936 19936 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+11-05 01:23:38.867 19936 19936 F DEBUG   : backtrace:
+11-05 01:23:38.867 19936 19936 F DEBUG   :       #00 pc 00000000002c966a  /memfd:exec (deleted)
+11-05 01:23:38.869 19936 19936 F DEBUG   : backtrace:
+11-05 01:23:38.869 19936 19936 F DEBUG   :       #00 pc 0000000000271868  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:38.869 19936 19936 F DEBUG   :       #01 pc 0000000000272190  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:38.869 19936 19936 F DEBUG   :       #02 pc 000000000012f338  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:38.869 19936 19936 F DEBUG   :       #03 pc 0000000000109af8  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:38.869 19936 19936 F DEBUG   :       #04 pc 0000000000108cc0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:38.869 19936 19936 F DEBUG   :       #05 pc 0000000000108768  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:38.869 19936 19936 F DEBUG   :       #06 pc 00000000001db6e0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:38.869 19936 19936 F DEBUG   :       #07 pc 0000000000058198  /system/lib64/arm64/libc.so (__libc_init+120) (BuildId: c5c43713cd9681d690d172caf219e57d)
+11-05 01:23:39.656 19965 19965 W libgit_cli.so: type=1400 audit(0.0:1020): avc:  denied  { link } for  name="tmp_obj_9FP46n" dev="dm-6" ino=109063 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:39.912 19969 19969 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 19969 (libgit_cli.so), pid 19969 (libgit_cli.so)
+11-05 01:23:39.908 19969 19969 W libgit_cli.so: type=1400 audit(0.0:1021): avc:  denied  { link } for  name="tmp_obj_liHzmA" dev="dm-6" ino=109066 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:39.940 19972 19972 F DEBUG   : Cmdline: /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so -c merge.gpgSign=false -c commit.gpgsign=false commit -q -m smoke
+11-05 01:23:39.940 19972 19972 F DEBUG   : pid: 19969, ppid: 19916, tid: 19969, name: libgit_cli.so  >>> /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 <<<
+11-05 01:23:39.940 19972 19972 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+11-05 01:23:39.940 19972 19972 F DEBUG   : backtrace:
+11-05 01:23:39.942 19972 19972 F DEBUG   :       #00 pc 00000000002d1eaa  /memfd:exec (deleted)
+11-05 01:23:39.943 19972 19972 F DEBUG   : backtrace:
+11-05 01:23:39.943 19972 19972 F DEBUG   :       #00 pc 0000000000271868  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:39.943 19972 19972 F DEBUG   :       #01 pc 0000000000272190  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:39.943 19972 19972 F DEBUG   :       #02 pc 000000000012f338  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:39.943 19972 19972 F DEBUG   :       #03 pc 0000000000109af8  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:39.943 19972 19972 F DEBUG   :       #04 pc 0000000000108cc0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:39.943 19972 19972 F DEBUG   :       #05 pc 0000000000108768  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:39.943 19972 19972 F DEBUG   :       #06 pc 00000000001db6e0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:39.943 19972 19972 F DEBUG   :       #07 pc 0000000000058198  /system/lib64/arm64/libc.so (__libc_init+120) (BuildId: c5c43713cd9681d690d172caf219e57d)
+11-05 01:23:40.880 19997 19997 W libgit_cli.so: type=1400 audit(0.0:1022): avc:  denied  { link } for  name="tmp_obj_opEDwO" dev="dm-6" ino=109063 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:41.040 20001 20001 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 20001 (libgit_cli.so), pid 20001 (libgit_cli.so)
+11-05 01:23:41.032 20001 20001 W libgit_cli.so: type=1400 audit(0.0:1023): avc:  denied  { link } for  name="tmp_obj_3lfxrm" dev="dm-6" ino=109066 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:41.066 20004 20004 F DEBUG   : Cmdline: /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so -c core.fsync=none -c core.fsyncObjectFiles=false commit -q -m smoke
+11-05 01:23:41.067 20004 20004 F DEBUG   : pid: 20001, ppid: 19916, tid: 20001, name: libgit_cli.so  >>> /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 <<<
+11-05 01:23:41.067 20004 20004 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+11-05 01:23:41.067 20004 20004 F DEBUG   : backtrace:
+11-05 01:23:41.067 20004 20004 F DEBUG   :       #00 pc 00000000002d45aa  /memfd:exec (deleted)
+11-05 01:23:41.069 20004 20004 F DEBUG   : backtrace:
+11-05 01:23:41.069 20004 20004 F DEBUG   :       #00 pc 0000000000271868  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:41.069 20004 20004 F DEBUG   :       #01 pc 0000000000272190  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:41.069 20004 20004 F DEBUG   :       #02 pc 000000000012f338  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:41.069 20004 20004 F DEBUG   :       #03 pc 0000000000109af8  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:41.069 20004 20004 F DEBUG   :       #04 pc 0000000000108cc0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:41.069 20004 20004 F DEBUG   :       #05 pc 0000000000108768  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:41.069 20004 20004 F DEBUG   :       #06 pc 00000000001db6e0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:41.069 20004 20004 F DEBUG   :       #07 pc 0000000000058198  /system/lib64/arm64/libc.so (__libc_init+120) (BuildId: c5c43713cd9681d690d172caf219e57d)
+11-05 01:23:41.840 20029 20029 W libgit_cli.so: type=1400 audit(0.0:1024): avc:  denied  { link } for  name="tmp_obj_mtWIWy" dev="dm-6" ino=109063 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:42.017 20033 20033 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 20033 (libgit_cli.so), pid 20033 (libgit_cli.so)
+11-05 01:23:42.012 20033 20033 W libgit_cli.so: type=1400 audit(0.0:1025): avc:  denied  { link } for  name="tmp_obj_qFWMWw" dev="dm-6" ino=109066 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:42.041 20036 20036 F DEBUG   : Cmdline: /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so -c core.fsmonitor=false -c core.useBuiltinFSMonitor=false commit -q -m smoke
+11-05 01:23:42.041 20036 20036 F DEBUG   : pid: 20033, ppid: 19916, tid: 20033, name: libgit_cli.so  >>> /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 <<<
+11-05 01:23:42.041 20036 20036 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+11-05 01:23:42.041 20036 20036 F DEBUG   : backtrace:
+11-05 01:23:42.041 20036 20036 F DEBUG   :       #00 pc 00000000002d21aa  /memfd:exec (deleted)
+11-05 01:23:42.042 20036 20036 F DEBUG   : backtrace:
+11-05 01:23:42.042 20036 20036 F DEBUG   :       #00 pc 0000000000271868  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:42.042 20036 20036 F DEBUG   :       #01 pc 0000000000272190  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:42.042 20036 20036 F DEBUG   :       #02 pc 000000000012f338  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:42.042 20036 20036 F DEBUG   :       #03 pc 0000000000109af8  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:42.042 20036 20036 F DEBUG   :       #04 pc 0000000000108cc0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:42.042 20036 20036 F DEBUG   :       #05 pc 0000000000108768  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:42.042 20036 20036 F DEBUG   :       #06 pc 00000000001db6e0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:42.042 20036 20036 F DEBUG   :       #07 pc 0000000000058198  /system/lib64/arm64/libc.so (__libc_init+120) (BuildId: c5c43713cd9681d690d172caf219e57d)
+11-05 01:23:42.964 20066 20066 W libgit_cli.so: type=1400 audit(0.0:1026): avc:  denied  { link } for  name="tmp_obj_rsizqq" dev="dm-6" ino=109063 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:43.146 20070 20070 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 20070 (libgit_cli.so), pid 20070 (libgit_cli.so)
+11-05 01:23:43.140 20070 20070 W libgit_cli.so: type=1400 audit(0.0:1027): avc:  denied  { link } for  name="tmp_obj_TCBPrv" dev="dm-6" ino=109066 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:23:43.173 20073 20073 F DEBUG   : Cmdline: /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so commit -q -m smoke
+11-05 01:23:43.173 20073 20073 F DEBUG   : pid: 20070, ppid: 19916, tid: 20070, name: libgit_cli.so  >>> /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 <<<
+11-05 01:23:43.173 20073 20073 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+11-05 01:23:43.173 20073 20073 F DEBUG   : backtrace:
+11-05 01:23:43.173 20073 20073 F DEBUG   :       #00 pc 00000000002c9baa  /memfd:exec (deleted)
+11-05 01:23:43.176 20073 20073 F DEBUG   : backtrace:
+11-05 01:23:43.176 20073 20073 F DEBUG   :       #00 pc 0000000000271868  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:43.176 20073 20073 F DEBUG   :       #01 pc 0000000000272190  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:43.176 20073 20073 F DEBUG   :       #02 pc 000000000012f338  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:43.176 20073 20073 F DEBUG   :       #03 pc 0000000000109af8  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:43.177 20073 20073 F DEBUG   :       #04 pc 0000000000108cc0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:43.177 20073 20073 F DEBUG   :       #05 pc 0000000000108768  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:43.177 20073 20073 F DEBUG   :       #06 pc 00000000001db6e0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:23:43.177 20073 20073 F DEBUG   :       #07 pc 0000000000058198  /system/lib64/arm64/libc.so (__libc_init+120) (BuildId: c5c43713cd9681d690d172caf219e57d)
+11-05 01:24:59.136 20166 20166 W libgit_cli.so: type=1400 audit(0.0:1036): avc:  denied  { link } for  name="tmp_obj_ouzndD" dev="dm-6" ino=109062 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:24:59.296 20169 20169 W libgit_cli.so: type=1400 audit(0.0:1037): avc:  denied  { link } for  name="tmp_obj_CwI9yU" dev="dm-6" ino=109066 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:24:59.444 20172 20172 W libgit_cli.so: type=1400 audit(0.0:1038): avc:  denied  { link } for  name="tmp_obj_927KlC" dev="dm-6" ino=109069 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:30:12.333 20482 20482 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 20482 (libgit_cli.so), pid 20482 (libgit_cli.so)
+11-05 01:30:12.356 20488 20488 F DEBUG   : Cmdline: /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so init --ref-format=reftable -q
+11-05 01:30:12.356 20488 20488 F DEBUG   : pid: 20482, ppid: 20480, tid: 20482, name: libgit_cli.so  >>> /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 <<<
+11-05 01:30:12.356 20488 20488 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+11-05 01:30:12.356 20488 20488 F DEBUG   : backtrace:
+11-05 01:30:12.356 20488 20488 F DEBUG   :       #00 pc 0000000000258aea  /memfd:exec (deleted)
+11-05 01:30:12.358 20488 20488 F DEBUG   : backtrace:
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #00 pc 0000000000271868  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #01 pc 0000000000272190  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #02 pc 00000000002fddfc  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #03 pc 000000000030b358  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #04 pc 00000000002fb810  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #05 pc 00000000002eee50  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #06 pc 00000000002f171c  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #07 pc 0000000000345090  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #08 pc 0000000000345b94  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #09 pc 000000000016bca4  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #10 pc 0000000000109af8  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #11 pc 0000000000108cc0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #12 pc 0000000000108768  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:30:12.358 20488 20488 F DEBUG   :       #13 pc 00000000001db6e0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:32:20.808 20656 20656 W libgit_cli.so: type=1400 audit(0.0:1063): avc:  denied  { link } for  name="tmp_obj_KrZEzY" dev="dm-6" ino=109063 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:32:20.992 20659 20659 W libgit_cli.so: type=1400 audit(0.0:1064): avc:  denied  { link } for  name="tmp_obj_UoQT7a" dev="dm-6" ino=109066 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:33:21.944 20739 20739 W libgit_cli.so: type=1400 audit(0.0:1073): avc:  denied  { link } for  name="tmp_obj_S8Myv1" dev="dm-6" ino=109063 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:33:22.104 20742 20742 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 20742 (libgit_cli.so), pid 20742 (libgit_cli.so)
+11-05 01:33:22.096 20742 20742 W libgit_cli.so: type=1400 audit(0.0:1074): avc:  denied  { link } for  name="tmp_obj_4CLE9b" dev="dm-6" ino=109066 scontext=u:r:runas_app:s0:c239,c256,c512,c768 tcontext=u:object_r:app_data_file:s0:c239,c256,c512,c768 tclass=file permissive=0 app=org.fellow99.pi.PiDesktopAndroid
+11-05 01:33:22.128 20745 20745 F DEBUG   : Cmdline: /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so commit -m smoke
+11-05 01:33:22.128 20745 20745 F DEBUG   : pid: 20742, ppid: 20724, tid: 20742, name: libgit_cli.so  >>> /system/bin/ndk_translation_program_runner_binfmt_misc_arm64 <<<
+11-05 01:33:22.128 20745 20745 F DEBUG   : signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000000 (read)
+11-05 01:33:22.128 20745 20745 F DEBUG   : backtrace:
+11-05 01:33:22.128 20745 20745 F DEBUG   :       #00 pc 00000000002c97aa  /memfd:exec (deleted)
+11-05 01:33:22.131 20745 20745 F DEBUG   : backtrace:
+11-05 01:33:22.131 20745 20745 F DEBUG   :       #00 pc 0000000000271868  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:33:22.131 20745 20745 F DEBUG   :       #01 pc 0000000000272190  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:33:22.132 20745 20745 F DEBUG   :       #02 pc 000000000012f338  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:33:22.132 20745 20745 F DEBUG   :       #03 pc 0000000000109af8  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:33:22.132 20745 20745 F DEBUG   :       #04 pc 0000000000108cc0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:33:22.132 20745 20745 F DEBUG   :       #05 pc 0000000000108768  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:33:22.132 20745 20745 F DEBUG   :       #06 pc 00000000001db6e0  /data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64/libgit_cli.so
+11-05 01:33:22.132 20745 20745 F DEBUG   :       #07 pc 0000000000058198  /system/lib64/arm64/libc.so (__libc_init+120) (BuildId: c5c43713cd9681d690d172caf219e57d)

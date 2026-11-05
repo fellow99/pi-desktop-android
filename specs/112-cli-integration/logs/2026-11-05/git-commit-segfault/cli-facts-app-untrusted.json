@@ -1,0 +1,245 @@
+{
+  "at": "2026-11-05T01:21:10.376Z",
+  "domain": "app-untrusted（常驻 login shell sh -l 自动 source $HOME/.profile 的 CLI 函数 + 哨兵帧；短名经函数 exec 绝对 ELF，与 TERM/PTY/EXEC 同路径）",
+  "env": {
+    "PATH": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/bin:/data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64:/system/bin:/system/xbin",
+    "HOME": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge",
+    "TMPDIR": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/tmp",
+    "PYTHONHOME": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools",
+    "GIT_EXEC_PATH": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/gitexec",
+    "NODE_HOME": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/node-bridge-tools",
+    "PNPM_HOME": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/.local/share/pnpm",
+    "UV_CACHE_DIR": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/.cache/uv",
+    "LD_LIBRARY_PATH": "/data/app/~~X1Y_b-BtfrDbwpkgR0bvhA==/org.fellow99.pi.PiDesktopAndroid-u1euHL0ium2T0kAC86biBw==/lib/arm64"
+  },
+  "pathResolution": [
+    {
+      "name": "node",
+      "onPath": true,
+      "resolved": "node"
+    },
+    {
+      "name": "npm",
+      "onPath": true,
+      "resolved": "npm"
+    },
+    {
+      "name": "npx",
+      "onPath": true,
+      "resolved": "npx"
+    },
+    {
+      "name": "corepack",
+      "onPath": true,
+      "resolved": "corepack"
+    },
+    {
+      "name": "python",
+      "onPath": true,
+      "resolved": "python"
+    },
+    {
+      "name": "pip",
+      "onPath": true,
+      "resolved": "pip"
+    },
+    {
+      "name": "pip3",
+      "onPath": true,
+      "resolved": "pip3"
+    },
+    {
+      "name": "git",
+      "onPath": true,
+      "resolved": "git"
+    },
+    {
+      "name": "uv",
+      "onPath": true,
+      "resolved": "uv"
+    },
+    {
+      "name": "pnpm",
+      "onPath": true,
+      "resolved": "pnpm"
+    }
+  ],
+  "checks": [
+    {
+      "name": "node",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 345,
+      "version": "v26.13.0",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "npm",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 11052,
+      "version": "11.20.0",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "npx",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 9288,
+      "version": "11.20.0",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "corepack",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 6090,
+      "version": "0.36.0",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "python",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 180,
+      "version": "Python 3.14.10",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "pip",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 9941,
+      "version": "pip 26.2.2 from /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools/lib/python",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "pip3",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 3230,
+      "version": "pip 26.2.2 from /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools/lib/python",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "git",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 161,
+      "version": "git version 2.56.0",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "uv",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 588,
+      "version": "uv 0.13.6 (aarch64-linux-android)",
+      "versionMatch": true,
+      "error": null
+    },
+    {
+      "name": "pnpm",
+      "ok": true,
+      "code": 0,
+      "timedOut": false,
+      "ms": 730,
+      "version": "12.16.1",
+      "versionMatch": true,
+      "error": null
+    }
+  ],
+  "gitSmoke": {
+    "steps": [
+      {
+        "step": "setup",
+        "ok": true,
+        "code": 0,
+        "timedOut": false,
+        "ms": 45,
+        "out": ""
+      },
+      {
+        "step": "init",
+        "ok": true,
+        "code": 0,
+        "timedOut": false,
+        "ms": 175,
+        "out": "hint: Using 'master' as the name for the initial branch. This default branch name\nhint: will change to \"main\" in Git 3.0. To configure the initial branch name\nhint: to use in all of your new repositories, which will suppress this warning,\nhint: call:\nhint:\nhint: \tgit config --global init.defaultBranch <name>\nhint:\nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'devel"
+      },
+      {
+        "step": "config",
+        "ok": true,
+        "code": 0,
+        "timedOut": false,
+        "ms": 156,
+        "out": ""
+      },
+      {
+        "step": "add",
+        "ok": true,
+        "code": 0,
+        "timedOut": false,
+        "ms": 218,
+        "out": ""
+      },
+      {
+        "step": "commit",
+        "ok": false,
+        "code": 139,
+        "timedOut": false,
+        "ms": 216,
+        "out": "Segmentation fault"
+      },
+      {
+        "step": "log",
+        "ok": false,
+        "code": 128,
+        "timedOut": false,
+        "ms": 154,
+        "out": "fatal: your current branch 'master' does not have any commits yet"
+      },
+      {
+        "step": "cleanup",
+        "ok": true,
+        "code": 0,
+        "timedOut": false,
+        "ms": 45,
+        "out": ""
+      }
+    ],
+    "commitOk": false,
+    "commitSegfault": true,
+    "logOk": false,
+    "ok": false,
+    "elapsedMs": 1071
+  },
+  "summary": {
+    "total": 10,
+    "ok": 10,
+    "failed": 0,
+    "timedOut": 0,
+    "onPath": 10,
+    "gitCommitOk": false,
+    "gitCommitSegfault": true,
+    "gitSmokeOk": false,
+    "elapsedMs": 43000
+  }
+}

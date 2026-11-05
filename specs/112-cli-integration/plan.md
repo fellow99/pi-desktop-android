@@ -70,8 +70,21 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
   短名必须由 Kotlin **生成绝对路径包装脚本**并 `chmod 755`（已验 `pip 26.2.2`）。纯 PIE 主件无此问题。
 - **幂等**：重装后 nativeLibraryDir 路径变化会使旧链接悬空，`File.exists()` 对 dangling link 返回 false；
   必须对每个短名/农场名**无条件 `delete()` 后重建**（`File.delete()` 删链接本身，不跟随目标），否则 `Os.symlink errno=17 EEXIST`。
-- 备选（.mkshrc / Node 侧命令映射 / 仅绝对路径）经 P0 判定**不需要**，留作未来某机型 SELinux 收紧时的退路，不在本期实现。
-- 纪律：C5 命令暴露以 P0 实证为准，**不得伪造命令可用**（宪法 A6）。
+ - 备选（.mkshrc / Node 侧命令映射 / 仅绝对路径）经 P0 判定**不需要**，留作未来某机型 SELinux 收紧时的退路，不在本期实现。
+ - 纪律：C5 命令暴露以 P0 实证为准，**不得伪造命令可用**（宪法 A6）。
+
+### D4b 命令短名暴露（P2 实测修订，覆盖 D4 的纯 symlink 结论）—— ✅ 已落地
+- P2 在真域 `untrusted_app_34` 实测发现两条 D4 未覆盖的硬约束：
+  1. **bionic linker 拒绝裸短名 argv[0] 的 PIE ELF**：PATH 命中 symlink 时 argv[0]=短名（如 `node`），报
+     `Error running .../bin/node: Unable to get realpath of node`（rc=255）；改绝对路径（`$HOME/bin/node`
+     或直调 `lib*_cli.so`）即成功。P0 的 ProcessBuilder 本就用绝对路径故 22/22 未暴露此问题。
+  2. **untrusted_app 域禁止 execve 数据目录常规文件**：pip 等 shell 包装脚本（落 filesDir）真域报
+     `Permission denied`；只有 nativeLibraryDir 内的 ELF/壳可执行。
+- **最终方案 = `$HOME/.profile` shell 函数 + 三通道统一 login shell**：Kotlin `CliTools.writeLoginProfile` 每次启动
+  无条件重建 `$HOME/.profile`，为每个短名写 `name() { exec '<nativeDir>/libxxx_cli.so' "$@"; }`（壳类经
+  `/system/bin/sh <nativeDir>/libxxx.so`）；TERM 本就是 `sh -l`，PTY 改 `["-l","-c",cmd]`、EXEC 改
+  `spawn(SHELL_PATH,["-l"])`，login shell 自动 source 该 profile。nativeLibraryDir 重装哈希变化由「每次重建」自愈。
+- **symlink 农场保留作绝对路径后备**（D4 的 `$HOME/bin` 与 gitexec 8 链接仍无条件重建），但短名权威路径改为 profile 函数。
 
 ### D5 环境变量契约（进程级注入，三通道全覆盖）
 - 注入点：Kotlin `PiDesktopRuntime.runBoot` 的 `env`（D3 物化之后），Node 侧 `pi-web-launch.js` 早期再做
@@ -86,10 +99,17 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
 - P0 实测：仅设 PYTHONPATH 会令 python 报 “Could not find platform independent libraries <prefix>”（虽 exit 0）；
   设 PYTHONHOME 后 `ssl/sqlite3/zlib/hashlib` 干净可用（OpenSSL 3.5.9 / sqlite 3.54.1）。git 传输件经 GIT_EXEC_PATH 农场解析，`ls-remote` TLS 成功。
 
-### D6 boot-facts 与能力面
-- `pi-web-launch.js#writeBootFacts` 增 `cli` 块：对五件做「present（文件在）+ version（`--version` 回程，带超时）」探针；
-  结果并入 boot-facts；任一失败结构化 `ready:false/reason`，不阻断主服务（与 pty 同纪律）。
-- 探针复用 `/system/bin/sh` spawn（android-exec 已证通道）或直接 child_process 绝对路径；严格超时、输出有界。
+### D6 boot-facts 与能力面 —— ✅ 已落地（P2 实测修订）
+- 探针**延迟到 Next 就绪后 `setImmediate(runCliProbe)` 异步执行**，不拖首启：boot-facts 只先写
+  `cli:{status:'deferred'}` 占位，探针结果另落 `pi-web.cli-facts.json`；任一失败结构化标记、绝不阻断 Next 主链路（宪法 A6）。
+- 探针复用常驻 `/system/bin/sh -l`（detached、不传 env 副本继承产品 `process.env`），随机哨兵帧结算，只看 stdout；
+  硬上限 150s、单步哨兵 12s；CRLF 入口归一化、`lineEnd` 从 `endAt+1` 搜索。实测 10 个 `--version` 全 ok、PATH 10/10、零超时、总耗时 43s。
+- **git 工作流冒烟用独立短生命周期 login shell（模块级 `runGitSmoke`）**：平台事实——内嵌引擎（libnode.so v24）下常驻
+  mksh 长会话累积十余帧后会进入续行等待（`wchan=unix_stream_read_generic`），Node 流健康却零回送；独立 shell 无历史帧、
+  启动即干净，git 段从 84s 超时压缩到 1071ms。七步 setup/init/config/add/commit/log/cleanup 落应用私有 TMPDIR、结束 `rm -rf`。
+- **git 冒烟裁决（2026-11-05 模拟器，详见 `logs/2026-11-05/git-commit-segfault/README.md`）**：真域 `untrusted_app_34`
+  下 `git commit` 稳定 rc=139（SIGSEGV）——SELinux 拒 `link(2)` 后该 git 2.56.0 构建不回退 rename 而 NULL 解引用；
+  init/add/hash-object/write-tree 等不触发 link 路径的操作全正常；配置层无 workaround。原生 arm64 对照留 P4。
 
 ### D7 移除纯 JS 替代（补充需求，与 D1–D6 同一提交序列）
 - 删 `payload/extensions/android-git/`（isomorphic-git）与 `scripts/sync-git-extension.mjs`；
@@ -139,7 +159,7 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
   报告 `P0-PROBE-REPORT.md`、设备 logcat `P0-PROBE-REPORT-device.txt`、离线门禁 `P0-ELF-GATE.json` 均在 `logs/2026-11-04-1/`。
   遗留：真机 cd3fac61（MIUI 人工安装门）原生 arm64 内核回归并入 P4。
 - **P1 获取/门禁/随包**：cli.lock + provision-cli + verify-cli + jniLibs/assets 投放 → assembleDebug 过 + 门禁绿。
-- **P2 运行期引导**：D3 物化 + D5 env + D4 命令暴露 + D6 boot-facts；真机 `--version` 五命令 + git 本地/https 工作流。
+- **P2 运行期引导 —— 🟦 进行（模拟器已验，待提交）**：D3 物化 + D5 env + D4b 命令暴露（.profile 函数 + 三通道 login shell）+ D6 延迟探针；模拟器 10/10 `--version` + PATH 10/10；**git 本地 commit 受 SELinux link 限制段错误（见 D6/证据目录），ls-remote TLS 正常**；原生真机回归留 P4。
 - **P3 移除纯 JS**：D7 删除/清理/CI/合规；回归四件套（终端、对话、载荷组装、合规）。
 - **P4 验收/取证**：test-cases 全量（CLI 功能 + DeepSeek 对话/看图）；回填能力清单；真机证据归档。
 
@@ -153,3 +173,5 @@ App 启动（PiDesktopRuntime 注入 nativeLibraryDir）                        
 | APK 体积：探针 debug APK 实测 121,695,971B（约 116MiB），最终产品增量以 P1 assembleDebug 对比为准 | 中 | 记录；动态分发留后续 |
 | ~~python/stdlib 工具树拖慢物化~~ | ~~中~~ | ✅ 实测 2710 文件，最终设备端耗时 1,797ms（历史轮次 922–4,518ms，受翻译层/调度影响）；digest marker 幂等，二启跳过 |
 | 移除 JS 扩展影响旧会话/旧物化 | 低 | 启动清残留 + 版本化 agentDir |
+| **真域 `git commit` 段错误（SELinux 拒 link，git 不回退 rename）** | **高** | 已钉死因果链并归档（`logs/2026-11-05/git-commit-segfault/`）；配置层无解；本期文档化规避 + 上报上游修构建；P4 原生 arm64 裁决是否翻译层叠加；不阻断其余四 CLI |
+| 内嵌引擎下常驻 mksh 长会话累积帧后进入续行等待（流健康零回送） | 中 | git 冒烟改独立短生命周期 login shell（`runGitSmoke`）；主探针 10 帧未观测污染；轮询统一 while+sleep、哨兵双标记 |
