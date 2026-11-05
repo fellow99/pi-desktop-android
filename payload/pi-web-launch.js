@@ -623,21 +623,30 @@ function materializeAgentResources(payloadRoot) {
  * 112：移除已废弃纯 JS 扩展的旧物化残留。
  * 历史版本把 payload/extensions/android-git（isomorphic-git）与 android-pnpm（进程内 JS bundle）
  * 复制到 <agentDir>/extensions/；112 起二者由真实 git/pnpm CLI 取代，载荷里已删目录，但升级安装
- * 不会自动清掉旧物化副本（materializeAgentResources 只增不删）。启动期显式删除，避免旧扩展被
- * discoverAndLoadExtensions 再次注册。只删这两个具名目录，绝不碰其它扩展；任何失败只告警不阻断。
+ * 不会自动清掉旧副本，残留分布在两个位置：
+ *   ① <agentDir>/extensions（materializeAgentResources 只增不删）——会被 discoverAndLoadExtensions
+ *      再次扫描注册，必须清；
+ *   ② <payloadRoot>/extensions（PayloadArchive 全量重解包只 mkdirs+覆盖同名文件，不删孤儿目录）——
+ *      虽不在扩展加载器扫描路径内（加载器只看 agentDir 与 cwd/.pi），不构成功能危害，但仍是废弃
+ *      文件残留，一并清掉以满足「零违规残留」。
+ * 只删这两个具名目录、两个根下的同名项，绝不碰其它扩展；任何失败只告警不阻断。
  */
-function cleanupLegacyExtensions() {
+function cleanupLegacyExtensions(payloadRoot) {
+  const roots = [];
   const agentDir = process.env.PI_CODING_AGENT_DIR;
-  if (!agentDir) return;
-  for (const name of ['android-git', 'android-pnpm']) {
-    const target = path.join(agentDir, 'extensions', name);
-    try {
-      if (fs.existsSync(target)) {
-        fs.rmSync(target, { recursive: true, force: true });
-        log(`已清理废弃扩展残留：${target}`);
+  if (agentDir) roots.push(agentDir);
+  if (payloadRoot) roots.push(payloadRoot);
+  for (const root of roots) {
+    for (const name of ['android-git', 'android-pnpm']) {
+      const target = path.join(root, 'extensions', name);
+      try {
+        if (fs.existsSync(target)) {
+          fs.rmSync(target, { recursive: true, force: true });
+          log(`已清理废弃扩展残留：${target}`);
+        }
+      } catch (err) {
+        logWarn(`清理废弃扩展残留失败（${target}）：${describeError(err)}`);
       }
-    } catch (err) {
-      logWarn(`清理废弃扩展残留失败（${target}）：${describeError(err)}`);
     }
   }
 }
@@ -1068,6 +1077,11 @@ async function runGitSmoke(spawnFn, cryptoMod, hardDeadline, sleepFn, home) {
         try { process.kill(-sh.pid, 'SIGKILL'); } catch { try { sh.kill('SIGKILL'); } catch { /* 已退 */ } }
       }
     } catch { /* 清理尽力而为 */ }
+    // M1：硬上限在 cleanup 帧前命中、或常驻 shell 中途死亡时，shell 侧 `rm -rf` 可能没跑完；
+    // Node 侧兜底删一次固定名临时仓库，避免 .git 对象残留占 TMPDIR（与 shell 帧同名，幂等）。
+    try {
+      fs.rmSync(`${process.env.TMPDIR || '/data/local/tmp'}/pi-gitsmoke`, { recursive: true, force: true });
+    } catch { /* 清理尽力而为 */ }
   }
 }
 
@@ -1447,7 +1461,7 @@ async function main() {
   }
 
   rotatePreviewSecrets(payloadRoot);
-  cleanupLegacyExtensions();
+  cleanupLegacyExtensions(payloadRoot);
   materializeAgentResources(payloadRoot);
 
   // PTY 常驻加载器（111-pty-integration）：在 pi-web server boot 之前 dlopen libpty_node.so
