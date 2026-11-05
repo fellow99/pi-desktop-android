@@ -1,6 +1,6 @@
 ---
 name: android-runtime-capabilities
-description: Pi Desktop（Android / 系统 WebView + 进程内 Node，aosp-node-bridge）的平台能力边界：哪些工具可用、哪些被平台封死、Git/pnpm 扩展的实际形态，以及在 `bash` 里必须遵守的约束。动手前先读，能避免把"平台没有"当成"代码写错"。
+description: Pi Desktop（Android / 系统 WebView + 进程内 Node，aosp-node-bridge）的平台能力边界：哪些工具可用、哪些被平台封死、五个真实 CLI（node/python/git/uv/pnpm）的实际形态与已知限制，以及在 `bash` 里必须遵守的约束。动手前先读，能避免把"平台没有"当成"代码写错"。
 ---
 
 # Android 平台能力边界（Pi Desktop / `pi-desktop-android`）
@@ -17,7 +17,7 @@ description: Pi Desktop（Android / 系统 WebView + 进程内 Node，aosp-node-
    ⇒ 能用 `read` / `write` / `edit` / `ls` / `find` / `grep` 完成的事，**不要**用 `bash` 绕。
 2. **工作目录用工作区根，别假设 POSIX 全盘可达。** 主线工作区在应用专属外存
    `Android/data/org.fellow99.pi.PiDesktopAndroid/files/workspace`（免权限真实路径）；
-   工作区根由宿主注入的 `PI_ANDROID_ROOTS` 声明（`PI_HOS_ROOTS` 是兼容别名，同值）。
+   工作区根由宿主注入的 `PI_ANDROID_ROOTS` 声明。
    其它目录树经 **SAF** 加入，返回的是 `content://` URI——**不是文件系统路径**，Node 的 fs
    不能直接打开，必须走 `android-saf` 桥。
 3. **`process.execPath` 不是 Node。** 实测 basename 为 `app_process64`，**永远不要**拿它
@@ -39,8 +39,8 @@ description: Pi Desktop（Android / 系统 WebView + 进程内 Node，aosp-node-
 | `bash` | ✅ 真机 | 常驻 `sh` + **随机哨兵行**判定结束（**不**依赖 `exit`/`close`，但 Android 上这两个事件其实正常送达）；默认超时 120 s，超时保留已产出输出；常驻复用显著减少僵尸。`sh -c "sh -c …"` 嵌套在探针上可用 |
 | `grep` | ✅ 真机 | **纯 JS**（无 `rg` 二进制）：只认 `pattern`/`path`/`glob`/`literal`/`ignoreCase` |
 | `find` | ✅ 真机 | **纯 JS**（无 `fd` 二进制）：`*` 匹配单段、`**` 跨段；`MAX_FILES 2000` / `MAX_DEPTH 8` |
-| `git_*`（21 个）+ `git_credentials` | 🔧 已随包；本地链+网络浅克隆真机自检通过，会话语义面待验 | **`android-git` 扩展**：纯 JS isomorphic-git 1.44.2（vendor bundle 915 KB），**不依赖系统 git**。init/status/log/add/commit/checkout/branch/merge/rebase 之外的本地生命周期 + HTTP(S) clone/fetch/pull/push；凭据存 `pi-agent/.git-credentials`（0600）。**不支持**：`rebase`、`blame`、SSH 远端（`git@host:` 自动改 https）、SHA-256 仓库、worktree。仓库必须在声明根内（围栏） |
-| pnpm 工具面（6 个） | 🔧 已随包；真机自检 7/7（本地包 add 等），网络 tarball 下载受当前设备网络限制 | **`android-pnpm` 扩展**：进程内 vendored pnpm 9.15.9（9 MB 单文件），**不 spawn node**。生命周期脚本**恒禁用**（`--ignore-scripts`，无法开启）；离线下写操作结构化拒绝、只读面保留；项目必须在声明根内。注意启动器已建 `<HOME>/tmp` 并冻结 `os.tmpdir()`（Android 无 /tmp） |
+| `git`（真实 CLI 2.56.0） | 🔧 已随包（112） | 交叉编译 arm64 ELF，经 login shell `sh -l` 的 `.profile` 函数在 PATH 暴露；`--version`/init/add/hash-object/write-tree/log 正常，HTTPS `ls-remote`/clone/fetch 走静态 curl+OpenSSL（TLS 已验）。**已知限制**：真域 SELinux 拒 app 数据目录 `link(2)`，当前构建 `git commit` 落 ref 时 rc=139 段错误（详见 112 证据）；不支持 SSH 远端、SHA-256 仓库、worktree。无 21 个 `git_*` 结构化工具，统一在 `bash`/终端敲 `git` |
+| `pnpm`（真实 CLI 12.16.1） | 🔧 已随包（112） | Rust 独立二进制，经 `.profile` 函数在 PATH 暴露，lifecycle 调用同 PATH 的真实 node；另有 node/npm/npx/corepack、python/pip、uv。无编译器，原生扩展/sdist 不可编译；可行域＝纯 JS/纯 Python 包 + 预置原生件 |
 | `rm` / `mv` / `cp` 工具 | ❌ | 没有这些**工具**；需要时用 `bash`（注意第 1 条） |
 | `codemode`（QuickJS 沙箱） | ⬜ 未验证 | Android **默认开 JIT**（无鸿蒙式 W^X ACL 门），探针上 `WebAssembly.validate` 成功，理论可用但未端到端验证 |
 | `powershell` | ❌ | Windows 专用 |
@@ -63,9 +63,9 @@ description: Pi Desktop（Android / 系统 WebView + 进程内 Node，aosp-node-
 
 ## 4. 网络
 
-- 应用出网 ✅（INTERNET 权限；HTTPS 模型调用正常；git 外网浅克隆真机 9/9，约 2.5 s）。
+- 应用出网 ✅（INTERNET 权限；HTTPS 模型调用正常；真实 git 的 HTTPS `ls-remote`/clone/fetch 经静态 curl+OpenSSL，TLS 已验）。
 - **刻意不设 `PI_OFFLINE`**（与鸿蒙 ark 的刻意差异——Android 有可用出网）；可在设置中显式离线。
-  此时 pnpm 写操作结构化拒绝、只读面保留。
+  此时 npm/pip/pnpm/uv 的 registry 访问不可用，仅离线子命令可跑。
 - 本地服务只监听 `127.0.0.1` 随机端口（见第 1 节第 4 条）；局域网路线（0.0.0.0）已移植但 v1 不启用。
 - MCP：`config/mcp.json` 随包为空（`mcpServers:{}`）。stdio 通道的子进程事件在 Android
   正常送达（不像鸿蒙），但**尚未接真实 MCP 服务器**；HTTP/SSE 类随 fetch 链路可用。

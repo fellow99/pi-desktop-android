@@ -619,6 +619,29 @@ function materializeAgentResources(payloadRoot) {
   return { copied, skipped };
 }
 
+/**
+ * 112：移除已废弃纯 JS 扩展的旧物化残留。
+ * 历史版本把 payload/extensions/android-git（isomorphic-git）与 android-pnpm（进程内 JS bundle）
+ * 复制到 <agentDir>/extensions/；112 起二者由真实 git/pnpm CLI 取代，载荷里已删目录，但升级安装
+ * 不会自动清掉旧物化副本（materializeAgentResources 只增不删）。启动期显式删除，避免旧扩展被
+ * discoverAndLoadExtensions 再次注册。只删这两个具名目录，绝不碰其它扩展；任何失败只告警不阻断。
+ */
+function cleanupLegacyExtensions() {
+  const agentDir = process.env.PI_CODING_AGENT_DIR;
+  if (!agentDir) return;
+  for (const name of ['android-git', 'android-pnpm']) {
+    const target = path.join(agentDir, 'extensions', name);
+    try {
+      if (fs.existsSync(target)) {
+        fs.rmSync(target, { recursive: true, force: true });
+        log(`已清理废弃扩展残留：${target}`);
+      }
+    } catch (err) {
+      logWarn(`清理废弃扩展残留失败（${target}）：${describeError(err)}`);
+    }
+  }
+}
+
 // ── 引擎引导事实（能力清单 §F P1-3/P1-4：形态事实落盘 + Intl 探针常态化）──────────
 /**
  * 在 require 任何 Next 代码**之前**，把引擎的 as-built 事实写到
@@ -1128,12 +1151,11 @@ async function runHostSelftest(payloadRoot) {
   return report;
 }
 
-// ── Phase 3 设备侧套件（git204-lite / pnpm O8 探针；PI_ANDROID_SELFTEST=1 才跑）────────
+// ── 设备侧自检公共辅助（pty/ptynode 探针仍在用；git/pnpm 纯 JS 扩展已于 112 移除）────────
 /**
- * 都跑在 **startNext 之前**（launch 窗口）——这是模拟器上唯一可靠的执行窗口（§E 翻译层
- * 会在 Next require 风暴期 SEGV）。扩展本体来自**已物化**的 agentDir（测的就是装机面）。
- * 报告各自落盘（pi-web.git-selftest.json / pi-web.pnpm-selftest.json）；pnpm 在 bundle
- * 重编译前先写 {"stage":"running"} 占位 —— 万一该步触发翻译层缺陷，已完成的证据不丢。
+ * 历史上这里还有 git204-lite（isomorphic-git）与 pnpm O8（进程内 bundle）两个 selftest；
+ * 112 引入真实 git/pnpm CLI 后两套纯 JS 扩展删除，其 selftest 一并移除。
+ * 下列辅助仍被 runPtySelftest / runPtyNodeSelftest 使用，故保留。
  */
 function selftestAgentDir() {
   return process.env.PI_CODING_AGENT_DIR || path.join(homeDir(), 'pi-agent');
@@ -1155,198 +1177,6 @@ function withTimeout(promise, ms, label) {
     promise,
     new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} 超时(${ms}ms)`)), ms)),
   ]);
-}
-
-async function runGitSelftest() {
-  if (process.env.PI_ANDROID_SELFTEST !== '1') return null;
-  const started = Date.now();
-  const report = { at: new Date().toISOString(), suite: 'git204-lite（规划 §10 验收的本地链）', results: [], summary: null };
-  try {
-    const agentDir = selftestAgentDir();
-    const loadTool = async (name) => {
-      const abs = path.join(agentDir, 'extensions', 'android-git', 'lib', 'tools', name + '.js');
-      const mod = await import(pathToFileURL(abs).href);
-      return mod.default;
-    };
-    const work = path.join(homeDir(), 'devtest-work', 'repo');
-    fs.rmSync(work, { recursive: true, force: true });
-    fs.mkdirSync(work, { recursive: true });
-    const ctx = { cwd: work };
-    const step = async (name, tool, params) => {
-      const t = await loadTool(tool);
-      const r = await withTimeout(t.execute('t-' + name, params, undefined, undefined, ctx), 10_000, 'git.' + name);
-      const text = (r.content || []).map((c) => c.text || '').join('\n');
-      const ok = r.isError !== true;
-      report.results.push({ name, ok, text: text.slice(0, 200) });
-      log(`[git-selftest] ${ok ? 'OK' : 'FAIL'} ${name}${ok ? '' : ' :: ' + text.slice(0, 200)}`);
-      return r;
-    };
-    await step('init', 'init', { dir: '.' });
-    await step('config-name', 'config', { action: 'set', key: 'user.name', value: 'pi-devtest' });
-    await step('config-email', 'config', { action: 'set', key: 'user.email', value: 'pi-devtest@example.invalid' });
-    fs.writeFileSync(path.join(work, 'a.txt'), 'hello\n');
-    await step('add', 'add', { filepath: 'a.txt' });
-    await step('commit', 'commit', { message: 'test: 初始提交' });
-    await step('log', 'log', { depth: 5 });
-    await step('branch-create', 'branch', { action: 'create', name: 'feat/x', checkout: true });
-    await step('status', 'status', {});
-    // C2：网络 clone 远端用例（isomorphic-git 纯 JS，不走系统 git）。默认浅克隆一个极小公开
-    // 仓库；可用 PI_DEVTEST_GIT_CLONE_URL 覆盖。网络不可达/离线时如实记为 skipped，不拉低本地链结果。
-    if (process.env.PI_SKIP_NETWORK_SELFTEST === '1') {
-      report.results.push({ name: 'clone-remote', ok: true, skipped: true, reason: 'PI_SKIP_NETWORK_SELFTEST=1' });
-    } else {
-      const cloneUrl = process.env.PI_DEVTEST_GIT_CLONE_URL || 'https://github.com/octocat/Hello-World.git';
-      const cloneDir = path.join(homeDir(), 'devtest-work', 'clone-target');
-      fs.rmSync(cloneDir, { recursive: true, force: true });
-      const t0 = Date.now();
-      try {
-        const t = await loadTool('clone');
-        const r = await withTimeout(
-          t.execute('t-clone', { url: cloneUrl, dir: cloneDir, depth: 1 }, undefined, undefined, { cwd: work }),
-          45_000, 'git.clone');
-        const text = (r.content || []).map((c) => c.text || '').join('\n');
-        // clone 工具失败会自删半成品目录；安全探测（不存在不算二次抛错，以工具 isError 为准）
-        let headExists = false;
-        try { headExists = fs.existsSync(cloneDir) && fs.readdirSync(cloneDir).length > 0; } catch { headExists = false; }
-        const ok = r.isError !== true && headExists;
-        report.results.push({ name: 'clone-remote', ok, ms: Date.now() - t0, url: cloneUrl, dir: cloneDir, text: text.slice(0, 200) });
-        log(`[git-selftest] ${ok ? 'OK' : 'FAIL'} clone-remote（${Date.now() - t0}ms）${ok ? '' : ' :: ' + text.slice(0, 200)}`);
-      } catch (e) {
-        report.results.push({ name: 'clone-remote', ok: false, ms: Date.now() - t0, url: cloneUrl, error: describeError(e) });
-        log(`[git-selftest] FAIL clone-remote :: ${describeError(e)}`);
-      }
-    }
-    report.summary = {
-      total: report.results.length,
-      ok: report.results.filter((r) => r.ok).length,
-      failed: report.results.filter((r) => !r.ok).length,
-      elapsedMs: Date.now() - started,
-    };
-  } catch (err) {
-    report.summary = { error: describeError(err), elapsedMs: Date.now() - started, ok: 0, failed: 1, total: report.results.length + 1 };
-  }
-  writeSelftestReport('pi-web.git-selftest.json', report);
-  log(`git204-lite 自检：${report.summary.ok}/${report.summary.total} 通过（${report.summary.elapsedMs}ms），报告 pi-web.git-selftest.json`);
-  return report;
-}
-
-async function runPnpmSelftest() {
-  if (process.env.PI_ANDROID_SELFTEST !== '1') return null;
-  const started = Date.now();
-  const report = {
-    at: new Date().toISOString(), suite: 'pnpm O8 探针（规划 §11/R8-1：进程内 bundle 真实 install --ignore-scripts）',
-    results: [], summary: null, stage: 'running',
-  };
-  // 先落占位：bundle 在翻译层重编译是本轮最高风险步骤（R8-1），崩了也要留下前半程证据
-  writeSelftestReport('pi-web.pnpm-selftest.json', report);
-  try {
-    const agentDir = selftestAgentDir();
-    const runnerUrl = pathToFileURL(path.join(agentDir, 'extensions', 'android-pnpm', 'lib', 'runner.mjs')).href;
-    const runner = await import(runnerUrl);
-    const work = path.join(homeDir(), 'devtest-work', 'pnpm-proj');
-    fs.rmSync(work, { recursive: true, force: true });
-    fs.mkdirSync(work, { recursive: true });
-    fs.writeFileSync(path.join(work, 'package.json'), JSON.stringify({ name: 'pnpm-probe', version: '0.0.0' }, null, 2));
-    process.env.npm_config_update_notifier = 'false';
-    let hangConfirmed = false; // R8-1：终止信号不落地已证实 ⇒ 后续步骤止损跳过
-    const step = async (name, args, dir, assert, runnerOpts = {}) => {
-      if (hangConfirmed && !runnerOpts.expectArtifacts) {
-        report.results.push({ name, skipped: true, reason: '前序步骤已证实：该环境 CLI 终止信号不落地（120s 观察足够）' });
-        return { code: -1 };
-      }
-      // C1：可传 expectArtifacts 让完成判据脱离不可靠的 exit 信号（产物齐即提前 code 0）
-      const r = await runner.runPnpm(args, { cwd: dir, timeoutMs: 20_000, ...runnerOpts });
-      // 任何“自带替代完成判据”的步骤（产物/输出）超时都不代表 bundle 挂死，不置 hang
-      if (r.timedOut && !r.artifactSatisfied && !runnerOpts.expectArtifacts && !runnerOpts.expectOutput) hangConfirmed = true;
-      const extra = assert ? assert() : {};
-      let ok;
-      if (runnerOpts.expectArtifacts) {
-        // 写操作：以产物为准（C1 产物断言）
-        ok = r.artifactSatisfied === true && !(extra && extra.assertFail);
-      } else if (runnerOpts.expectOutput) {
-        // 只读探测（--version/config get）：exit 信号在本环境不落地，以输出含预期内容为准
-        ok = runnerOpts.expectOutput(String(r.output || ''));
-      } else {
-        ok = r.code === 0 && r.artifactSatisfied !== false && !(extra && extra.assertFail);
-      }
-      report.results.push({ name, code: r.code, ms: r.ms, ok, output: String(r.output || '').replace(/\s+/g, ' ').slice(0, 400), ...extra });
-      log(`[pnpm-selftest] ${ok ? 'OK' : 'FAIL'} ${name}（exit=${r.code}，${r.ms}ms）${ok ? '' : ' :: ' + String(r.output || '').replace(/\s+/g, ' ').slice(0, 300)}`);
-      return r;
-    };
-    await step('--version', ['--version'], homeDir(), null, {
-      timeoutMs: 10_000,
-      expectOutput: (o) => /\b9\.\d+\.\d+\b/.test(o) || /9\.15\.9/.test(o),
-    });
-    // 离线可判定步骤：把「安装机制是否工作」与「registry 是否可达」解耦（R8-1 判据设计）
-    await step('config-get-registry', ['config', 'get', 'registry'], homeDir(), null, {
-      timeoutMs: 10_000,
-      expectOutput: (o) => /registry\.npmjs|https?:\/\//.test(o),
-    });
-    {
-      const localPkg = path.join(work, 'local-pkg');
-      fs.mkdirSync(localPkg, { recursive: true });
-      fs.writeFileSync(path.join(localPkg, 'package.json'), JSON.stringify({ name: 'local-pkg', version: '1.0.0' }, null, 2));
-      await step('add-local-dir', ['add', '--ignore-scripts', './local-pkg'], work, () => ({
-        lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
-        nodeModules: fs.existsSync(path.join(work, 'node_modules', 'local-pkg')) || fs.existsSync(path.join(work, 'node_modules', 'local-pkg', 'package.json')),
-      }), { silent: true, expectArtifacts: [path.join('node_modules', 'local-pkg', 'package.json'), 'pnpm-lock.yaml'] });
-    }
-    if (process.env.PI_OFFLINE !== '1') {
-      const storeDir = path.join(homeDir(), 'pnpm-store');
-      // 真机多在国内网络：devtest 探针默认首试 npmmirror（可用 PI_DEVTEST_NPM_REGISTRY 覆盖），
-      // 官方 registry 留作 fallback。判据是产物，registry 选择不影响机制结论。
-      const preferredRegistry = process.env.PI_DEVTEST_NPM_REGISTRY || 'https://registry.npmmirror.com/';
-      process.env.npm_config_registry = preferredRegistry;
-      const addArgs = ['add', '--ignore-scripts', 'ms@2.1.3', '--store-dir', storeDir];
-      // 网络步骤的完成判据：node_modules/ms/package.json（tarball 真正落盘）。
-      // 注意：lockfile 只证明 meta 解析；真机网络可能只解 meta 不下 tarball（downloaded 0），
-      // 此时记 networkBlocked 而非 FAIL（机制已由 add-local-dir 证明，剩纯网络）。
-      const addArtifacts = [path.join('node_modules', 'ms', 'package.json')];
-      let add = await step('add-ms', addArgs, work, () => ({
-        nodeModules: fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
-        lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
-        assertFail: false, // 成功与否以 artifactSatisfied 为准，不让旧 assertFail 干扰
-      }), { silent: true, expectArtifacts: addArtifacts, timeoutMs: 45_000 });
-      if (!add.artifactSatisfied) {
-        // 首选镜像不下 tarball ⇒ 官方 registry 兑底（如实记录）
-        const fallback = 'https://registry.npmjs.org/';
-        process.env.npm_config_registry = fallback;
-        add = await step('add-ms-fallback-registry', addArgs, work, () => ({
-          registry: fallback,
-          nodeModules: fs.existsSync(path.join(work, 'node_modules', 'ms', 'package.json')),
-          lockfile: fs.existsSync(path.join(work, 'pnpm-lock.yaml')),
-          assertFail: false,
-        }), { silent: true, expectArtifacts: addArtifacts, timeoutMs: 45_000 });
-      }
-      // 两个 registry 都只解 meta 不下 tarball（真网络限制）⇒ 软判定 networkBlocked，不计失败
-      if (!add.artifactSatisfied) {
-        const r2 = report.results[report.results.length - 1];
-        const metaResolved = fs.existsSync(path.join(work, 'pnpm-lock.yaml'))
-          || /resolved/i.test(String(add.output || ''));
-        if (metaResolved) {
-          for (const r of report.results) if (r.name && r.name.startsWith('add-ms')) { r.ok = true; r.networkBlocked = true; r.note = 'meta 解析/lockfile OK，但 tarball 0 字节（真机网络限制）；安装机制已由 add-local-dir 证明'; }
-          log('[pnpm-selftest] add-ms 网络软判定：meta OK / tarball 被网络阻断（不计失败）');
-        }
-      }
-      delete process.env.npm_config_registry; // 成功/失败都不把探针 registry 泄到运行环境
-      await step('list', ['list'], work, null, { timeoutMs: 10_000, expectOutput: () => true });
-      await step('store-status', ['store', 'status', '--store-dir', storeDir], homeDir(), null, { timeoutMs: 10_000, expectOutput: () => true });
-    } else {
-      report.results.push({ name: 'add-ms', skipped: true, reason: 'PI_OFFLINE=1（离线降级）' });
-    }
-    report.summary = {
-      total: report.results.length,
-      ok: report.results.filter((r) => r.ok).length,
-      failed: report.results.filter((r) => r.ok === false).length,
-      elapsedMs: Date.now() - started,
-    };
-  } catch (err) {
-    report.summary = { error: describeError(err), elapsedMs: Date.now() - started, ok: 0, failed: 1, total: report.results.length + 1 };
-  }
-  report.stage = 'done';
-  writeSelftestReport('pi-web.pnpm-selftest.json', report);
-  log(`pnpm O8 探针：${report.summary.ok}/${report.summary.total} 通过（${report.summary.elapsedMs}ms），报告 pi-web.pnpm-selftest.json`);
-  return report;
 }
 
 // ── O6 PTY 探针（规划 §14.2 O6；Phase 4 暂缓项重启评估的第一步）──────────────────
@@ -1617,6 +1447,7 @@ async function main() {
   }
 
   rotatePreviewSecrets(payloadRoot);
+  cleanupLegacyExtensions();
   materializeAgentResources(payloadRoot);
 
   // PTY 常驻加载器（111-pty-integration）：在 pi-web server boot 之前 dlopen libpty_node.so
@@ -1652,10 +1483,6 @@ async function main() {
 
   // 宿主能力自检（仅 PI_ANDROID_SELFTEST=1；诊断资产，失败不阻断启动）
   await runHostSelftest(payloadRoot);
-
-  // Phase 3 设备侧套件（同门控；git 在前、pnpm 最后——后者含最高翻译层风险步骤）
-  await runGitSelftest();
-  await runPnpmSelftest();
 
   // Phase 4 O6 PTY 探针（暂缓项重启评估第一步；只测不改行为）
   await runPtySelftest();

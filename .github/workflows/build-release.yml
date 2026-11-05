@@ -111,6 +111,11 @@ jobs:
         # 原生支持 \p{ID_Start} 转义，跳过以免对 Linux next 产物误判（0/4 覆盖不全）
         run: node scripts/assemble-payload.mjs --apply --no-vendor-compat --pi-web "$GITHUB_WORKSPACE/../pi-web"
 
+      - name: 五个真实 CLI 投放（provision-cli --download：sha256 锁值 + ELF/壳/工具树门禁，112）
+        # 干净 runner 无本地 jniLibs/assets/cli-tools（均 gitignored）；按 cli.lock.json#releases 拉五个
+        # GitHub Release tarball，校验 sha256 后投放 12 个 CLI .so + 3 个确定性工具树 .tar，脚本末尾自动跑 verify-cli 门禁。
+        run: node scripts/provision-cli.mjs --download
+
       # ── 签名注秘（可选；无 secrets → debug 签名兜底）────────────────────────
       - name: 签名注秘（有 secrets → VARIANT=release；无 → debug）
         env:
@@ -156,12 +161,17 @@ jobs:
           LOWER_VARIANT="${VARIANT,,}"
           APK="app/build/outputs/apk/${LOWER_VARIANT}/app-${LOWER_VARIANT}.apk"
           test -f "$APK"
-          echo "── .so 清单（G3 白名单）──"
+          echo "── .so 清单（G3 白名单：引擎 5 + cli.lock 登记的 CLI 受管文件）──"
           unzip -l "$APK" | grep -E '\.so$' || true
-          if unzip -l "$APK" | grep -E '\.so$' | awk -F/ '{print $NF}' | grep -vE '^(libnode\.so|libc\+\+_shared\.so|libnode_bridge\.so|libnode_host_client\.so|libpty_node\.so)$'; then
+          # 白名单单一事实源 = cli.lock.json（7 ELF + 5 壳），叠加引擎/桥/PTY 5 件；读不到锁即失败（fail-closed）。
+          # 用 grep -Fxf 固定字符串整行比对，避免 .so 名在 shell/node 多层转义里的正则反斜杠问题。
+          SO_LIST="$(mktemp)" ALLOW_LIST="$(mktemp)"
+          unzip -l "$APK" | grep -E '\.so$' | awk -F/ '{print $NF}' | sort -u > "$SO_LIST"
+          node -e 'const l=require("./cli.lock.json");const e=["libnode.so","libc++_shared.so","libnode_bridge.so","libnode_host_client.so","libpty_node.so"];const a=[...e,...l.elf.map(x=>x.path),...l.shells.map(x=>x.path)];if(!l.elf.length)process.exit(3);console.log(a.join("\n"))' > "$ALLOW_LIST"
+          if grep -vFxf "$ALLOW_LIST" "$SO_LIST"; then
             echo "::error::APK 出现 G3 白名单外的 .so"; exit 1
           fi
-          echo "── 16KB 页对齐（G5）──"
+          rm -f "$SO_LIST" "$ALLOW_LIST"
           zipalign -c -P 16 -v 4 "$APK" | tail -3
           echo "── 版本 / 包名 / 标签（G10）──"
           aapt2 dump badging "$APK" 2>/dev/null | grep -E '^package:|application-label:' || true

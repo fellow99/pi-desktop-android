@@ -31,18 +31,18 @@
 - [x] T2.5 模拟器（API37 翻译层，真机留 T4.x）：十命令 `--version` 全回程——node v26.13.0 / npm·npx 11.20.0 / corepack 0.36.0 / Python 3.14.10 / pip 26.2.2 / git 2.56.0 / uv 0.13.6 / pnpm 12.16.1。✅ 证据 `cli-facts-app-untrusted.json`。
 - [⚠️] T2.6 git 工作流：init/config/add/hash-object/write-tree/log 正常、`ls-remote` TLS 成功；**`git commit` 在真域稳定 rc=139（SELinux 拒 `link(2)` + git 不回退 rename 而 NULL 解引用）**，配置层无 workaround。因果链/对照表/产品处置见 `logs/2026-11-05/git-commit-segfault/README.md`；原生 arm64 是否同样崩溃留 T4.x 裁决。
 - [ ] T2.7 模拟器：`uv venv`（离线可判定）；`pnpm install` 纯 JS 小包验证 lifecycle 找 node；npm/pip 纯包安装按网络据实记录。⬜ 待跑（本轮聚焦探针/段错误裁决）。
-- [ ] T2.8 验证无编译器边界被如实上报（promptGuidelines/能力标志），不静默降级。⬜ 随 T3.7 一并改。
+- [x] T2.8 验证无编译器边界被如实上报（promptGuidelines/能力标志），不静默降级。✅ `android-exec.js` promptGuidelines 明示 PATH 五 CLI 但无 gcc/make/toolchain，node-gyp 原生构建与 pip sdist 编译不可用；SKILL.md 同步登记。
 
 ## P3 移除纯 JS 替代（补充需求）
 
-- [ ] T3.1 删 `payload/extensions/android-git/`（isomorphic-git）与 `scripts/sync-git-extension.mjs`。
-- [ ] T3.2 删 `payload/extensions/android-pnpm/`（JS pnpm 9.15.9 bundle）。
-- [ ] T3.3 `pi-web-launch.js`：删 `runGitSelftest`/`runPnpmSelftest` 及 main 调用与仅其使用的辅助；新增启动期清理旧物化残留 `extensions/{android-git,android-pnpm}`。
-- [ ] T3.4 `env.js`：确认无其它消费者后移除 harmony-git `PI_HOS_ROOTS` 单源别名。
-- [ ] T3.5 `compliance-check.mjs`：移除 pnpm.LICENSE/isomorphic-git 在位断言，改登记五 CLI 的 LICENSE/THIRD-PARTY-NOTICES 来源；确认门禁绿。
-- [ ] T3.6 `.github/workflows/build-release.yml`：移除 sync-git 检查；构建前加 `provision-cli --download/--check`（CI 网络拉 Release）；保留构建机 pnpm12 装 pi-web 步骤。
-- [ ] T3.7 `android-exec.js` promptGuidelines：更新为「PATH 含 node/npm/python/pip/git/uv/pnpm；无 gcc/make，原生扩展/sdist 不可编译」。
-- [ ] T3.8 grep 全仓确认无残留引用（历史 docs/specs/evidence 保留不改；代码/脚本/CI 零残留）；重新 assemble + 组装载荷验证产物不含两扩展。
+- [x] T3.1 删 `payload/extensions/android-git/`（isomorphic-git）与 `scripts/sync-git-extension.mjs`。✅ `git rm -r` 全目录 + 同步脚本。
+- [x] T3.2 删 `payload/extensions/android-pnpm/`（JS pnpm 9.15.9 bundle）。✅ `git rm -r` 全目录。
+- [x] T3.3 `pi-web-launch.js`：删 `runGitSelftest`/`runPnpmSelftest` 及 main 调用（保留 pty selftest 仍用的 `selftestAgentDir/writeSelftestReport/withTimeout`）；新增启动期 `cleanupLegacyExtensions()` 清理旧物化残留。✅ 模拟器预置假目录重启后被删（logcat 取证）；评审中发现并修复重复调用，仅保留物化前唯一调用。
+- [x] T3.4 `env.js`：确认无其它消费者后移除 harmony-git `PI_HOS_ROOTS` 单源别名。✅ KEYS 与赋值均删，全仓代码侧零消费者。
+- [x] T3.5 `compliance-check.mjs`：G4 改登记式断言（cli.lock 五 CLI 含 repository/url/sha256 + 旧两扩展目录缺席）；G3 白名单改 cli.lock 动态受管名单（fail-closed）。✅ 语法通过；LICENSE 正文随 Release tarball 分发标 MANUAL。
+- [x] T3.6 `.github/workflows/build-release.yml`：原工作流本无 sync-git 引用（记录「无需移除」）；载荷组装后新增 `provision-cli --download` 步骤（干净 runner 投放 12 .so + 3 tar 并自动 verify-cli）；内联 G3 预检改 `grep -Fxf` 锁驱动白名单（17 名，本地三用例验证）。✅ YAML 18 步解析通过。
+- [x] T3.7 `android-exec.js` promptGuidelines：更新为「PATH 含 node/npm/npx/corepack/python/pip/pip3/git/uv/pnpm；无 bash/curl、无 gcc/make/toolchain，node-gyp 原生构建与 pip sdist 编译不可用」。✅ SKILL.md 同步。
+- [x] T3.8 grep 全仓确认无违规残留（仅余 compliance 缺席断言、launch 清理逻辑、README「已移除」表述与历史 docs/specs/evidence，均符合保留纪律）；重组装载荷 + 重建 APK 解包验证旧两扩展 0 条目、cleanup 函数在、PI_HOS_ROOTS=0；模拟器三通道 10/10。✅ 证据 `logs/2026-11-05/p3-removal/`。
 
 ## P4 验收 / 取证 / 文档
 

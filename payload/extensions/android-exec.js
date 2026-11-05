@@ -469,7 +469,7 @@ export default function harmonyExec(pi) {
       + "truncated at 256KB.",
     promptSnippet: "Execute shell commands (ls, grep, find, toybox, etc.)",
     promptGuidelines: [
-      "On this device the shell is mksh R59 at /system/bin/sh; there is no bash/curl/git/node on PATH.",
+      "On this device the shell is mksh R59 at /system/bin/sh (login shell). Real CLIs on PATH: node, npm, npx, corepack, python, pip, pip3, git, uv, pnpm. No bash/curl; no gcc/make/toolchain, so native node-gyp builds and pip sdist compilation are unavailable.",
       "Each command runs in a subshell: `cd` and shell variables do NOT persist between calls.",
       "A non-zero exit code is reported as `(exit code N)`; use `toybox <name>` for applets without a symlink.",
     ],

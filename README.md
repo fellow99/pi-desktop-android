@@ -64,10 +64,13 @@ Requirements are organized under `specs/1NN-<name>/` (mirroring the ark numberin
 | `106-tools-extensions` | [`specs/106-tools-extensions-same-name-overrides/`](specs/106-tools-extensions-same-name-overrides/) | Same-name extension overrides (`bash` / `find` / `grep`) |
 | `107-compliance` | [`specs/107-compliance-and-security/`](specs/107-compliance-and-security/) | Store-compliance checklist G1–G11 (manifest minimality, 16 KB alignment, debug-only diagnostics, AI-content label, privacy draft) |
 
-The two capability increments beyond ark are tracked in `docs/000-工程规划.md` §10/§11:
-**`android-git`** (pure-JS isomorphic-git, single-sourced from `pi-desktop-hos`) and
-**`android-pnpm`** (in-process vendored pnpm 9.15.9). Both are assembled into the payload but have
-**no on-device end-to-end report archived yet** — treat them as implemented-but-unverified.
+The CLI capability increment is tracked in [`specs/112-cli-integration/`](specs/112-cli-integration/):
+five real cross-compiled CLIs — **node** (npm/npx/corepack), **python** (pip/pip3), **git**, **uv**,
+and **pnpm** — provisioned from GitHub Releases into `jniLibs`/`assets` (binaries not committed) and
+exposed on PATH through a per-launch `$HOME/.profile` plus login shell `sh -l` across the terminal and
+the agent `bash`/`ptyBash` channels. The earlier pure-JS `android-git` (isomorphic-git) and in-process
+`android-pnpm` extensions have been removed. Known limit: `git commit` segfaults in the app SELinux
+domain because `link(2)` on app data is denied (see the 112 evidence directory); native arm64 ruling pending.
 
 ## Repository layout
 
@@ -97,9 +100,8 @@ pi-desktop-android/
 │   │   ├── android-search.js                # overrides find/grep: pure-JS walk, zero rg/fd/child processes
 │   │   ├── android-runtime.js · android-workspace-roots.js
 │   │   ├── android-saf.js                   # SAF bridge (content://, persistable permissions)
-│   │   ├── android-git/                     # 21 git_* tools + git_credentials (isomorphic-git 1.44.2)
-│   │   ├── android-pnpm/                    # vendored pnpm 9.15.9, in-process, --ignore-scripts
-│   │   └── android-pty/                     # node-pty 1.1.0 (Maven AAR) + always-on loader + ptyBash tool + /pty-test
+│   │   ├── android-pty/                     # node-pty 1.1.0 (Maven AAR) + loader + ptyBash tool + /pty-test
+│   │   └── (android-git/ android-pnpm/ removed in 112 — replaced by real git/pnpm CLIs via .profile)
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # pure-JS compatibility layer, activated only if WebAssembly is absent
@@ -190,8 +192,8 @@ Device verification so far (see [`docs/002-真机验证记录.md`](docs/002-真�
 | File read / write / edit / list | ✅ | Pure Node.js inside the app process |
 | Command execution (the `bash` tool) | ✅ on device | Replaced under the same name by `android-exec.js`: one resident non-PTY `/system/bin/sh` (mksh) + a random sentinel line; completion is judged from stdout alone, never from `exit`/`close` events |
 | File lookup / content search (`find` / `grep`) | ✅ on device | Replaced by `android-search.js`: pure-JS walk, zero `fd`/`rg`, zero child processes; 512 KiB per-file cap |
-| Git operations | 🔧 implemented, device verification pending | `android-git` ships 21 `git_*` tools + `git_credentials` via pure-JS isomorphic-git 1.44.2 (no system git binary needed). Out of scope: `rebase`, `blame`, SSH remotes, SHA-256 repositories |
-| Package management (pnpm) | 🔧 implemented, device verification pending | `android-pnpm` runs vendored pnpm 9.15.9 **in-process**; lifecycle scripts are always disabled (`--ignore-scripts`), write operations are refused structurally when offline, and projects must lie inside declared workspace roots |
+| Git operations | ✅ real CLI on device (emulator-verified) | Real git 2.56.0 arm64 binary on PATH via `.profile`; `--version`/init/add/hash-object/write-tree/log and HTTPS `ls-remote`/clone/fetch work (static curl+OpenSSL). **Known limit:** `git commit` segfaults (rc 139) because the app SELinux domain denies `link(2)` on app data and this build does not fall back to `rename`; native-arm64 ruling pending (112 evidence). No SSH remotes, SHA-256 repos, or worktree |
+| Package management | ✅ real CLIs on device (emulator-verified) | Real pnpm 12.16.1 (Rust), node/npm/npx/corepack 26.13.0, python/pip 3.14.10, uv 0.13.6 on PATH; pnpm lifecycle scripts invoke the real node. No gcc/make/toolchain, so native node-gyp builds and pip sdist compilation are unavailable; pure-JS/pure-Python packages and prebuilt natives only |
 | Terminal panel / PTY | ✅ on device (node 26.13.0) | node-pty 1.1.0 ships in the APK (`libpty_node.so` + vendored JS) and is dlopen'd by an always-on boot loader (`pty.ready` boot-fact). Upstream `terminal-manager` runs a real mksh PTY (`/api/terminal` + SSE); `android-pty` also registers a simplest `ptyBash` tool (onExit true exit codes) and `/pty-test`. Verified E2E on real device Xiaomi MIX: tty→`/dev/pts/0`, echo+ANSI, resize (`COLUMNS/LINES`), Ctrl-C (SIGINT rc=130, shell alive), exit-close; `ptyBash echo ok;tty`→rc0, `exit 3`→rc3 |
 | Code-mode (QuickJS sandbox) | ⬜ not yet verified | Android runs **JIT by default** (no HarmonyOS-style W^X ACL gate) and WebAssembly validates on the probes, so code-mode is expected to work; it is simply not verified end-to-end yet. The `jitless/` layer is a fallback installed only when `WebAssembly` is missing |
 | MCP stdio servers | ⚠️ transport only | The spawn event-ordering blocker that existed on HarmonyOS is moot under Android (`exit`/`close` are delivered), but no real MCP server has been attached yet; shipped `mcp.json` is empty |
@@ -243,5 +245,6 @@ is restored to pristine afterwards):
 
 ## License
 
-MIT (see [`LICENSE`](LICENSE)). Upstream `Pi` and `Pi Web` are MIT-licensed; vendored components
-keep their own licenses (`payload/extensions/android-pnpm/vendor/pnpm.LICENSE`, etc.).
+MIT (see [`LICENSE`](LICENSE)). Upstream `Pi` and `Pi Web` are MIT-licensed. The five bundled CLIs
+(node/python/git/uv/pnpm) keep their own licenses; each CLI's `LICENSE`/`THIRD-PARTY-NOTICES` ships in
+its GitHub Release tarball and is registered in `cli.lock.json`.

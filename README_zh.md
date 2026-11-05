@@ -9,7 +9,7 @@
 > 运行时（aosp-node-bridge + 投放制 `libnode.so`），由该运行时在本机提供上游 **Pi Web** 服务，
 > 再用**系统 WebView** 加载这个本地服务渲染界面。功能目标与
 > [`pi-desktop-ark`](../pi-desktop-ark)（鸿蒙纯血版）对齐，并增加 Android 增量：
-> 前台服务保活、进程内 pnpm 扩展、SAF 存储访问框架桥。
+> 前台服务保活、五个真实交叉编译 CLI（node/python/git/uv/pnpm）、SAF 存储访问框架桥。
 
 | 项 | 值 |
 | --- | --- |
@@ -59,10 +59,12 @@
 | `106-tools-extensions` | [`specs/106-tools-extensions-same-name-overrides/`](specs/106-tools-extensions-same-name-overrides/) | 同名顶替扩展（`bash` / `find` / `grep`） |
 | `107-compliance` | [`specs/107-compliance-and-security/`](specs/107-compliance-and-security/) | 上架合规清单 G1–G11（清单最小权限、16 KB 对齐、诊断面仅 debug、AI 标识、隐私草稿） |
 
-相对 ark 的两项能力增量登记在 `docs/000-工程规划.md` §10/§11：**`android-git`**
-（纯 JS isomorphic-git，从 `pi-desktop-hos` 单源同步）与 **`android-pnpm`**
-（进程内 vendored pnpm 9.15.9）。两者均已装进载荷，但**尚无入库的真机端到端报告**，
-按「已实现未验证」对待。
+CLI 能力增量登记在 [`specs/112-cli-integration/`](specs/112-cli-integration/)：五个真实交叉编译
+CLI —— **node**（npm/npx/corepack）、**python**（pip/pip3）、**git**、**uv**、**pnpm** —— 从
+GitHub Release 投放到 `jniLibs`/`assets`（二进制不入库），经每次启动重建的 `$HOME/.profile` 与
+login shell `sh -l` 在终端与 Agent `bash`/`ptyBash` 三通道的 PATH 暴露。早期纯 JS 的 `android-git`
+（isomorphic-git）与进程内 `android-pnpm` 扩展已移除。已知限制：App SELinux 域拒绝对应用数据
+`link(2)`，当前 git 构建的 `git commit` 会段错误（rc 139，见 112 证据目录），原生 arm64 裁决待 P4。
 
 ## 目录结构
 
@@ -92,9 +94,8 @@ pi-desktop-android/
 │   │   ├── android-search.js                # 顶替 find/grep：纯 JS 遍历，零 rg/fd、零子进程
 │   │   ├── android-runtime.js · android-workspace-roots.js
 │   │   ├── android-saf.js                   # SAF 桥（content://、持久化授权）
-│   │   ├── android-git/                     # 21 个 git_* 工具 + git_credentials（isomorphic-git 1.44.2）
-│   │   ├── android-pnpm/                    # vendored pnpm 9.15.9，进程内执行，恒 --ignore-scripts
-│   │   └── android-pty/                     # 仅评估用 node-pty 试验件（未产品化，见「能力边界」）
+│   │   ├── android-pty/                     # node-pty 试验件 + ptyBash（真实 CLI 经 .profile+login shell，112）
+│   │   └──（android-git/ android-pnpm/ 已于 112 移除，由真实 git/pnpm 二进制取代）
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # 纯 JS 兼容层，仅当 WebAssembly 不存在时启用
@@ -175,8 +176,8 @@ adb shell am start -n org.fellow99.pi.PiDesktopAndroid/.MainActivity
 | 文件读 / 写 / 编辑 / 列举 | ✅ | 应用进程内纯 Node.js |
 | 命令执行（`bash` 工具） | ✅ 真机 | 由 `android-exec.js` 同名顶替：一个常驻非 PTY `/system/bin/sh`（mksh）+ 随机哨兵行；只凭 stdout 哨兵判定完成，从不等待 `exit`/`close` 事件 |
 | 文件查找 / 内容搜索（`find` / `grep`） | ✅ 真机 | 由 `android-search.js` 同名顶替：纯 JS 遍历，零 `fd`/`rg`、零子进程；单文件 512 KiB 上限 |
-| Git 操作 | 🔧 已实现，待真机验证 | `android-git` 以纯 JS isomorphic-git 1.44.2 提供 21 个 `git_*` 工具 + `git_credentials`，不依赖系统 git 二进制。范围外：`rebase`、`blame`、SSH 远端、SHA-256 仓库 |
-| 包管理（pnpm） | 🔧 已实现，待真机验证 | `android-pnpm` 在**进程内**运行 vendored pnpm 9.15.9；生命周期脚本恒禁用（`--ignore-scripts`），离线下写操作结构化拒绝，项目必须落在声明的工作区根内 |
+| Git 操作 | ✅ 真实 CLI（模拟器已验） | 真实 git 2.56.0 arm64 二进制经 `.profile` 上 PATH；`--version`/init/add/hash-object/write-tree/log 与 HTTPS `ls-remote`/clone/fetch 可用（静态 curl+OpenSSL）。**已知限制**：App SELinux 域拒应用数据 `link(2)`，该构建不回退 rename，`git commit` 段错误（rc 139）；原生 arm64 裁决待 P4（112 证据）。不支持 SSH 远端、SHA-256 仓库、worktree |
+| 包管理 | ✅ 真实 CLI（模拟器已验） | 真实 pnpm 12.16.1（Rust）、node/npm/npx/corepack 26.13.0、python/pip 3.14.10、uv 0.13.6 上 PATH；pnpm lifecycle 调真实 node。无 gcc/make/toolchain，node-gyp 原生构建与 pip sdist 编译不可用；仅纯 JS/纯 Python 包与预置原生件 |
 | 终端面板 / PTY | ❌ v1 不做（决策暂缓） | 补丁 0001 + 宿主桥把 `terminal.pty` 暴露为结构化 unsupported。`payload/extensions/android-pty/` 是**仅评估用**试验件（`/pty-test`），其原生件尚未投放到 jniLibs，自检会结构化失败，不影响产品 |
 | Code-mode（QuickJS 沙箱） | ⬜ 未验证 | Android **默认开 JIT**（没有鸿蒙式 W^X ACL 门），探针上 WebAssembly validate 成功，因此 code-mode 预期可用，只是尚未端到端验证。`jitless/` 是仅当 `WebAssembly` 缺失时安装的兜底层 |
 | MCP stdio 服务器 | ⚠️ 仅通道 | 鸿蒙上「子进程 exit 事件不送达」的阻塞在 Android 不存在（`exit`/`close` 正常送达），但尚未接真实 MCP 服务器；随包 `mcp.json` 为空 |
@@ -225,5 +226,5 @@ adb shell am start -n org.fellow99.pi.PiDesktopAndroid/.MainActivity
 
 ## 许可
 
-MIT（见 [`LICENSE`](LICENSE)）。上游 `Pi` / `Pi Web` 为 MIT 许可；vendored 组件保留各自许可证
-（如 `payload/extensions/android-pnpm/vendor/pnpm.LICENSE`）。
+MIT（见 [`LICENSE`](LICENSE)）。上游 `Pi` / `Pi Web` 为 MIT 许可；五个随包 CLI（node/python/git/uv/pnpm）
+保留各自许可证，其 `LICENSE`/`THIRD-PARTY-NOTICES` 随对应 GitHub Release tarball 分发，并登记在 `cli.lock.json`。

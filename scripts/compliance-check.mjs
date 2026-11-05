@@ -57,24 +57,38 @@ const row = (g, name, state, detail = '') => {
   row(2, '无浏览器语义（无 BROWSABLE 深链）', browsable ? 'FAIL' : 'PASS', browsable ? 'Manifest 声明了 BROWSABLE' : 'Manifest 无 BROWSABLE');
 }
 
-// G3 无动态下发可执行代码（.so 清单 = 引擎+桥+库；JS 载荷为唯一运行期解包物）
+// G3 无动态下发可执行代码（.so 清单 = 引擎/桥/PTY 5 件 + cli.lock 登记的 CLI 受管文件；JS 载荷为唯一运行期解包物）
 {
   const sos = [...new Set(apkList.split('\n').map((l) => (l.match(/lib\/[^/]+\/(lib[^/]+\.so)/) || [])[1]).filter(Boolean))].sort();
-  // 111-pty-integration：白名单补 libpty_node.so（node-pty AAR 随包进 nativeLibraryDir）。
-  const allowed = (s) => /^(libnode\.so|libc\+\+_shared\.so|libnode_bridge\.so|libnode_host_client\.so|libpty_node\.so)$/.test(s);
+  // 111-pty：libpty_node.so；112-cli：7 ELF + 5 shell 壳（共 12）由 cli.lock.json 单一事实源动态登记，fail-closed
+  const engineSo = new Set(['libnode.so', 'libc++_shared.so', 'libnode_bridge.so', 'libnode_host_client.so', 'libpty_node.so']);
+  let cliSo = new Set();
+  try {
+    const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'cli.lock.json'), 'utf8'));
+    cliSo = new Set([...(lock.elf || []).map((e) => e.path), ...(lock.shells || []).map((s) => s.path)]);
+  } catch (e) { cliSo = new Set(); }
+  const allowed = (s) => engineSo.has(s) || cliSo.has(s);
   const unexpected = sos.filter((s) => !allowed(s));
-  row(3, '无动态下发可执行代码', unexpected.length === 0 ? 'PASS' : 'FAIL',
+  row(3, `无动态下发可执行代码（引擎 5 + CLI 受管 ${cliSo.size}）`, unexpected.length === 0 ? 'PASS' : 'FAIL',
     sos.length ? `so=${sos.join(',')}` : '未列出 .so（unzip 输出异常？）');
 }
 
-// G4 第三方许可清单（材料项：正文在 docs；此处机械断言 vendor 许可随包）
+// G4 第三方许可清单（112：纯 JS 扩展已删，改登记五个真实 CLI 的来源；许可正文随各 Release 分发）
 {
-  const lic = ['LICENSE', 'keystore.properties.sample'];
-  const pnpmLic = fs.existsSync(path.join(ROOT, 'payload', 'extensions', 'android-pnpm', 'vendor', 'pnpm.LICENSE'));
-  const gitBundle = fs.existsSync(path.join(ROOT, 'payload', 'extensions', 'android-git', 'vendor', 'isomorphic-git.bundle.cjs'));
-  const okAll = pnpmLic && gitBundle;
-  row(4, '第三方许可清单', okAll ? 'PASS' : 'FAIL',
-    `pnpm.LICENSE=${pnpmLic} isomorphic-git.bundle=${gitBundle}（清单正文：Node/V8/ICU MIT 族 + pi/pi-web MIT + isomorphic-git MIT + pnpm MIT —— 发布材料页人工归档）`);
+  let lock = null;
+  try {
+    lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'cli.lock.json'), 'utf8'));
+  } catch { lock = null; }
+  const want = ['node', 'python', 'git', 'uv', 'pnpm'];
+  const releases = lock?.releases || {};
+  const registered = want.filter((k) => releases[k]?.repository && releases[k]?.url && releases[k]?.sha256);
+  const legacyGit = fs.existsSync(path.join(ROOT, 'payload', 'extensions', 'android-git'));
+  const legacyPnpm = fs.existsSync(path.join(ROOT, 'payload', 'extensions', 'android-pnpm'));
+  const okAll = registered.length === want.length && !legacyGit && !legacyPnpm;
+  row(4, '第三方许可/来源清单（五真实 CLI 登记于 cli.lock，旧 JS 扩展已移除）', okAll ? 'PASS' : 'FAIL',
+    `registered=${registered.join(',') || 'none'}（${registered.length}/${want.length}）；`
+    + `legacy android-git=${legacyGit} android-pnpm=${legacyPnpm}。`
+    + '各 CLI LICENSE/THIRD-PARTY-NOTICES 随对应 GitHub Release tarball 分发，发布材料页人工归档（MANUAL）');
 }
 
 // G5 16KB 页对齐（zipalign -c -P 16）
