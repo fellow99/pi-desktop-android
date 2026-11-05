@@ -22,12 +22,13 @@ description: Pi Desktop（Android / 系统 WebView + 进程内 Node，aosp-node-
    不能直接打开，必须走 `android-saf` 桥。
 3. **`process.execPath` 不是 Node。** 实测 basename 为 `app_process64`，**永远不要**拿它
    spawn node（补丁 0004 据此让会话导出等路径自动走进程内回退）。所有 JS 只在**应用进程内**
-   的 Node（aosp-node-runtime v24.22.1，small-ICU）里跑。
+   的 Node（aosp-node-runtime v26.13.0，small-ICU）里跑。
 4. **本地服务只绑 loopback、免密、端口随机。** `127.0.0.1:<随机端口>`，真实端口见
    `<filesDir>/node-bridge/payload/pi-web.ready.json`；**不要硬编码端口**。loopback 是安全
    上下文（`crypto.subtle` 可用）。
-5. **PTY/终端面板 v1 不提供。** `terminal.pty` 返回结构化 `unsupported`——不是坏，是产品决策
-   暂缓（路线 A 原生件技术验证已 Go，但未产品化；`android-pty` 只是评估试验件）。
+5. **PTY/终端面板已产品化（111）。** `terminal.pty` 按启动期 `globalThis.__piWebPty.ok`
+   （dlopen `libpty_node.so` 成功）运行期裁决，成功即结构化 `supported:true` 走上游原路径；
+   终端面板经 node-pty 1.1.0 + 随包原生件，Agent 侧另有 `ptyBash` 工具（已列入 defaultTools）。
 
 ## 2. 工具清单（同名顶替，行为与内建对齐）
 
@@ -84,7 +85,7 @@ Node 侧可 `host.invoke(name, args)`，均返回结构化 JSON：
 | `runtime.keepAlive` | ✅ **Android 独有增量**：启停 `dataSync` 型前台服务 + 常驻通知；真机验 isForeground、Doze deep-idle 存活、loopback SSE 36s+ 不断 |
 | `shell.openExternal` | ✅ 仅 http(s)，`ACTION_VIEW` 交系统浏览器（其余 scheme 拒绝） |
 | `log.hilog` | ✅ 追加到 app.log（Android 侧为 logcat 命名沿用） |
-| `terminal.pty` | ❅ 结构化 `supported:false`（决策暂缓） |
+| `terminal.pty` | ✅ 运行期裁决 | `globalThis.__piWebPty.ok`（dlopen libpty_node.so 成功）为真即 `supported:true` 走上游原路径；node-pty 1.1.0，Agent 侧另有 `ptyBash` 工具 |
 
 ## 6. WebView 事实（渲染面）
 
@@ -104,7 +105,7 @@ Node 侧可 `host.invoke(name, args)`，均返回结构化 JSON：
 
 | 能力 | 层 | 说明 |
 |---|---|---|
-| PTY / 终端面板产品化 | L3（决策暂缓） | `/dev/ptmx` 应用域可开（真机复测），但 devpts ptmxmode=000/ioctl slave 受限；node-pty 路线 A 原生件已交叉编译验证（3/3），产品化待 B3（exec 通道 + /api/terminal 联调 + 用户拍板） |
+| PTY / 终端面板 | ✅ 已产品化（111） | node-pty 1.1.0 + 随包 `libpty_node.so`（路线 A 原生件，exec 位走 nativeLibraryDir）；`terminal.pty` 按 `__piWebPty.ok` 运行期裁决，`ptyBash` 已在 defaultTools；111 已真机 E2E 通过 |
 | x86_64 模拟器跑 Next 服务 | L-ENV | berberis ARM 翻译层下 Next require 图确定性 SIGSEGV（JIT/jitless/各内存配置同签名）；模拟器只覆盖轻负载探针与诊断，**取证以 arm64 真机为准** |
 | 开机自启 / `SYSTEM_ALERT_WINDOW` / `MANAGE_EXTERNAL_STORAGE` / `REQUEST_INSTALL_PACKAGES` / `QUERY_ALL_PACKAGES` | L3 合规红线 | 明确不申请 |
 | 托盘 / 桌面窗口状态记忆 | ➖ | 桌面版概念，Android 不适用（Activity 生命周期由系统管理） |

@@ -85,11 +85,11 @@ dependencies {
     // JNI 桥（Maven Central）：Kotlin API + libnode_bridge.so + libnode_host_client.so + 引导 JS。
     implementation(libs.node.bridge)
 
-    // 引擎 libnode.so + libc++_shared.so：现由 Maven Central `node-runtime:24.22.1`（small-icu）
+    // 引擎 libnode.so + libc++_shared.so：现由 Maven Central `node-runtime:26.13.0`（small-icu）
     // 以 runtimeOnly 直解进 APK（对齐 oc-desktop-android 001；verify-runtime.mjs 门禁 SHA-256 + ELF 六项，
     // 单一事实源 = 工程根 runtime.lock.json）。
     // 历史：早期用 scripts/provision-engine.mjs 从本机 aosp-node-runtime 目录投放 jniLibs（不入库）；
-    // 本机无 24.22.1 的 Central AAR 缓存时该脚本仍作零网兜底（--check 验 sha=be1d16…）。
+    // 本机无 26.13.0 的 Central AAR 缓存时该脚本仍作零网兜底（--check 验锁档 sha256）。
     // 为什么不能用旧版 node-runtime:24.2.0：该构建 --with-intl=none ⇒ Intl 全缺 ⇒
     // Next16 compiled 产物 Unicode 属性转义在编译期 SyntaxError（O2 实测），且翻译层模拟器引导 SEGV。
     runtimeOnly(libs.node.runtime)

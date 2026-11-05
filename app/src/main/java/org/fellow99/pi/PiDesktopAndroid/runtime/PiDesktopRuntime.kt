@@ -134,7 +134,7 @@ object PiDesktopRuntime {
         // launch 脚本跑起来后由 waitReadyPort 轮询合并 pi-web.boot-facts.json。
         EngineFacts.writeAll(appContext, payloadRoot)
         // jitless 说明：早先 24.2.0(no-icu) 引擎在翻译层模拟器引导期 SEGV，曾按环境强制 jitless；
-        // 换装 24.22.1(small-icu) 后参考工程同模拟器以默认 JIT 全通 ⇒ 撤除强制（默认 false）。
+        // 换装 26.13.0(small-icu) 后参考工程同模拟器以默认 JIT 全通 ⇒ 撤除强制（默认 false）。
         val result = rt.start(
             NodeRuntimeOptions(
                 entry = "bootstrap.js",

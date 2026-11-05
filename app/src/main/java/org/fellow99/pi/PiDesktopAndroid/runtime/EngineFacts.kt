@@ -87,7 +87,7 @@ object EngineFacts {
                     .put("jitless", false)
                     .put(
                         "jitlessReason",
-                        "24.22.1(small-icu) 默认 JIT；ohos 式编译期 jitless 不适用（能力清单 §A「JIT 形态」）",
+                        "26.13.0(small-icu) 默认 JIT；ohos 式编译期 jitless 不适用（能力清单 §A「JIT 形态」）",
                     ),
             )
             .put("payloadSha256", payloadSha256(context) ?: JSONObject.NULL)

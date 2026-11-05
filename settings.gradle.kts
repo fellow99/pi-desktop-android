@@ -21,7 +21,7 @@ dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         // 注意：刻意**不**放 mavenLocal —— 本机 mavenLocal 里有
-        // io.github.fellow99:node-runtime:24.22.1（small-icu 试验变体），
+        // io.github.fellow99:node-runtime:26.13.0（small-icu 变体），
         // 放进来会让引擎版本依赖本机状态（宪法 A3：结论以锁定版本为准）。
         google()
         mavenCentral()

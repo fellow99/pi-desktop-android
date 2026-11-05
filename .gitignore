@@ -48,7 +48,7 @@ probe-work/
 *.pem
 secrets*
 # 引擎 .so（主路径 = Maven Central node-runtime AAR 直解，不入库；
-# jniLibs 仅作 provision-engine.mjs 零网幛底投放位；来源 aosp-node-runtime v24.22.1 small-icu）
+# jniLibs 仅作 provision-engine.mjs 零网兜底投放位；来源 aosp-node-runtime v26.13.0 small-icu）
 app/src/main/jniLibs/
 # 签名材料（不入库；模板见 keystore.properties.sample）
 keystore.properties

@@ -6,11 +6,12 @@
   "size": 90816,
   "sha256": "b965c62d8ab066d8d5b290c34c924b597699aaaa94ea4dabb6eedad414077a93",
   "builtFrom": {
-    "nodeHeaders": "nodejs.org dist v24.22.1（npmmirror 镜像下载）",
+    "nodeHeaders": "nodejs.org dist v26.13.0（npmmirror 镜像下载）",
     "ndk": "r28c (28.2.13676358)",
     "flags": "clang++ -std=gnu++17 -fPIC -shared -O2 -DNAPI_DISABLE_CPP_EXCEPTIONS -DNODE_ADDON_API_DISABLE_DEPRECATED",
     "source": "node-pty@1.1.0 npm 源码（未改动）"
   },
-  "enginePairing": "libnode.so v24.22.1 (be1d1641…)；NODE_MODULE_VERSION 137",
-  "flags": "clang++ -std=gnu++17 -fPIC -shared -O2 -DNAPI_DISABLE_CPP_EXCEPTIONS -DNODE_ADDON_API_DISABLE_DEPRECATED -Wl,--no-as-needed -Wl,-l:libnode.so（DT_NEEDED 引擎符号可达）"
+  "enginePairing": "libnode.so v26.13.0；NODE_MODULE_VERSION 147",
+  "flags": "clang++ -std=gnu++17 -fPIC -shared -O2 -DNAPI_DISABLE_CPP_EXCEPTIONS -DNODE_ADDON_API_DISABLE_DEPRECATED -Wl,--no-as-needed -Wl,-l:libnode.so（DT_NEEDED 引擎符号可达）",
+  "$runtimeNote": "本文件是 vendor 占位 pty.node 的溯源留痕，非运行件；产品实际加载 Maven Central io.github.fellow99:node-pty:26.13.0 的 libpty_node.so（NODE_MODULE_VERSION 147，与 node-runtime:26.13.0 逐字同版本配对），见 runtime.lock.json 与 specs/111-pty-integration。"
 }
