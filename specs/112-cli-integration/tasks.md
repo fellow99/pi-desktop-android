@@ -37,7 +37,7 @@
 
 - [x] T3.1 删 `payload/extensions/android-git/`（isomorphic-git）与 `scripts/sync-git-extension.mjs`。✅ `git rm -r` 全目录 + 同步脚本。
 - [x] T3.2 删 `payload/extensions/android-pnpm/`（JS pnpm 9.15.9 bundle）。✅ `git rm -r` 全目录。
-- [x] T3.3 `pi-web-launch.js`：删 `runGitSelftest`/`runPnpmSelftest` 及 main 调用（保留 pty selftest 仍用的 `selftestAgentDir/writeSelftestReport/withTimeout`）；新增启动期 `cleanupLegacyExtensions()` 清理旧物化残留。✅ 模拟器预置假目录重启后被删（logcat 取证）；评审中发现并修复重复调用，仅保留物化前唯一调用。
+- [x] T3.3 `pi-web-launch.js`：删 `runGitSelftest`/`runPnpmSelftest` 及 main 调用（保留 pty selftest 仍用的 `selftestAgentDir/writeSelftestReport/withTimeout`）；新增启动期 `cleanupLegacyExtensions(payloadRoot)` 清理旧物化残留。✅ 模拟器预置假目录重启后被删（logcat 取证）；评审中发现并修复重复调用，仅保留物化前唯一调用。**评审后加固（`87826d9`）**：① 原函数只清 `agentDir/extensions`，补 payload 解包点 `<payloadRoot>/extensions` 同名孤儿（PayloadArchive 全量重解包不删孤儿），双根各删 android-git/android-pnpm；② `runGitSmoke` finally 补 Node 侧 `fs.rmSync($TMPDIR/pi-gitsmoke)` 兜底，防硬上限/shell 死亡路径临时仓库残留。设备实测 4 条清理日志、两处计数 0、6 合法扩展未误伤。
 - [x] T3.4 `env.js`：确认无其它消费者后移除 harmony-git `PI_HOS_ROOTS` 单源别名。✅ KEYS 与赋值均删，全仓代码侧零消费者。
 - [x] T3.5 `compliance-check.mjs`：G4 改登记式断言（cli.lock 五 CLI 含 repository/url/sha256 + 旧两扩展目录缺席）；G3 白名单改 cli.lock 动态受管名单（fail-closed）。✅ 语法通过；LICENSE 正文随 Release tarball 分发标 MANUAL。
 - [x] T3.6 `.github/workflows/build-release.yml`：原工作流本无 sync-git 引用（记录「无需移除」）；载荷组装后新增 `provision-cli --download` 步骤（干净 runner 投放 12 .so + 3 tar 并自动 verify-cli）；内联 G3 预检改 `grep -Fxf` 锁驱动白名单（17 名，本地三用例验证）。✅ YAML 18 步解析通过。
@@ -48,7 +48,7 @@
 
 - [ ] T4.1 按 `test-cases.md` 跑 CLI 功能用例（终端 + Agent bash + ptyBash 三通道）。
 - [ ] T4.2 按 `test-cases.md` 跑 Agent 用例：DeepSeek（key 一次性注入，不入库）、模型 deepseek-flash、建工作区、对话「介绍一下你自己」、看图分析。
-- [ ] T4.3 回归四件套：终端面板 111 用例、一次普通对话、载荷组装 pristine、合规门禁；确认未引入回归。
+- [⚠️] T4.3 回归四件套（模拟器 `emulator-5554`，修复后 APK sha 前缀 `138fae4d`）：① CLI 探针 onPath 10/10、8 ok + npm/npx 哨兵 12s 冷启动踩线超时（手动复跑 11.20.0 功能正常，非回归）、git commit 仍 139（G1 已知边界）；② login shell 三通道同路径 10 短名 10/10 rc=0；③ G1/G2/G3 边界复核保持（139 / 裸短名 255 vs 绝对 ELF 0 / python -I isolated 失败 vs 普通模式 ok）；④ 载荷组装 pristine（脚本收尾反向 6 补丁）。终端面板 111 交互用例与普通对话留 T4.2 DeepSeek E2E 一并签收；合规门禁 T4.6 终检。证据 `logs/2026-11-05/review-fix-p4-regression/`。
 - [ ] T4.4 回填 `docs/安卓环境能力清单-*.md`（git/pnpm 真实二进制 ✅；新增 node/python/uv ✅；生态边界）、README×2（CLI 能力/体积/限制）。
 - [ ] T4.5 真机证据归档 `logs/<date>-N/` + `docs/evidence/`（脱敏：无 API Key/Authorization/凭据）；更新 `specs/SPECS_CHECKLIST.md` 收录 112。
 - [ ] T4.6 `./gradlew assembleDebug` + 全量 verify/合规门禁终检；提交序列收尾。
