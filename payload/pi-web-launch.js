@@ -675,7 +675,7 @@ function ensurePtyNative(payloadRoot) {
   }
 }
 
-function writeBootFacts(payloadRoot, jitlessState) {
+function writeBootFacts(payloadRoot, jitlessState, cliFacts) {
   const safe = (fn) => {
     try { return fn(); } catch (err) { return `error: ${describeError(err)}`; }
   };
@@ -724,6 +724,8 @@ function writeBootFacts(payloadRoot, jitlessState) {
     pid: process.pid,
     jitless: { active: jitlessState && jitlessState.active === true },
     pty: ptyNative ? { ready: ptyNative.ok, version: ptyNative.version, detail: ptyNative.detail } : { ready: false, detail: 'not-run' },
+    // 112：五 CLI 在 App 真进程域的可达性/版本事实（runCliProbe；失败仅记录不阻断）
+    cli: cliFacts || { skipped: true, detail: 'cli probe not run' },
     intl,
     wasm,
   };
@@ -738,6 +740,312 @@ function writeBootFacts(payloadRoot, jitlessState) {
     logWarn(`引擎引导事实写入失败（诊断资产，不影响主链路）：${describeError(err)}`);
   }
   return facts;
+}
+
+// ── 112 CLI 集成：五 CLI 常态化探针（App 真进程域裁决；并入 boot-facts.cli）──────────────
+/**
+ * 为什么必须在 App 真进程域裁决：run-as（runas_app 域）下纯 PIE ELF 经 symlink 调用会触发
+ *   bionic realpath 自检失败（"Unable to get realpath of <name>"，rc=255；git 甚至不回 close），
+ *   但产品的 TERM/PTY/EXEC 三通道都跑在 App 自身的 untrusted_app 域（P0 探针在该域 22/22 PASS）。
+ *
+ * 为什么用「常驻 sh + 哨兵帧」而不是逐命令 child_process 事件（2026-11-05 实测根因，与
+ *   extensions/android-exec.js 头部记载的平台事实同一条）：app_process 内嵌 Node 的 libuv
+ *   child_process 在本宿主上 **exit/close 事件永不送达** —— 子进程约 1.5s 变僵尸（ps 可见 Z 态），
+ *   libuv 的 waitpid 回收不触发，连 setTimeout 兜底都会被卡死的事件路径拖住；spawnSync 更在首个
+ *   调用即永久阻塞事件循环。逐命令 spawn 实测：5 个 ELF 偶发回收成功、5 个 sh 壳必僵尸，
+ *   首启被拖到 139s。唯一在本平台验证可靠的执行形态是 android-exec.js 的常驻 /system/bin/sh +
+ *   随机哨兵行：只 spawn 一次 shell，命令经 stdin 帧下发，结束判定**只看 stdout 哨兵**，
+ *   完全不依赖任何进程事件。本探针沿用同一纪律（精简版，无 abort/进度/截断）。
+ *
+ * 为什么这也直接裁决了「终端敲短名」：常驻 sh 以产品 env（PATH 前置 $HOME/bin）启动，帧内直接
+ *   写 `node --version` 等短名 —— 与用户在 TERM/PTY 里敲的解析路径完全一致（shell 做 PATH 搜索、
+ *   内核解 symlink、sh 壳由 shell 按 shebang 处理），是比绝对路径 exec 更贴近产品的裁决。
+ *
+ * 纪律：① 常态化（不挂 selftest 门控），每次启动给版本/可达性事实；② 只跑离线 --version，
+ *   不做网络动作；③ 单命令哨兵超时 + 整探针硬上限，超时只结构化标记不卡死；④ 全程 try/catch，
+ *   任何失败落盘，绝不阻断 Next 主链路（宪法 A6）；⑤ 探针结束即销毁常驻 shell，不留长驻资源。
+ */
+async function runCliProbe() {
+  const { spawn } = require('node:child_process');
+  const crypto = require('node:crypto');
+  const started = Date.now();
+  const PROBE_TIMEOUT_MS = 12_000;   // 单条命令哨兵等待上限
+  const HARD_DEADLINE_MS = 150_000;  // 整探针硬上限（10 条 --version + PATH 探测 + git 工作流冒烟；探针在 Next 就绪后异步跑，不阻塞首启）
+  // [短名, 参数, 预期输出正则]
+  const commands = [
+    ['node', ['--version'], /^v\d+\.\d+\.\d+/],
+    ['npm', ['--version'], /^\d+\.\d+\.\d+/],
+    ['npx', ['--version'], /^\d+\.\d+\.\d+/],
+    ['corepack', ['--version'], /^\d+\.\d+\.\d+/],
+    ['python', ['--version'], /Python 3\.\d+\.\d+/],
+    ['pip', ['--version'], /^pip \d+\.\d+/],
+    ['pip3', ['--version'], /^pip \d+\.\d+/],
+    ['git', ['--version'], /git version \d+\.\d+/],
+    ['uv', ['--version'], /uv \d+\.\d+\.\d+/],
+    ['pnpm', ['--version'], /^\d+\.\d+\.\d+/],
+  ];
+  const hardDeadline = started + HARD_DEADLINE_MS;
+  let proc = null;
+  let buffer = '';
+  let shellDied = false;
+  try {
+    // 只 spawn 一次常驻 **login shell**（sh -l）：mksh 启动自动 source $HOME/.profile，加载 CliTools
+    // 生成的 10 个 CLI 函数（函数体 exec 绝对 ELF/壳，argv[0] 绝对，规避 bionic 裸短名 realpath 失败）。
+    // 继承产品 process.env（PATH 已前置 $HOME/bin，勿传 env 副本——与 android-exec.js 同纪律）；stdio 全管道、
+    // stdin 喂帧；detached 建新进程组，使本宿主下管道回送与 waitpid 与已验证可靠的 EXEC 通道一致。
+    proc = spawn('/system/bin/sh', ['-l'], { cwd: homeDir(), stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+    proc.stdout.setEncoding('utf8');
+    // 翻译层/部分路径可能输出 CRLF：入口统一归一化为 LF，哨兵与版本解析只需处理 LF（CR 不跨 chunk 残留，因 \r 必紧邻 \n）。
+    proc.stdout.on('data', (chunk) => { buffer += String(chunk).replace(/\r\n/g, '\n'); });
+    proc.stderr.on('data', () => { /* 帧内 2>&1 已合并；排空防反压 */ });
+    proc.on('error', () => { shellDied = true; });
+    proc.stdout.on('end', () => { shellDied = true; });
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    // 单条命令：下发哨兵帧 → 轮询 stdout 找本 token 的 END 哨兵（不依赖任何进程事件）。
+    const runOne = async (name, args, expectRe) => {
+      const t0 = Date.now();
+      const token = crypto.randomBytes(6).toString('hex');
+      const begin = `__PI_CLIBEGIN__${token}`;
+      const end = `__PI_CLIEND__${token}`;
+      const quotedArgs = args.map((a) => `'${String(a).replace(/'/g, "'\\''")}'`).join(' ');
+      // 子 shell 括号组：隔离 cd/变量；</dev/null 防读 stdin 的命令吃掉帧；2>&1 合并流。
+      const frame = `printf '\\n${begin}\\n'; ( ${name} ${quotedArgs} ) </dev/null 2>&1; __rc=$?; printf '\\n${end} %s\\n' "$__rc"\n`;
+      try {
+        proc.stdin.write(frame);
+      } catch (err) {
+        return { name, ok: false, code: null, timedOut: false, ms: Date.now() - t0, version: '', versionMatch: false, error: `stdin write: ${describeError(err)}` };
+      }
+      const beginMarker = `\n${begin}\n`;
+      const endMarker = `\n${end} `;
+      while (Date.now() < Math.min(t0 + PROBE_TIMEOUT_MS, hardDeadline)) {
+        if (shellDied) {
+          return { name, ok: false, code: null, timedOut: false, ms: Date.now() - t0, version: '', versionMatch: false, error: 'resident shell died' };
+        }
+        const endAt = buffer.indexOf(endMarker);
+        if (endAt >= 0) {
+          // 从 endAt+1 起找行尾换行：endAt 指向 END 标记的前导 \n，若从 endAt 搜会立刻命中该 \n（实测 bug）。
+          const lineEnd = buffer.indexOf('\n', endAt + 1);
+          if (lineEnd >= 0) {
+            // 翻译层/PTY 可能输出 CRLF：剥离 rc 尾部 \r，保证 /^\d+$/ 命中。
+            const rcText = buffer.slice(endAt + endMarker.length, lineEnd).replace(/\r$/, '').trim();
+            const beginAt = buffer.lastIndexOf(beginMarker, endAt);
+            const body = beginAt >= 0 ? buffer.slice(beginAt + beginMarker.length, endAt) : '';
+            const firstLine = body.split('\n').map((s) => s.replace(/\r$/, '').trim()).find(Boolean) || '';
+            const code = /^\d+$/.test(rcText) ? Number(rcText) : null;
+            return {
+              name,
+              ok: code === 0 && expectRe.test(firstLine),
+              code,
+              timedOut: false,
+              ms: Date.now() - t0,
+              version: firstLine.slice(0, 120),
+              versionMatch: expectRe.test(firstLine),
+              error: null,
+            };
+          }
+        }
+        await sleep(20); // eslint-disable-line no-await-in-loop
+      }
+      return { name, ok: false, code: null, timedOut: true, ms: Date.now() - t0, version: '', versionMatch: false, error: `sentinel timeout ${PROBE_TIMEOUT_MS}ms` };
+    };
+
+    const checks = [];
+    for (const [name, args, expectRe] of commands) {
+      if (Date.now() >= hardDeadline) {
+        checks.push({ name, ok: false, code: null, timedOut: true, ms: 0, version: '', versionMatch: false, error: 'probe hard deadline reached' });
+      } else {
+        checks.push(await runOne(name, args, expectRe)); // eslint-disable-line no-await-in-loop
+      }
+    }
+
+    // PATH 短名可达性：同一常驻 shell 批量 command -v（走产品 PATH，与终端敲短名同路径）。
+    const names = commands.map((c) => c[0]);
+    const pathResolution = await (async () => {
+      const token = crypto.randomBytes(6).toString('hex');
+      const begin = `__PI_PATHBEGIN__${token}`;
+      const end = `__PI_PATHEND__${token}`;
+      const endMarker = `\n${end} `;
+      const probe = names.map((n) => `printf '%s=' '${n}'; command -v '${n}' || echo MISSING`).join('; ');
+      try {
+        // 与 runOne 完全同构：BEGIN/END 双 printf、单引号 '\n'（真换行），杜绝字面 \\n 的异类帧。
+        proc.stdin.write(`printf '\n${begin}\n'; ( ${probe} ) </dev/null 2>&1; __rc=$?; printf '\n${end} %s\n' "$__rc"\n`);
+      } catch (err) {
+        return names.map((name) => ({ name, onPath: false, resolved: null, detail: describeError(err) }));
+      }
+      // while+await sleep 轮询（本宿主内嵌引擎下与常驻 shell 管道兼容的唯一可靠形态）。
+      const t0 = Date.now();
+      while (Date.now() - t0 < 8000) {
+        if (shellDied) return names.map((name) => ({ name, onPath: false, resolved: null, detail: 'shell died' }));
+        const endAt = buffer.indexOf(endMarker);
+        if (endAt >= 0 && buffer.indexOf('\n', endAt + 1) >= 0) {
+          const map = new Map();
+          for (const line of buffer.slice(0, endAt).split('\n')) {
+            const m = /^([^=]+)=(.*)$/.exec(line.replace(/\r$/, '').trim());
+            if (m && names.includes(m[1])) map.set(m[1], m[2] === 'MISSING' ? null : m[2].replace(/\r$/, ''));
+          }
+          return names.map((name) => {
+            const resolved = map.has(name) ? map.get(name) : null;
+            return { name, onPath: !!resolved, resolved };
+          });
+        }
+        await sleep(20); // eslint-disable-line no-await-in-loop
+      }
+      return names.map((name) => ({ name, onPath: false, resolved: null, detail: 'path probe timeout' }));
+    })();
+
+
+    // 真域 git 工作流冒烟交给**独立的全新 login shell**（见模块级 runGitSmoke）：不与上面的主探针
+    // 常驻 shell 共享 buffer/解析状态。/proc 取证表明主 shell 在多帧累积后会卡在 unix_stream_read_generic
+    // （mksh 续行等待，Node 流仍健康），独立短生命周期 shell 从根本上规避该长会话状态污染。
+    const gitSmoke = await runGitSmoke(spawn, crypto, hardDeadline, sleep, homeDir());
+    const envSnapshot = {};
+    for (const key of ['PATH', 'HOME', 'TMPDIR', 'PYTHONHOME', 'GIT_EXEC_PATH', 'NODE_HOME', 'PNPM_HOME', 'UV_CACHE_DIR', 'LD_LIBRARY_PATH']) {
+      envSnapshot[key] = process.env[key] || null;
+    }
+    const summary = {
+      total: checks.length,
+      ok: checks.filter((c) => c.ok).length,
+      failed: checks.filter((c) => !c.ok).length,
+      timedOut: checks.filter((c) => c.timedOut).length,
+      onPath: pathResolution.filter((p) => p.onPath).length,
+      gitCommitOk: gitSmoke.commitOk,
+      gitCommitSegfault: gitSmoke.commitSegfault,
+      gitSmokeOk: gitSmoke.ok,
+      elapsedMs: Date.now() - started,
+    };
+    const report = {
+      at: new Date().toISOString(),
+      domain: 'app-untrusted（常驻 login shell sh -l 自动 source $HOME/.profile 的 CLI 函数 + 哨兵帧；短名经函数 exec 绝对 ELF，与 TERM/PTY/EXEC 同路径）',
+      env: envSnapshot,
+      pathResolution,
+      checks,
+      gitSmoke,
+      summary,
+    };
+    log(`[cli-probe] 执行 ${summary.ok}/${summary.total} 可用｜PATH 短名 ${summary.onPath}/${summary.total}（${summary.elapsedMs}ms，超时 ${summary.timedOut}）`);
+    for (const c of checks) {
+      log(`[cli-probe] ${c.ok ? 'OK ' : 'FAIL'} ${c.name}（code=${c.code}，${c.ms}ms）${c.version ? ' :: ' + c.version : (c.error ? ' :: ' + c.error : '')}`);
+    }
+    log(`[cli-probe] git 工作流冒烟 ${gitSmoke.ok ? 'OK' : 'FAIL'}（commit=${gitSmoke.commitOk ? 'ok' : (gitSmoke.commitSegfault ? 'SEGFAULT(139)' : 'fail')}，log=${gitSmoke.logOk ? 'ok' : 'fail'}，${gitSmoke.elapsedMs}ms，${gitSmoke.steps.length} 步）`);
+    return report;
+  } catch (err) {
+    // 整体异常绝不拖垮主链路：返回结构化失败，boot-facts 仍落盘。
+    logWarn(`CLI 探针整体异常（不阻断启动）：${describeError(err)}`);
+    return { at: new Date().toISOString(), skipped: true, detail: `cli probe threw: ${describeError(err)}`, elapsedMs: Date.now() - started };
+  } finally {
+    // 探针结束即销毁常驻 shell（进程组），不留长驻资源；忽略清理错误。
+    try {
+      if (proc) {
+        try { proc.stdin.destroy(); } catch { /* 已关 */ }
+        try { process.kill(-proc.pid, 'SIGKILL'); } catch { try { proc.kill('SIGKILL'); } catch { /* 已退 */ } }
+      }
+    } catch { /* 清理尽力而为 */ }
+  }
+}
+
+// ── 112 CLI 集成：真域 git 工作流冒烟（独立短生命周期 login shell）──────────────────────
+/**
+ * 为什么独立 shell：D6 主探针的常驻 login shell 在累积 10 条 --version + PATH 探测帧后，mksh 会进入
+ *   续行等待（/proc/<sh>/wchan = unix_stream_read_generic），此时 Node 侧 stdin/stdout 流仍健康
+ *   （未销毁、可写、writableLength=0），但 shell 不再执行/回送，bufLen 恒定。该长会话解析状态污染与
+ *   内嵌引擎（libnode.so v24）libuv 的 socketpair 生命周期相关，run-as + CLI Node(v26) 无法复现。
+ *   用一个全新、短生命周期、只跑 7 个 git 帧的 login shell 从根本上规避：它没有历史累积帧，启动即干净。
+ *
+ * 裁决目标：run-as（runas_app 域）实测 git commit 因 SELinux 禁 link 而段错误（rc=139）；产品三通道
+ *   跑在 App 自身 untrusted_app 域，git 在 link(2) 失败时应回退 rename/复制写对象。此处给出真域事实，
+ *   若仍 139 则记为翻译层/域差异，留 P4 原生 arm64 真机对照。
+ * 纪律：全程离线；仓库在应用私有 TMPDIR，结束即 rm -rf；每步独立哨兵帧；git 在子 shell 内运行，
+ *   段错误只杀子进程；整段 try/catch，失败结构化返回，绝不阻断 Next 主链路（宪法 A6）。
+ */
+async function runGitSmoke(spawnFn, cryptoMod, hardDeadline, sleepFn, home) {
+  const sleep = sleepFn || ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const STEP_TIMEOUT_MS = 12_000;
+  const started = Date.now();
+  const steps = [];
+  let sh = null;
+  let buf = '';
+  let died = false;
+  try {
+    // 独立 login shell：与主探针同形态（sh -l 自动 source $HOME/.profile 的 git 函数）、同 env（继承产品
+    // process.env，不传副本）、独立进程组（detached），cwd 为产品 HOME。
+    sh = spawnFn('/system/bin/sh', ['-l'], { cwd: home, stdio: ['pipe', 'pipe', 'pipe'], detached: true });
+    sh.stdout.setEncoding('utf8');
+    sh.stdout.on('data', (chunk) => { buf += String(chunk).replace(/\r\n/g, '\n'); });
+    sh.stderr.on('data', () => { /* 帧内 2>&1 已合并；排空防反压 */ });
+    sh.on('error', () => { died = true; });
+    sh.stdout.on('end', () => { died = true; });
+
+    const runStep = async (step, cmd) => {
+      const t0 = Date.now();
+      const token = cryptoMod.randomBytes(6).toString('hex');
+      const begin = `__PI_GITBEGIN__${token}`;
+      const end = `__PI_GITEND__${token}`;
+      // 与 runOne 同构的 subshell 哨兵帧（printf 单引号 \n 真换行，</dev/null 防吞帧，2>&1 合流）。
+      const frame = `printf '\n${begin}\n'; ( ${cmd} ) </dev/null 2>&1; __rc=$?; printf '\n${end} %s\n' "$__rc"\n`;
+      try {
+        sh.stdin.write(frame);
+      } catch (err) {
+        steps.push({ step, ok: false, code: null, timedOut: false, ms: Date.now() - t0, out: `stdin write: ${describeError(err)}` });
+        return;
+      }
+      const beginMarker = `\n${begin}\n`;
+      const endMarker = `\n${end} `;
+      while (Date.now() < Math.min(t0 + STEP_TIMEOUT_MS, hardDeadline)) {
+        if (died) { steps.push({ step, ok: false, code: null, timedOut: false, ms: Date.now() - t0, out: 'git shell died' }); return; }
+        const endAt = buf.indexOf(endMarker);
+        if (endAt >= 0) {
+          const lineEnd = buf.indexOf('\n', endAt + 1);
+          if (lineEnd >= 0) {
+            const rcText = buf.slice(endAt + endMarker.length, lineEnd).replace(/\r$/, '').trim();
+            const beginAt = buf.lastIndexOf(beginMarker, endAt);
+            const out = (beginAt >= 0 ? buf.slice(beginAt + beginMarker.length, endAt) : '').replace(/\r/g, '').trim();
+            const code = /^\d+$/.test(rcText) ? Number(rcText) : null;
+            steps.push({ step, ok: code === 0, code, timedOut: false, ms: Date.now() - t0, out: out.slice(0, 400) });
+            return;
+          }
+        }
+        await sleep(20); // eslint-disable-line no-await-in-loop
+      }
+      steps.push({ step, ok: false, code: null, timedOut: true, ms: Date.now() - t0, out: `sentinel timeout ${STEP_TIMEOUT_MS}ms` });
+    };
+
+    const smokeBase = `${process.env.TMPDIR || '/data/local/tmp'}/pi-gitsmoke`;
+    const q = (p) => `'${String(p).replace(/'/g, "'\\''")}'`;
+    const guard = async (step, cmd) => {
+      if (Date.now() >= hardDeadline) steps.push({ step, ok: false, code: null, timedOut: true, ms: 0, out: 'probe hard deadline reached' });
+      else await runStep(step, cmd);
+    };
+    await guard('setup', `rm -rf ${q(smokeBase)} && mkdir -p ${q(`${smokeBase}/repo`)} ${q(`${smokeBase}/tpl`)}`);
+    await guard('init', `cd ${q(`${smokeBase}/repo`)} && GIT_TEMPLATE_DIR=${q(`${smokeBase}/tpl`)} git init`);
+    await guard('config', `cd ${q(`${smokeBase}/repo`)} && git config user.email probe@pi.local && git config user.name 'PI Probe'`);
+    await guard('add', `cd ${q(`${smokeBase}/repo`)} && printf 'hello pi\n' > README.md && git add README.md`);
+    await guard('commit', `cd ${q(`${smokeBase}/repo`)} && git commit -m 'pi cli smoke'`);
+    await guard('log', `cd ${q(`${smokeBase}/repo`)} && git log --oneline -1`);
+    await guard('cleanup', `rm -rf ${q(smokeBase)}`);
+
+    const commitStep = steps.find((s) => s.step === 'commit');
+    const logStep = steps.find((s) => s.step === 'log');
+    return {
+      steps,
+      commitOk: !!commitStep && commitStep.ok,
+      commitSegfault: !!commitStep && commitStep.code === 139,
+      logOk: !!logStep && logStep.ok,
+      ok: steps.every((s) => s.ok),
+      elapsedMs: Date.now() - started,
+    };
+  } catch (err) {
+    logWarn(`git 冒烟整体异常（不阻断启动）：${describeError(err)}`);
+    return { steps, commitOk: false, commitSegfault: false, logOk: false, ok: false, skipped: true, detail: `git smoke threw: ${describeError(err)}`, elapsedMs: Date.now() - started };
+  } finally {
+    // 独立 shell 用完即销毁（进程组），不留长驻资源；忽略清理错误。
+    try {
+      if (sh) {
+        try { sh.stdin.destroy(); } catch { /* 已关 */ }
+        try { process.kill(-sh.pid, 'SIGKILL'); } catch { try { sh.kill('SIGKILL'); } catch { /* 已退 */ } }
+      }
+    } catch { /* 清理尽力而为 */ }
+  }
 }
 
 // ── 宿主能力自检（调试/验收通道；默认关闭）────────────────────────────────────
@@ -1318,8 +1626,14 @@ async function main() {
   // terminal-capability.ts（Next 路由，同一进程）经 globalThis 读真装载结果（宪法 A6）
   globalThis.__piWebPty = ptyNative;
 
-  // 引擎引导事实（P1-3/P1-4）：必须在任何 Next 代码被 require 之前落盘
-  writeBootFacts(payloadRoot, jitless);
+  // 112：五 CLI 探针**延迟**到 Next 就绪后非阻塞执行（不在 boot 关键路径 await）。
+  // 平台时机约束（2026-11-05 实测）：app_process 内嵌 Node 在 Next 引导前的早期事件循环上，
+  // child_process 的 stdin 写入/setInterval 轮询不被调度，常驻 sh 哨兵探针会卡死且硬超时也不触发；
+  // 而 Next 就绪后事件循环健康（与 android-exec.js 首次工具调用惰性 spawn 的可靠时机一致）。
+  // 故 boot-facts 先落 deferred 标记，真实结果就绪后写独立 pi-web.cli-facts.json。
+  const cliFacts = { status: 'deferred', detail: 'probe runs after Next ready; see pi-web.cli-facts.json' };
+  // 引擎引导事实（P1-3/P1-4）：必须在任何 Next 代码被 require 之前落盘（112 的 cli 块为 deferred 占位）
+  writeBootFacts(payloadRoot, jitless, cliFacts);
 
   const hostname = process.env.PI_WEB_HOSTNAME && process.env.PI_WEB_HOSTNAME.length > 0
     ? process.env.PI_WEB_HOSTNAME
@@ -1355,8 +1669,25 @@ async function main() {
   writeReadyMarker(port, hostname, payloadRoot);
   log(`本进程已就绪：http://${hostname}:${port}/（同源 HTTP + SSE；ArkWeb 侧 loadUrl 目标）`);
   log(`日志读回：ArkTS 诊断面板用 Logger.tail(logPath)，或 hdc fport 后 curl /log（node.log ↔ app.log 双通道）`);
-}
 
+  // 112：Next 就绪后非阻塞跑五 CLI 探针（事件循环已健康，常驻 sh 哨兵模式才可靠）。
+  // 不 await、不 reject：探针在后台跑完自行落盘 pi-web.cli-facts.json，绝不影响就绪与主服务。
+  setImmediate(() => {
+    runCliProbe()
+      .then((report) => {
+        const out = path.join(homeDir(), 'payload', 'pi-web.cli-facts.json');
+        try {
+          const tmp = `${out}.tmp-${process.pid}`;
+          fs.writeFileSync(tmp, JSON.stringify(report, null, 2) + '\n', 'utf8');
+          fs.renameSync(tmp, out);
+          log(`CLI 探针结果已落盘：${out}（${report.summary ? report.summary.ok + '/' + report.summary.total : 'n/a'} 可用）`);
+        } catch (err) {
+          logWarn(`CLI 探针结果落盘失败（诊断资产，不影响主链路）：${describeError(err)}`);
+        }
+      })
+      .catch((err) => logWarn(`CLI 探针后台异常（不阻断）：${describeError(err)}`));
+  });
+}
 main().catch((err) => {
   // 顶层失败：**刻意不 process.exit**（契约 §3.3 FR-004-033 的取舍）——
   // 让库的崩溃记录与 /log 读回通道都还有机会被读到（谁写谁读）。

@@ -163,7 +163,9 @@ function killShellProcess(state) {
 
 function spawnShell() {
   if (shell && shell.alive && shell.proc) return shell;
-  const proc = spawn(SHELL_PATH, [], {
+  // login shell（-l）：mksh 启动自动 source $HOME/.profile，加载 CliTools 生成的 CLI 函数
+  // （函数体 exec 绝对 ELF/壳，规避 bionic 对裸短名 PIE 的 realpath 自检失败）。
+  const proc = spawn(SHELL_PATH, ["-l"], {
     stdio: ["pipe", "pipe", "pipe"],
     // 进程组长：让 `killShellProcess()` 能整组杀（与内建 `bash` 的 detached 形状一致）。
     detached: true,

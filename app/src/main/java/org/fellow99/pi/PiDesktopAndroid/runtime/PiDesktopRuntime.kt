@@ -88,6 +88,10 @@ object PiDesktopRuntime {
         val archive = materializeArchive()
         PayloadArchive.ensureExtracted(archive, payloadRoot)
 
+        // 112 D3/D4/D5：五个真实 CLI 工具树物化 + 短名/gitexec 农场（须在 rt.start 前，env 一次到位）。
+        say("物化 CLI 工具树与命令短名（node/python/git/uv/pnpm）…")
+        val cliPaths = CliTools.materialize(appContext)
+
         // 工作区根（规划 §5 #10 ①）：app-specific 外存真实路径
         val workspace = HostCapabilities.workspaceRoot(appContext)
         val agentDir = File(appContext.filesDir, "pi-agent")
@@ -104,7 +108,7 @@ object PiDesktopRuntime {
         val noProxy = (noProxyBase.split(',').map { it.trim() }.filter { it.isNotEmpty() } +
             listOf("127.0.0.1", "localhost", "::1")).distinct().joinToString(",")
 
-        val env = buildMap {
+        val baseEnv = buildMap {
             put("PI_CODING_AGENT_DIR", agentDir.absolutePath)
             put("PI_ANDROID_ROOTS", roots.toString())
             put("NO_PROXY", noProxy)
@@ -119,6 +123,9 @@ object PiDesktopRuntime {
             )
             if (selftest) put("PI_ANDROID_SELFTEST", "1") // 调试/验收：launch 脚本自检宿主能力（am start --ez selftest true）
         }
+        // 112 D5：合并五个 CLI 的进程级 env（PATH/HOME/PYTHONHOME/GIT_*/NODE_*/UV_*/PNPM_HOME…），
+        // 三通道（TERM/ptyBash/android-exec）均继承 Node 的 process.env，无需逐通道改。
+        val env = CliTools.environment(baseEnv, cliPaths)
 
         say("启动进程内 Node…")
         val appEntryAbs = File(payloadRoot, "pi-web/pi-web-launch.js")

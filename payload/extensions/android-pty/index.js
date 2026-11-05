@@ -59,7 +59,8 @@ function runPtyCommand(command, cwd, timeoutMs, signal) {
       catch { /* 忽略 signal 绑定失败 */ }
     }
     try {
-      term = loadPty().spawn("/system/bin/sh", ["-c", command], {
+      // login shell（-l -c）：自动 source $HOME/.profile 的 CLI 函数（短名 exec 绝对 ELF，规避 bionic realpath）。
+      term = loadPty().spawn("/system/bin/sh", ["-l", "-c", command], {
         name: "xterm-256color",
         cols: 80,
         rows: 24,
@@ -156,7 +157,7 @@ export default function register(pi) {
       let report;
       try {
         const pty = loadPty();
-        const term = pty.spawn("/system/bin/sh", ["-c", "echo PTY_ROUNDTRIP_OK; id; tty"], {
+        const term = pty.spawn("/system/bin/sh", ["-l", "-c", "echo PTY_ROUNDTRIP_OK; id; tty"], {
           name: "xterm-color",
           cwd: ctx?.cwd || process.cwd(),
           env: process.env,
