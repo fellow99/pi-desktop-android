@@ -30,7 +30,7 @@
 - [x] T2.4 `pi-web-launch.js`：探针**延迟到 Next 就绪后 `setImmediate` 异步跑**，boot-facts 写 `cli:{status:'deferred'}`，结果另落 `pi-web.cli-facts.json`；常驻 `sh -l` + 随机哨兵 + 只看 stdout；PATH 探测与 runOne 同构双标记帧；git 冒烟走独立短生命周期 shell（`runGitSmoke`）。✅ 模拟器 10/10、PATH 10/10、零超时、43s。
 - [x] T2.5 模拟器（API37 翻译层，真机留 T4.x）：十命令 `--version` 全回程——node v26.13.0 / npm·npx 11.20.0 / corepack 0.36.0 / Python 3.14.10 / pip 26.2.2 / git 2.56.0 / uv 0.13.6 / pnpm 12.16.1。✅ 证据 `cli-facts-app-untrusted.json`。
 - [⚠️] T2.6 git 工作流：init/config/add/hash-object/write-tree/log 正常、`ls-remote` TLS 成功；**`git commit` 在真域稳定 rc=139（SELinux 拒 `link(2)` + git 不回退 rename 而 NULL 解引用）**，配置层无 workaround。因果链/对照表/产品处置见 `logs/2026-11-05/git-commit-segfault/README.md`；原生 arm64 是否同样崩溃留 T4.x 裁决。
-- [ ] T2.7 模拟器：`uv venv`（离线可判定）；`pnpm install` 纯 JS 小包验证 lifecycle 找 node；npm/pip 纯包安装按网络据实记录。⬜ 待跑（本轮聚焦探针/段错误裁决）。
+- [⚠️] T2.7 模拟器：`uv venv` 与 `pnpm install` lifecycle 实测（离线，emulator-5554 真域）。**pnpm 纯 JS lifecycle 可用但有调用约定**：pnpm 内部以非 login `sh -c` 跑脚本，`.profile` 函数不可见，裸 `node` 短名撞 bionic realpath rc=255；脚本改用绝对 `libnode_cli.so` 后 preinstall/`pnpm run`/store 全 rc=0（node v26.13.0 arm64，store 在 PNPM_HOME 可写域）。**`uv venv` 为硬边界**：uv 以 isolated（`python -I`，environment=0）探测解释器、忽略 PYTHONHOME，交叉编译 Python 找不到外置 stdlib（No module named 'encodings'），默认与 `--python` 绝对 ELF 均 rc=2，非配置可解；`uv --version`/`cache dir` 正常。主 Python/pip 工作流健康（pip 26.2.2，离线 `--no-index` 正确报无源）。证据 `logs/2026-11-05/t27-lifecycle-uv-boundary/README.md`；npm/pip 联网安装按网络条件另记。
 - [x] T2.8 验证无编译器边界被如实上报（promptGuidelines/能力标志），不静默降级。✅ `android-exec.js` promptGuidelines 明示 PATH 五 CLI 但无 gcc/make/toolchain，node-gyp 原生构建与 pip sdist 编译不可用；SKILL.md 同步登记。
 
 ## P3 移除纯 JS 替代（补充需求）

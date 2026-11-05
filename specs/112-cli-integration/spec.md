@@ -158,6 +158,8 @@ isomorphic-git 结构化工具集。
 - ssh 远程 git（`git@…`）需 openssh/dropbear，**本期不含**；https 远程在本期验收。
 - ~~symlink 农场若被真机探针否决~~：P2 已改 `.profile` 函数 + login shell（见上文短名机制），symlink 农场降级为绝对路径后备；不得伪造命令可用。
 - **G1（P2 实测，模拟器 API37 真域）**：targetSdk 36 下 SELinux 拒绝 `untrusted_app` 对 app_data_file 的 `link(2)`，git 2.56.0 该 arm64 构建在 link 失败后不回退 rename 而 NULL 解引用，`git commit` 稳定 rc=139（SIGSEGV）；`init/add/hash-object/write-tree/log` 等不触发 link 落盘的子命令正常，`ls-remote`/clone/fetch 走 TLS 不受影响。证据与 workaround 对照（gpgsign/fsync/fsmonitor/tmpdir/reftable 全失败）见 `logs/2026-11-05/git-commit-segfault/`。**是否为 berberis 翻译层叠加须 P4 原生 arm64 裁决**；本期不 fork 上游，能力面如实标注「本地 commit 受限」，不伪报可用。
+- **G2（T2.7 实测，模拟器 API37 真域）**：`.profile` 短名函数只在 login shell（`sh -l`）可见；CLI 程序内部再 spawn 的**非 login 子 shell 不继承函数**，裸短名经 PATH 命中 `bin/<name>` symlink → bionic `Unable to get realpath` rc=255（对照：绝对 ELF 直跑与 login shell 函数路径均成功）。受影响面 = pnpm/npm 的 lifecycle 脚本（Rust CLI 以 `sh -c` 执行）里裸写 `node`；规避＝脚本解释器用绝对 `libnode_cli.so`（实测 preinstall/`pnpm run`/store 全 rc=0）。三通道**顶层命令**走常驻 `sh -l` 不受影响（探针 10/10）。证据 `logs/2026-11-05/t27-lifecycle-uv-boundary/`。
+- **G3（T2.7 实测，模拟器 API37 真域）**：`uv venv`（及需探测解释器的 `uv pip`）不可用——uv 以 isolated 模式（`python -I` 语义，`environment=0`）inspect 解释器，主动忽略 `PYTHONHOME`，而本交叉编译 Python 的 stdlib 靠 PYTHONHOME 外置注入，遂 `No module named 'encodings'` 启动失败（默认 PATH 探测与 `--python` 绝对 ELF 均 rc=2；手动 `python -I` 复现、普通模式正常）。非配置可解；`uv --version`/`uv cache dir` 正常。Python 隔离需求改用主解释器 + `pip install --target/--user` 或预置 wheel。证据同 T2.7 目录。
 
 ## 非目标（本期不做）
 - 不改 Maven 依赖获取（第二轮）；不做 Play Dynamic Feature 体积分发；不引入 bash/openssh；

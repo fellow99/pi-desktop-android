@@ -40,7 +40,8 @@ description: Pi Desktop（Android / 系统 WebView + 进程内 Node，aosp-node-
 | `grep` | ✅ 真机 | **纯 JS**（无 `rg` 二进制）：只认 `pattern`/`path`/`glob`/`literal`/`ignoreCase` |
 | `find` | ✅ 真机 | **纯 JS**（无 `fd` 二进制）：`*` 匹配单段、`**` 跨段；`MAX_FILES 2000` / `MAX_DEPTH 8` |
 | `git`（真实 CLI 2.56.0） | 🔧 已随包（112） | 交叉编译 arm64 ELF，经 login shell `sh -l` 的 `.profile` 函数在 PATH 暴露；`--version`/init/add/hash-object/write-tree/log 正常，HTTPS `ls-remote`/clone/fetch 走静态 curl+OpenSSL（TLS 已验）。**已知限制**：真域 SELinux 拒 app 数据目录 `link(2)`，当前构建 `git commit` 落 ref 时 rc=139 段错误（详见 112 证据）；不支持 SSH 远端、SHA-256 仓库、worktree。无 21 个 `git_*` 结构化工具，统一在 `bash`/终端敲 `git` |
-| `pnpm`（真实 CLI 12.16.1） | 🔧 已随包（112） | Rust 独立二进制，经 `.profile` 函数在 PATH 暴露，lifecycle 调用同 PATH 的真实 node；另有 node/npm/npx/corepack、python/pip、uv。无编译器，原生扩展/sdist 不可编译；可行域＝纯 JS/纯 Python 包 + 预置原生件 |
+| `pnpm`（真实 CLI 12.16.1） | 🔧 已随包（112） | Rust 独立二进制，经 `.profile` 函数在 PATH 暴露。**lifecycle 调用约定（G2）**：pnpm 以非 login `sh -c` 跑 package.json 脚本，`.profile` 函数不可见，脚本里裸 `node` 会撞 bionic realpath rc=255；须把脚本解释器写成绝对 `libnode_cli.so`（preinstall/`pnpm run`/store 实测全 rc=0，store 在 PNPM_HOME 可写域）。顶层 `pnpm --version`/`pnpm run` 走常驻 `sh -l` 正常 |
+| `uv`（真实 CLI 0.13.6） | 🔧 部分可用（112，G3） | `uv --version`/`uv cache dir`（`$HOME/.cache/uv` 可写域）/rustls 根证书正常；**`uv venv` 与需探测解释器的 `uv pip` 不可用**——uv 以 isolated（`python -I`，environment=0）inspect 解释器、忽略 PYTHONHOME，交叉编译 Python 找不到外置 stdlib（No module named 'encodings'），非配置可解。Python 隔离需求改用主解释器 + `pip install --target/--user` 或预置 wheel |
 | `rm` / `mv` / `cp` 工具 | ❌ | 没有这些**工具**；需要时用 `bash`（注意第 1 条） |
 | `codemode`（QuickJS 沙箱） | ⬜ 未验证 | Android **默认开 JIT**（无鸿蒙式 W^X ACL 门），探针上 `WebAssembly.validate` 成功，理论可用但未端到端验证 |
 | `powershell` | ❌ | Windows 专用 |
