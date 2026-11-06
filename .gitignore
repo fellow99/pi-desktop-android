@@ -47,6 +47,12 @@ probe-work/
 # 运行期敏感/本机文件双保险
 *.pem
 secrets*
+# 凭证文件兜底：API Key/口令只在运行期写入设备 App 私有域（如 files/pi-agent/auth.json，0600），
+# 绝不落工程目录；此处防止任何主机侧临时凭证被误提交（112 DeepSeek E2E 纪律）
+.env
+.env.*
+auth.json
+*credentials*.json
 # 引擎 .so（主路径 = Maven Central node-runtime AAR 直解，不入库；
 # jniLibs 仅作 provision-engine.mjs 零网兜底投放位；来源 aosp-node-runtime v26.13.0 small-icu）
 app/src/main/jniLibs/
