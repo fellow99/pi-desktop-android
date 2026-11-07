@@ -64,7 +64,13 @@ CLI —— **node**（npm/npx/corepack）、**python**（pip/pip3）、**git**�
 GitHub Release 投放到 `jniLibs`/`assets`（二进制不入库），经每次启动重建的 `$HOME/.profile` 与
 login shell `sh -l` 在终端与 Agent `bash`/`ptyBash` 三通道的 PATH 暴露。早期纯 JS 的 `android-git`
 （isomorphic-git）与进程内 `android-pnpm` 扩展已移除。已知限制：App SELinux 域拒绝对应用数据
-`link(2)`，当前 git 构建的 `git commit` 会段错误（rc 139，见 112 证据目录），原生 arm64 裁决待 P4。
+`link(2)`，当前 git 构建的 `git commit` 会段错误（rc 139，见 112 证据目录）——**2026-11-07 已在原生
+arm64 真机确认复现**（非仅模拟器翻译层；详见 node-bridge-workspace `docs/20261107-git问题报告.md`）。
+
+**终端命令环境**：终端面板与 Agent `bash`/`ptyBash` 三通道运行 **mksh**（`/system/bin/sh`，login shell `sh -l`）。
+**本应用预置 CLI**：[git、node、npm、pnpm、python、pip、uv](https://github.com/fellow99/node-bridge-workspace.git)（真实交叉编译二进制）。
+**系统内置命令**：toybox 全套文本/文件集；`awk`/`sed`/`tr`；`tar`/`gzip`；`sha256sum`；`curl`；`ping`；`pm`；`getprop`；`logcat`。
+无 gcc/make/toolchain，故 node-gyp 原生构建与 pip sdist 编译不可用。
 
 ## 目录结构
 

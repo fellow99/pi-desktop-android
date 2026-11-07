@@ -70,7 +70,12 @@ and **pnpm** — provisioned from GitHub Releases into `jniLibs`/`assets` (binar
 exposed on PATH through a per-launch `$HOME/.profile` plus login shell `sh -l` across the terminal and
 the agent `bash`/`ptyBash` channels. The earlier pure-JS `android-git` (isomorphic-git) and in-process
 `android-pnpm` extensions have been removed. Known limit: `git commit` segfaults in the app SELinux
-domain because `link(2)` on app data is denied (see the 112 evidence directory); native arm64 ruling pending.
+domain because `link(2)` on app data is denied — **confirmed on native arm64 real device (2026-11-07)**,
+not just the emulator translation layer. See the 112 evidence directory and
+[`node-bridge-workspace/docs/20261107-git问题报告.md`](https://github.com/fellow99/node-bridge-workspace/blob/main/docs/20261107-git%E9%97%AE%E9%A2%98%E6%8A%A5%E5%91%8A.md).
+
+**Terminal command environment.** The terminal panel and the agent `bash`/`ptyBash` channels run
+**mksh** (`/system/bin/sh`, login shell `sh -l`). **Pre-installed CLIs**: [git、node、npm、pnpm、python、pip、uv](https://github.com/fellow99/node-bridge-workspace.git) (real cross-compiled binaries). **System built-ins**: toybox (full text/file set), `awk`/`sed`/`tr`, `tar`/`gzip`, `sha256sum`, `curl`, `ping`, `pm`, `getprop`, `logcat`. No gcc/make/toolchain, so native node-gyp builds and pip sdist compilation are unavailable.
 
 ## Repository layout
 
