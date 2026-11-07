@@ -100,6 +100,7 @@ object CliTools {
             extractToolTar(context, tool, paths.toolsRoot)
         }
         buildSymlinkFarms(paths)
+        buildPythonPrefix(paths) // 非阻断：失败仅影响 uv venv/python -m venv 自愈能力，不影响其余 CLI
         return paths
     }
 
@@ -125,6 +126,9 @@ object CliTools {
 
         // Python：PYTHONHOME 指向标准布局根（其下 lib/python3.14 + site-packages）；刻意不设 PYTHONPATH（D5）。
         env["PYTHONHOME"] = paths.pythonTools().absolutePath
+        // C1（node-bridge 20261105 设计）：自洽 python prefix + UV_PYTHON，使 `uv venv`/`python -m venv`
+        // 的隔离解释器自检（-I 忽略 PYTHONHOME）能找到 stdlib，解除 G3 边界。
+        env["UV_PYTHON"] = File(paths.toolsRoot, "pyruntime/bin/python").absolutePath
         env["SSL_CERT_FILE"] = File(paths.pythonTools(), "cacert.pem").absolutePath
 
         // Git：exec-path 农场 + TLS + 模板 + 全局配置落点（均可写私有目录）。
@@ -185,6 +189,40 @@ object CliTools {
         errThread.join(5000)
         if (code != 0) {
             throw CliException("toybox tar 解包失败 rc=$code：${err.toString(Charsets.UTF_8).take(500)}")
+        }
+    }
+
+    // ── C1 python 自洽 prefix（node-bridge 20261105 设计 §4.2；非阻断）──────────
+    // 目标：让 `uv venv`/`python -m venv` 的隔离解释器（`-I`，忽略 PYTHONHOME）能自检到 stdlib。
+    // 结构：<tools>/pyruntime/pyvenv.cfg(home=自身) + bin/python -> libpython_cli.so
+    //       + lib/python3.14 -> stdlib（软链失败降级整树复制，幂等）。
+    private fun buildPythonPrefix(paths: Paths) {
+        try {
+            val prefix = File(paths.toolsRoot, "pyruntime")
+            val binDir = File(prefix, "bin")
+            val libDir = File(prefix, "lib")
+            prefix.mkdirs(); binDir.mkdirs(); libDir.mkdirs()
+            File(prefix, "pyvenv.cfg").writeText(
+                "home = ${prefix.absolutePath}\n" +
+                    "include-system-site-packages = false\n" +
+                    "version = 3.14.10\n"
+            )
+            forceSymlink(
+                File(paths.nativeLibDir, "libpython_cli.so").absolutePath,
+                File(binDir, "python")
+            )
+            val stdlibSrc = File(paths.pythonTools(), "lib/python3.14")
+            if (stdlibSrc.isDirectory) {
+                val link = File(libDir, "python3.14")
+                try {
+                    forceSymlink(stdlibSrc.absolutePath, link)
+                } catch (e: Exception) {
+                    // SELinux 收紧时软链失败 → 整树复制兜底（幂等，仅首启一次性成本）。
+                    if (!link.isDirectory) stdlibSrc.copyRecursively(link, overwrite = true)
+                }
+            }
+        } catch (_: Exception) {
+            // C1 为增强项，失败不阻断启动；能力边界由 boot-facts 如实暴露（宪法 A6）。
         }
     }
 
