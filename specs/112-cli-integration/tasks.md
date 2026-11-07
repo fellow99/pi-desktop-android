@@ -46,12 +46,13 @@
 
 ## P4 验收 / 取证 / 文档
 
-- [ ] T4.1 按 `test-cases.md` 跑 CLI 功能用例（终端 + Agent bash + ptyBash 三通道）。
-- [ ] T4.2 按 `test-cases.md` 跑 Agent 用例：DeepSeek（key 一次性注入，不入库）、模型 deepseek-flash、建工作区、对话「介绍一下你自己」、看图分析。
+- [x] T4.1 按 `test-cases.md` 跑 CLI 功能用例（终端 + Agent bash + ptyBash 三通道）。✅ 真机 8f155833（Mi 11 / API30 / 原生 arm64）2026-11-07：CLI 探针 10/10 全版本回程（node 26.13.0 / npm·npx 11.20.0 / corepack 0.36.0 / python 3.14.10 / pip 26.2.2 / git 2.56.0 / uv 0.13.6 / pnpm 12.16.1）；`logs/20261107-1/REVIEW_112.md` 记录。
+- [x] T4.2 按 `test-cases.md` 跑 Agent 用例：DeepSeek（key 一次性注入，不入库）、模型 deepseek-flash、建工作区、对话「介绍一下你自己」、看图分析。✅ 真机 8f155833 2026-11-07 全过：API key 经 `/api/auth/api-key/deepseek` 一次性注入；默认模型 deepseek-flash（`/api/models/default`）；工作区 sandbox（外部 `Android/data/.../files/workspace`）经 `/api/cwd/validate` + `/api/agent/new` 建会话；「介绍一下你自己」生成完整中文自述；看图分析 `images:[{type:image,...}]` 准确识别测试图（蓝底/黄圆/白条/文字 42）。证据仅记录于设备端会话记录，**不落盘任何 Key/Authorization 明文**（宪法 A6 + D8）。
 - [⚠️] T4.3 回归四件套（模拟器 `emulator-5554`，修复后 APK sha 前缀 `138fae4d`）：① CLI 探针 onPath 10/10、8 ok + npm/npx 哨兵 12s 冷启动踩线超时（手动复跑 11.20.0 功能正常，非回归）、git commit 仍 139（G1 已知边界）；② login shell 三通道同路径 10 短名 10/10 rc=0；③ G1/G2/G3 边界复核保持（139 / 裸短名 255 vs 绝对 ELF 0 / python -I isolated 失败 vs 普通模式 ok）；④ 载荷组装 pristine（脚本收尾反向 6 补丁）。终端面板 111 交互用例与普通对话留 T4.2 DeepSeek E2E 一并签收；合规门禁 T4.6 终检。证据 `logs/2026-11-05/review-fix-p4-regression/`。
-- [ ] T4.4 回填 `docs/安卓环境能力清单-*.md`（git/pnpm 真实二进制 ✅；新增 node/python/uv ✅；生态边界）、README×2（CLI 能力/体积/限制）。
-- [ ] T4.5 真机证据归档 `logs/<date>-N/` + `docs/evidence/`（脱敏：无 API Key/Authorization/凭据）；更新 `specs/SPECS_CHECKLIST.md` 收录 112。
-- [ ] T4.6 `./gradlew assembleDebug` + 全量 verify/合规门禁终检；提交序列收尾。
+- [⚠️] T4.3b 真机原生 arm64 复核（2026-11-07，8f155833）：`git commit` 在真域原生 arm64 **同样 SIGSEGV(139)**——证实 G1 边界与模拟器 berberis 翻译层**无关**，为 aosp-git-cli arm64 构建在 SELinux 拒 link 后不回退 rename 而 NULL 解引用之真机固有问题；`ls-remote` TLS 仍正常（`logs/20261107-1/REVIEW_112.md`）。
+- [⬜] T4.4 回填 `docs/安卓环境能力清单-*.md`（git/pnpm 真实二进制 ✅；新增 node/python/uv ✅；生态边界）、README×2（CLI 能力/体积/限制）。⬜ 留待后续轮次（本轮聚焦 112 完成度与 E2E）。
+- [⬜] T4.5 真机证据归档 `logs/<date>-N/` + `docs/evidence/`（脱敏：无 API Key/Authorization/凭据）；更新 `specs/SPECS_CHECKLIST.md` 收录 112。⬜ 部分：`logs/20261107-1/REVIEW_112.md` 已含评审与证据索引；SPECS_CHECKLIST 收录待补。
+- [x] T4.6 `./gradlew assembleDebug` + 全量 verify/合规门禁终检；提交序列收尾。✅ 2026-11-07：assembleDebug 通过（APK 约 492MB，17 .so + 3 cli-tools 齐全）；verify-cli / verify-runtime / verify-pty 全绿；provision-cli --check 全过。
 
 ## 提交规划（Conventional Commits，禁止 --no-verify）
 - `build: provision five real CLI binaries from GitHub releases (112)`（cli.lock/provision/verify/gitignore/gradle）
