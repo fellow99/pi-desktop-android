@@ -16,8 +16,8 @@
       "repository": "fellow99/aosp-node-cli",
       "tarball": "node-cli-v26.13.0-android-arm64-v8a.tar.gz",
       "url": "https://github.com/fellow99/aosp-node-cli/releases/download/v26.13.0/node-cli-v26.13.0-android-arm64-v8a.tar.gz",
-      "sha256": "60d7d89919f93bcb279411ad872ca4babbe023a080a3de4e21c50057d682803f",
-      "size": 46531153
+      "sha256": "f336a8c2adb272a70346215115bf60f8dfc5c532edd0942f9634747612f8e9a1",
+      "size": 75579004
     },
     "python": {
       "version": "3.14.10",
@@ -61,8 +61,8 @@
       "tool": "node",
       "path": "libnode_cli.so",
       "profile": "exec",
-      "size": 62155912,
-      "sha256": "eb51b439d2a8164bc2e4be233b9a363b6def736a000feb432ce72702ee28b86c"
+      "size": 100037408,
+      "sha256": "ac5911ef9b476e8c590d723e8ef698e9050f06dddb67aac28e0daf84b570bdd8"
     },
     {
       "tool": "python",
@@ -174,10 +174,10 @@
       "archive": "node.tar",
       "root": "node-bridge-tools",
       "manifest": "manifest.json",
-      "manifestSha256": "1fcebf7bdc30f888bb028e3cdc5f80b413860ac7d6ae6a62bdee2d0479d9c75a",
+      "manifestSha256": "c4a266794963208ff1e1f354aac4b45ac0f7ba308f2aff3803694356803baf65",
       "manifestFileCount": 1591,
       "manifestTotalSha256": "124c54c0d3e6fd2a8748d7383979c211cee96efe13512a0092d58edbbd39053b",
-      "archiveSha256": "f690fdbcc061ccffc7a5dd02fca155aec4f97966ab5cb52a0795536a882216a7",
+      "archiveSha256": "d841c4eacd884f65bddad7cfb9f204a68bb38c7c79e5ed49a9bf490bebec4178",
       "archiveSize": 2507524
     },
     "git": {
