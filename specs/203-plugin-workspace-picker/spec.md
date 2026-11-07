@@ -1,6 +1,6 @@
 # 插件 · 选择工作区目录（203-plugin-workspace-picker）—— 规格
 
-> **Module:** 203-plugin-workspace-picker ｜ **Status:** Proposed（方案 A 已获采纳，实施中） ｜ **Last Updated:** 2026-11-07
+> **Module:** 203-plugin-workspace-picker ｜ **Status:** ✅ 已交付（结项，2026-11-07） ｜ **Last Updated:** 2026-11-07
 > **上游基线:** pi-web v0.15.0（tag `f130910`）· 关联模块 `104-host-capabilities-kotlin-impl`
 > **需求编号:** 203-plugin-workspace-picker ｜ **需求名称:** 插件：选择工作区目录
 > **git 分支:** 不改动 ｜ **测试真机:** 8f155833（M2105K81C，SDK 33 / Android 13）
@@ -130,3 +130,27 @@ G7.1 修订、上游补丁 Android 化、spec 四件套、真机构建部署与�
 - **上游**：pi-web DirectoryPicker / directory-browser / browse route / host route（补丁 0002/0005/0006/0007）。
 - **本工程**：`104-host-capabilities-kotlin-impl`（`perm.*` + SAF 桥）、`PiDesktopRuntime.kt`（roots env）、`MainActivity`（onRequestPermissionsResult 转发）、`AndroidManifest.xml`。
 - **治理**：`docs/000-工程规划.md` §17（G7.1）；`specs/104-*` 的 SAFe/存储表述（随 104 spec 收敛）。
+
+## 9. 结项记录（2026-11-07）
+
+> 状态：✅ 已交付（结项）。真机证据：`logs/20261107-2/`（TEST_REPORT / REVIEW_REPORT）。参考工程同源记录：`dsh-desktop-android/specs/106-workspace-picker`（修复记录 2026-11-07）。
+
+### 9.1 真机验证结论（`8f155833` · Android 13 / SDK 33 · MIUI，deepseek-flash）
+
+| 项 | 结果 |
+|---|---|
+| 选择器服务端 | 3 根契约（沙箱/文档/下载）✅、沙箱根 ✅、`parentPath` 根围栏 ✅ |
+| 授权门（宿主） | 未授权 → 拉 `AppManageExternalStorageActivity`（All-files 设置页）✅；已可读 → `granted:true` 不再拉页 ✅（`sharedStorageReadable` readdir 终判） |
+| 端到端 | 沙箱 / 文档 / 下载 三个工作区各自 **建区 + 对话 + 看图** 全通 ✅ |
+| UI 对话框 | 用户手动验证「选择目录」对话框通过 ✅ |
+
+### 9.2 平台事实（MIUI 宽松 scoped storage）
+
+- 现象：全新安装（无任何存储授权：`MANAGE_EXTERNAL_STORAGE=default`、`isExternalStorageManager()=false`、API33 下无 `READ/WRITE_EXTERNAL_STORAGE`），`/storage/emulated/0/{Documents,Download}` **readdir 仍可读** → 选择器走「有权限 → 显示列表」分支，「请求权限 / 刷新」不出现。
+- 根因：**厂商 ROM（MIUI）未严格实施 AOSP 分区存储，与 Android 13 系统语义无关**（标准 Android 13 无 All-files/SAF 时应 `EACCES`）。
+- 设计印证：授权门以「实际可读（readdir）」为唯一事实（FR-AND-203-008）——宽松 ROM 直接列列表，严格 ROM 走 403→「请求权限/刷新」→ All-files → 列表，两分支均覆盖；不把「宽松 ROM 直接可读」误判为授权门失效。
+
+### 9.3 交付物与遗留
+
+- 交付：`spec/plan/test-cases.md`；G7.1 修订（`docs/000-工程规划.md` §17 / 宪法 C8.1）；补丁 `0006`（Android 语义）+ `0007`（根围栏）；Kotlin 授权门 `HostCapabilities.kt`；三根注入 `PiDesktopRuntime.kt`；manifest 存储权限。
+- 遗留（⬜ 已登记）：ark/hos 真机验收待补（需求明确暂不测试）；android API24–29 运行时权限路径待旧设备复验（沿用 deepseek 2026-11-01 证据）；严格执行 scoped storage 的标准 ROM 上「无权限 → 请求权限/刷新」分支待复现（本机无法制造 `EACCES`）。

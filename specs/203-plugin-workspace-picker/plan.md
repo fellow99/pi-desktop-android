@@ -36,16 +36,16 @@
 
 | # | 落点 | 文件 | 状态 |
 |---|---|---|---|
-| 1 | 规格四件套 | `specs/203-plugin-workspace-picker/{spec,plan,test-cases}.md` + `specs/README.md` 登记 | ✅/🔄 |
-| 2 | 治理修订 | `docs/000-工程规划.md` §17 G7.1；回引本模块 | 🔄 |
-| 3 | roots env | `PiDesktopRuntime.kt`（+documents/download 根） | 🔄 |
-| 4 | 宿主授权门 | `HostCapabilities.kt`（`storageGranted()` / `perm.request` SDK 分派 / `perm.check` 存储分支） | 🔄 |
-| 5 | Activity 转发 | `MainActivity.kt`（`onResume` 可选 / 已具备 onRequestPermissionsResult） | ✅ 已具备 |
-| 6 | manifest | `AndroidManifest.xml`（+`MANAGE_EXTERNAL_STORAGE`、+`READ/WRITE_EXTERNAL_STORAGE` maxSdk=29） | 🔄 |
-| 7 | 扩展自检 | `payload/extensions/android-workspace-roots.js`（EXPECTED_IDS 三根 + 授权状态） | 🔄 |
-| 8 | 补丁 Android 化 | `patches/v0.15.0/0006`：`permissionForRoot` + `ALLOWED_PERMISSIONS` 改 Android 权限语义；往返验证 | 🔄 |
-| 9 | 构建 | 载荷重装配（assemble-payload）+ `gradlew assembleDebug` | 🔄 |
-| 10 | 部署验收 | adb 安装 → 沙箱 + 文档/下载授权门 → 建区/对话/看图 | 🔄 |
+| 1 | 规格四件套 | `specs/203-plugin-workspace-picker/{spec,plan,test-cases}.md` + `specs/README.md` 登记 | ✅ 已提交 |
+| 2 | 治理修订 | `docs/000-工程规划.md` §17 G7.1；回引本模块 | ✅ 已提交 |
+| 3 | roots env | `PiDesktopRuntime.kt`（+documents/download 根） | ✅ 已提交 |
+| 4 | 宿主授权门 | `HostCapabilities.kt`（`storageGranted` / `sharedStorageReadable` / `perm.request` SDK 分派 / `perm.check` 存储分支） | ✅ 已提交 |
+| 5 | Activity 转发 | `MainActivity.kt`（onRequestPermissionsResult 转发；onActivityResult） | ✅ 既有，无需改 |
+| 6 | manifest | `AndroidManifest.xml`（`MANAGE_EXTERNAL_STORAGE`、`READ/WRITE_EXTERNAL_STORAGE` maxSdk=29） | ✅ 已提交 |
+| 7 | 扩展自检 | `payload/extensions/android-workspace-roots.js`（EXPECTED_IDS 三根 + 授权状态以可读为准） | ✅ 已提交 |
+| 8 | 补丁 Android 化 | `patches/v0.15.0/0006`（权限语义 + hunk 行数修正）+ `0007`（v0.15.0/0.14.x） | ✅ 已提交，往返+重编通过 |
+| 9 | 构建 | 载荷重装配（next build 264s）+ `gradlew assembleDebug` | ✅ APK 845MB 构建/安装成功 |
+| 10 | 部署验收 | adb 安装 → 沙箱·文档·下载 建区/对话/看图 + 授权门 + 用户手动对话框 | ✅ 全过（logs/20261107-2） |
 
 ## 4. 治理修订（G7.1）内容草案
 
