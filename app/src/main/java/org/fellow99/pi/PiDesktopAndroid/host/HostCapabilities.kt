@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import org.fellow99.nodebridge.NodeHostBridge
 import org.fellow99.nodebridge.NodeRuntime
@@ -43,6 +44,9 @@ object HostCapabilities {
     private const val ASYNC_RESULT_DIR = "node-bridge/saf-results"
 
     private const val REQ_PERM_NOTIFICATION = 4201
+
+    /** 共享存储运行时权限（API 24–29：READ/WRITE_EXTERNAL_STORAGE 系统弹窗；API 30+ 走 All-files 设置页）。 */
+    private const val REQ_PERM_STORAGE = 4202
 
     /** 库冻结的能力名清单 + Android 增量（keepAlive；缺一个 = 注册面不完整，启动时要吼出来）。 */
     val NAMES = listOf(
@@ -166,9 +170,27 @@ object HostCapabilities {
                         .put("persistedCount", persisted.size)
                         .put("note", "SAF 持久化授权数（fs.pick* 授予；content:// 非 POSIX 路径）")
                 }
+                isStoragePermission(perm) -> {
+                    // 需求 203（方案 A）：文档/下载工作区根 = All-files（API30+）/ READ+WRITE_EXTERNAL_STORAGE（API24-29）。
+                    // 真可读性以 readdir 为准（MIUI 等 ROM 的 isExternalStorageManager 有假阴性）：
+                    // 目录实际可读即视为已授权，避免「已可读仍跳设置页」的错觉。
+                    val granted = storageGranted(context) || sharedStorageReadable(context)
+                    result
+                        .put("granted", granted)
+                        .put("readable", sharedStorageReadable(context))
+                        .put("sdkInt", Build.VERSION.SDK_INT)
+                        .put(
+                            "note",
+                            if (Build.VERSION.SDK_INT >= 30) {
+                                "All-files（isExternalStorageManager）=${storageGranted(context)}；实际可读=${sharedStorageReadable(context)}"
+                            } else {
+                                "READ/WRITE_EXTERNAL_STORAGE 运行时=$granted（以实际可读收尾）"
+                            },
+                        )
+                }
                 perm.startsWith("ohos.") -> result
                     .put("granted", false)
-                    .put("note", "OHOS 权限模型在 Android 不存在；共享目录授权 = SAF（fs.pickFolder/fs.pickFiles）")
+                    .put("note", "OHOS 权限模型在 Android 不存在；文档/下载共享目录授权 = All-files / 运行时存储权限（需求 203 方案 A）")
                 else -> result
                     .put("granted", JSONObject.NULL)
                     .put("note", "未知权限名；Android 侧可判定：sandbox/notification/saf")
@@ -224,11 +246,67 @@ object HostCapabilities {
                             }
                         }
                     }
+                    isStoragePermission(perm) -> {
+                        when {
+                            storageGranted(context) || sharedStorageReadable(context) -> {
+                                grantedCount += 1
+                                entry.put("granted", true)
+                                    .put("mode", "already-granted")
+                                    .put("note", "共享存储已授权（以实际可读为准：All-files / 运行时存储权限 / ROM 宽松可读均已覆盖）")
+                            }
+                            Build.VERSION.SDK_INT >= 30 -> {
+                                // API 30+：All-files 设置页（G7.1 特例；带 resolveActivity 守卫，无入口时结构化报错而非崩溃）。
+                                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                                    .setData(Uri.parse("package:" + context.packageName))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                if (intent.resolveActivity(context.packageManager) == null) {
+                                    deniedCount += 1
+                                    entry.put("granted", false)
+                                        .put("error", "no-all-files-settings")
+                                        .put("note", "该设备无 All-files 设置页；请到系统设置中手动授予存储访问，或检查厂商 ROM")
+                                } else {
+                                    context.startActivity(intent)
+                                    entry.put("granted", JSONObject.NULL)
+                                        .put("pending", true)
+                                        .put("mode", "all-files-settings")
+                                        .put("note", "已打开系统「所有文件访问」设置页；授权后返回应用，在对话框点「刷新」重新判定")
+                                }
+                            }
+                            else -> {
+                                // API 24–29：经典存储运行时权限（系统弹窗），结果经 MainActivity.onRequestPermissionsResult 回传。
+                                val activity = activityRef?.get()
+                                if (activity == null) {
+                                    deniedCount += 1
+                                    entry.put("granted", false).put("error", "no-activity")
+                                        .put("note", "无前台 Activity；请保持应用在前台后重试")
+                                } else {
+                                    val requestId = "perm-storage-" + nextRequestId()
+                                    val callback = fun(granted: Map<String, Boolean>) {
+                                        val yes = granted.values.any { it }
+                                        runCatching {
+                                            writeAsyncResult(
+                                                context, requestId,
+                                                JSONObject().put("ok", true).put("capability", "perm.request")
+                                                    .put("permission", perm).put("granted", yes).put("at", System.currentTimeMillis()),
+                                            )
+                                        }
+                                    }
+                                    synchronized(this) { pendingPermissionResults[REQ_PERM_STORAGE] = callback }
+                                    activity.requestPermissions(
+                                        arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                                        REQ_PERM_STORAGE,
+                                    )
+                                    entry.put("granted", JSONObject.NULL).put("async", true).put("pending", true)
+                                        .put("mode", "storage-runtime").put("requestId", requestId)
+                                }
+                            }
+                        }
+                    }
                     perm.startsWith("ohos.") -> {
                         deniedCount += 1
                         entry.put("granted", false)
                             .put("error", "platform-mapping")
-                            .put("note", "OHOS user_grant 权限在 Android 不存在；共享目录授权走 SAF（fs.pickFolder/fs.pickFiles）")
+                            .put("note", "OHOS user_grant 权限在 Android 不存在；文档/下载共享目录授权 = All-files / 运行时存储权限（需求 203 方案 A）")
                     }
                     perm == "saf" -> {
                         deniedCount += 1
@@ -466,6 +544,34 @@ object HostCapabilities {
 
     private fun persistedUriPermissions(context: Context): List<Uri> =
         context.contentResolver.persistedUriPermissions.map { it.uri }
+
+    /** 需求 203（方案 A）：存储权限名识别（文档/下载根经 `/api/host/perm` 上送的语义名）。 */
+    private fun isStoragePermission(name: String): Boolean = when (name) {
+        "allFiles", "all-files", "externalStorage",
+        "android.permission.MANAGE_EXTERNAL_STORAGE",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE" -> true
+        else -> false
+    }
+
+    /** 共享存储授权事实：API 30+ 看 All-files（isExternalStorageManager）；API 24–29 看 READ/WRITE_EXTERNAL_STORAGE。 */
+    private fun storageGranted(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= 30) {
+            Environment.isExternalStorageManager()
+        } else {
+            context.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED &&
+                context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+
+    /** 共享存储实读探针（FR-AND-203-008）：`/storage/emulated/0/Documents` 能否列出。
+     *  以实际可读为唯一事实 —— MIUI 等 ROM 的 `isExternalStorageManager` 存在假阴性。 */
+    private fun sharedStorageReadable(context: Context): Boolean = try {
+        val probe = File(Environment.getExternalStorageDirectory(), "Documents")
+        probe.isDirectory && (probe.list() != null)
+    } catch (t: Throwable) {
+        false
+    }
+
 
     private fun notificationGranted(context: Context): Boolean =
         Build.VERSION.SDK_INT < 33 ||

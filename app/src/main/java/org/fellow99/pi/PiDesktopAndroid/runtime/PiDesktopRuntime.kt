@@ -1,6 +1,7 @@
 package org.fellow99.pi.PiDesktopAndroid.runtime
 
 import android.content.Context
+import android.os.Environment
 import kotlinx.coroutines.flow.asStateFlow
 import org.fellow99.nodebridge.NodeRuntime
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,18 +93,24 @@ object PiDesktopRuntime {
         say("物化 CLI 工具树与命令短名（node/python/git/uv/pnpm）…")
         val cliPaths = CliTools.materialize(appContext)
 
-        // 工作区根（规划 §5 #10 ①）：app-specific 外存真实路径
+        // 工作区根（规划 §5 #10 ①）：app-specific 外存真实路径（免权限）；
+        // 需求 203（方案 A）：文档/下载 = 共享存储 POSIX 路径，经 G7.1 特例授权后可用。
         val workspace = HostCapabilities.workspaceRoot(appContext)
+        val userRoot = Environment.getExternalStorageDirectory().absolutePath.replace('\\', '/').trimEnd('/')
         val agentDir = File(appContext.filesDir, "pi-agent")
         agentDir.mkdirs()
 
-        val roots = JSONArray().put(
+        fun root(id: String, label: String, path: String, permType: String?): JSONObject =
             JSONObject()
-                .put("id", "sandbox")
-                .put("label", "工作区")
-                .put("path", workspace.absolutePath.replace('\\', '/'))
-                .put("permType", JSONObject.NULL),
-        )
+                .put("id", id)
+                .put("label", label)
+                .put("path", path)
+                .put("permType", permType ?: JSONObject.NULL)
+
+        val roots = JSONArray()
+            .put(root("sandbox", "沙箱", workspace.absolutePath.replace('\\', '/'), null))
+            .put(root("documents", "文档", "$userRoot/Documents", "storage"))
+            .put(root("download", "下载", "$userRoot/Download", "storage"))
         val noProxyBase = System.getenv("NO_PROXY") ?: System.getenv("no_proxy") ?: ""
         val noProxy = (noProxyBase.split(',').map { it.trim() }.filter { it.isNotEmpty() } +
             listOf("127.0.0.1", "localhost", "::1")).distinct().joinToString(",")

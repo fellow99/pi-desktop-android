@@ -1,9 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- 最小权限面（规划 §17 G6/G7）：出网 + 网络状态；不申请任何存储/安装/查询类权限 -->
+    <!-- 最小权限面（规划 §17 G6）：出网 + 网络状态；不申请任何安装/查询类权限 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 需求 203（方案 A，G7.1 特例，2026-11-07）：文档/下载工作区根的共享存储授权。
+         · MANAGE_EXTERNAL_STORAGE（API 30+ 编辑）＝ All-files 访问，系统设置页显式授予，不自启不静默申请；
+         · READ/WRITE_EXTERNAL_STORAGE（maxSdk=29）＝ API 24-29 运行时权限（系统弹窗）；仅 ≤29 生效。 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="29" />
     <!-- Phase 2（能力清单 §F 第 2 级）：
          · POST_NOTIFICATIONS = 通知运行时权限（API 33+；声明≠授权，授权走 perm.request）；
          · FOREGROUND_SERVICE(_DATA_SYNC) = 前台服务（runtime.keepAlive，normal 级）。

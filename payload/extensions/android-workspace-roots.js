@@ -8,11 +8,10 @@
  * 对标 ark 的 `harmony-workspace-roots.js`（需求 203 的 Android 形态）：
  *   · 根清单来源 = 宿主注入的 `PI_ANDROID_ROOTS`（由 Kotlin 侧 `PiDesktopRuntime`
  *     按 `env.js` 契约装配）；本扩展只**消费**，不猜路径。
- *   · Android v1 只声明 `sandbox` 一个根（app-specific 外存真实路径，免权限）；
- *     文档/下载等共享目录走 SAF 授权桥（Phase 2，届时经宿主桥 `perm.*` 能力接入），
- *     本版**不声明**、不提示授权窗（避免误导）。
- *   · 权限状态：bridge 0.2.0 的 Node 侧 `host.js` 没有 perm 查询能力 ⇒ 如实显示
- *     「不适用/不可判定」，绝不猜。
+ *   · Android（需求 203 方案 A）声明**三个**根：沙箱（app-specific 外存 workspace，
+ *     免权限）+ 文档/下载（共享存储 POSIX 路径，经 G7.1 特例 All-files/运行时授权）。
+ *   · 授权状态：共享存储是否可用以**实际可读性（readdir）**为准——权限 API 有假阴性，
+ *     真实可读才是「现在能不能用」的唯一事实。
  *
  * 提供能力：`/roots` 命令 —— 摊开每个根的解析结果、存在性与可读性。
  *
@@ -25,8 +24,8 @@ import { readdirSync, statSync } from "node:fs";
 /** 宿主写入的根清单环境变量名（与 `payload/env.js`、Kotlin 侧同一字面量）。 */
 const ROOTS_ENV = "PI_ANDROID_ROOTS";
 
-/** 本版期望的根 id（Android v1 只有沙箱根；SAF 授权树随 Phase 2 扩展）。 */
-const EXPECTED_IDS = ["sandbox"];
+/** 本版期望的根 id（需求 203 方案 A：三根）。 */
+const EXPECTED_IDS = ["sandbox", "documents", "download"];
 
 function lines(...parts) {
   return parts.filter((p) => p !== undefined && p !== null).join("\n");
@@ -67,22 +66,23 @@ function probeRoot(root) {
   }
 }
 
-/** 权限状态（Android v1：沙箱根免权限；其余形态 Phase 2 经宿主桥接入）。 */
-function permissionStatus(permType) {
+/** 权限/授权状态（Android 需求 203 方案 A）。 */
+function permissionStatus(permType, probe) {
   if (!permType) return "不适用（app-specific 目录，无 OS 权限门槛）";
-  return "不可判定（SAF 授权桥随 Phase 2 接入；本版不声明共享存储根）";
+  if (probe && probe.readable) return "共享存储已可读（All-files / 运行时存储权限生效；以实际可读为准）";
+  return "共享存储未授权（All-files/运行时存储权限；以实际可读为准）—— 未授权时选择器显示「请求权限 / 刷新」";
 }
 
 function buildReport() {
   const { roots, error } = readRoots();
-  const heading = "工作区主目录（Android v1 · 选择工作区目录）";
+  const heading = "工作区主目录（Android · 选择工作区目录 · 需求 203 方案 A）";
 
   if (error) {
     return lines(
       heading,
       `  ⚠ ${error}`,
       "",
-      "  本版期望的主目录：沙箱（app-specific 外存 workspace 目录）。",
+      "  本版期望的主目录：沙箱 / 文档 / 下载。",
       "  选择器顶部缺 Tab 时先查这里。",
     );
   }
@@ -95,7 +95,7 @@ function buildReport() {
       `  · ${root.label || root.id}（id=${root.id}）`,
       `      路径：${root.path}`,
       `      状态：${probe.detail}`,
-      `      授权：${permissionStatus(root.permType)}`,
+      `      授权：${permissionStatus(root.permType, probe)}`,
     );
   });
 
@@ -109,8 +109,9 @@ function buildReport() {
     "",
     "  说明：",
     "    · 沙箱根 = app-specific 外存 workspace 目录（getExternalFilesDir 派生；免权限、真实 POSIX 路径）。",
-    "    · 共享存储（文档/下载等）走 SAF 持久化授权桥，随 Phase 2 接入（本版不声明）。",
-    "    · 不申请 MANAGE_EXTERNAL_STORAGE（合规红线，规划 §17 G7）。",
+    "    · 文档/下载根 = 共享存储 POSIX 路径（/storage/emulated/0/{Documents,Download}），授权经 G7.1 特例",
+    "      （需求 203 方案 A：API30+ All-files 设置页 / API24-29 运行时权限）。",
+    "    · 共享存储是否可用**以实际可读（readdir）为准**，不依赖权限 API 返回值（防假阴性）。",
   );
 }
 
