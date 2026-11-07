@@ -40,8 +40,13 @@ Kotlin 侧只做四件事：**启动编排、渲染壳（加载/错误/诊断）
 
 ## C8 最小权限面
 
-仅 `INTERNET` + `ACCESS_NETWORK_STATE`；不申请 `MANAGE_EXTERNAL_STORAGE` / `QUERY_ALL_PACKAGES` / `REQUEST_INSTALL_PACKAGES` / `SYSTEM_ALERT_WINDOW`。
-工作区默认根 = app-specific 外存真实路径（免权限）；共享存储一律走 SAF（Phase 2 桥接）。
+仅 `INTERNET` + `ACCESS_NETWORK_STATE`；不申请 `QUERY_ALL_PACKAGES` / `REQUEST_INSTALL_PACKAGES` / `SYSTEM_ALERT_WINDOW`。
+工作区默认根 = app-specific 外存真实路径（免权限）；共享存储一律走 SAF（导入/导出桥）。
+
+**C8.1 特例（需求 203-plugin-workspace-picker，方案 A，2026-11-07 经决策采纳）**：仅「选择工作区目录」的**文档/下载根**，
+允许用户经系统设置授予「所有文件访问」（`MANAGE_APP_ALL_FILES_ACCESS`，API 30+）或授权 `READ/WRITE_EXTERNAL_STORAGE`（API 26–29）。
+授权动作由用户**显式点「请求权限」**触发；范围严格限定在文档/下载工作区根的 POSIX 读写，不用于整盘浏览或其它功能；
+应用不自启、不静默申请。详见 `docs/000-工程规划.md` §17 G7.1 与 `specs/203-plugin-workspace-picker/`。
 
 ## C9 敏感信息不入库
 

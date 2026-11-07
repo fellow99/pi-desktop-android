@@ -30,12 +30,14 @@
 | `105-auth-loopback-no-password/` | 鉴权（loopback 免密路线 ①） | 105 |
 | `106-tools-extensions-same-name-overrides/` | 同名顶替扩展四件 | 106 |
 | `107-compliance-and-security/` | 合规与敏感信息纪律 | 107 |
+| `203-plugin-workspace-picker/` | 插件：选择工作区目录（三根 + 授权门，方案 A All-files） | 203 |
 | `011-version-0.12.1/` | 版本更新（上游 v0.12.1 / 应用 0.1.0） | 公共模块（父工程 011） |
 | `012-building-workflow/` | GitHub Actions 标签触发构建/发布流程 | 公共模块（父工程 012） |
 | `013-branding/` | 品牌化（Pi Desktop / 图标 / 载荷文案） | 公共模块（父工程 013） |
 
 > 编号规则：`0XX` 公共模块（011 版本 / 012 构建工作流 / 013 品牌化）、`1XX` 本工程基础模块、
 > `2XX` 插件模块。每个模块目录含 `spec.md`（需求/验收）与 `plan.md`（技术方案），as-built 状态以 ✅/⬜/⚠️ 标注。
+> 203 的需求 / 方案 / 用例见 [203-plugin-workspace-picker/](./203-plugin-workspace-picker/)（三主目录 + All-files 授权门，G7.1 修订见 `../docs/000-工程规划.md` §17）。
 
 ## 项目一句话
 
