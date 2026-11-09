@@ -822,7 +822,8 @@ async function runCliProbe() {
   let shellDied = false;
   try {
     // 只 spawn 一次常驻 **login shell**（sh -l）：mksh 启动自动 source $HOME/.profile，加载 CliTools
-    // 生成的 10 个 CLI 函数（函数体 exec 绝对 ELF/壳，argv[0] 绝对，规避 bionic 裸短名 realpath 失败）。
+    // 生成的 10 个 CLI 函数（函数体直接执行绝对 ELF/壳——不含 exec，避免替换 login shell；
+    // argv[0] 绝对，规避 bionic 裸短名 realpath 失败）。
     // 继承产品 process.env（PATH 已前置 $HOME/bin，勿传 env 副本——与 android-exec.js 同纪律）；stdio 全管道、
     // stdin 喂帧；detached 建新进程组，使本宿主下管道回送与 waitpid 与已验证可靠的 EXEC 通道一致。
     proc = spawn('/system/bin/sh', ['-l'], { cwd: homeDir(), stdio: ['pipe', 'pipe', 'pipe'], detached: true });
@@ -948,7 +949,7 @@ async function runCliProbe() {
     };
     const report = {
       at: new Date().toISOString(),
-      domain: 'app-untrusted（常驻 login shell sh -l 自动 source $HOME/.profile 的 CLI 函数 + 哨兵帧；短名经函数 exec 绝对 ELF，与 TERM/PTY/EXEC 同路径）',
+      domain: 'app-untrusted（常驻 login shell sh -l 自动 source $HOME/.profile 的 CLI 函数 + 哨兵帧；短名经函数执行绝对 ELF（不含 exec），与 TERM/PTY/EXEC 同路径）',
       env: envSnapshot,
       pathResolution,
       checks,
