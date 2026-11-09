@@ -55,6 +55,21 @@ object PiDesktopRuntime {
             t?.let { append("（${it.javaClass.simpleName}: ${it.message}）") }
         }
         _state.value = ShellState.Failed(stage, detail, tailLogs())
+        // 真机无屏幕可读时的诊断落盘：失败现场（stage/message/栈）写入 HOME 下 boot-fail.log。
+        try {
+            val out = File(File(appContext.filesDir, "node-bridge"), "boot-fail.log")
+            out.parentFile?.mkdirs()
+            out.writeText(
+                buildString {
+                    appendLine("stage=$stage")
+                    appendLine(detail)
+                    t?.let { appendLine("exception=" + it.javaClass.name + ": " + it.message) }
+                    t?.let { appendLine(it.stackTraceToString()) }
+                },
+            )
+        } catch (_: Exception) {
+            /* 诊断资产写不写都继续 */
+        }
         throw IllegalStateException(detail)
     }
 

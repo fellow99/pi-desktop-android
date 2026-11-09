@@ -59,7 +59,8 @@ function runPtyCommand(command, cwd, timeoutMs, signal) {
       catch { /* 忽略 signal 绑定失败 */ }
     }
     try {
-      // login shell（-l -c）：自动 source $HOME/.profile 的 CLI 函数（短名 exec 绝对 ELF，规避 bionic realpath）。
+      // login shell（-l -c）：自动 source $HOME/.profile 的 CLI 函数（短名执行绝对 ELF——不含
+      // exec，避免替换 login shell；argv[0] 绝对，规避 bionic realpath）。
       term = loadPty().spawn("/system/bin/sh", ["-l", "-c", command], {
         name: "xterm-256color",
         cols: 80,
