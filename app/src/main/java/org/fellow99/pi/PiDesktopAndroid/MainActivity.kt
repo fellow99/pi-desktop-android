@@ -273,16 +273,34 @@ class MainActivity : Activity() {
     }
 
     override fun onBackPressed() {
-        // 返回键守卫（§5 #11）+ 113-system-back：READY（WebView 已挂载）后系统返回不再退出/goBack ——
-        // 改为派发 `pi-back` 事件，由 Web（113-system-back 补丁）按优先级关闭设置页/收回移动端抽屉；
-        // 首页/会话页/无浮层时 no-op，壳也不退出（覆盖更新真机验收，不卸载）。
-        // 未挂载（加载/错误页）仍交系统默认（退出），作为跳出加载/错误页的兜底。
+        // 返回键守卫（§5 #11）+ 113-system-back：
+        //  · 主界面（WebView 挂在 app 根 URL，path=/ 且 loopback）→ 派发 `pi-back`，由 Web
+        //    按优先级关闭设置页/收回移动端抽屉；首页/会话页/无浮层时 no-op，壳不退出/goBack。
+        //  · 应用内非 SPA 页（如会话导出 `/api/sessions/...`，经 window.open→同一 WebView）→
+        //    保留旧语义 goBack/退出，避免被困在子页（评审 I-1）。
+        //  · 未挂载（加载/错误页）→ 交系统默认（退出）完成兜底。
         if (webAttached) {
-            web.evaluateJavascript("window.dispatchEvent(new Event('pi-back'))", null)
-            return
+            if (isAppRootUrl(web.url)) {
+                web.evaluateJavascript("window.dispatchEvent(new Event('pi-back'))", null)
+                return
+            }
+            if (web.canGoBack()) {
+                web.goBack()
+                return
+            }
         }
         @Suppress("DEPRECATION")
         super.onBackPressed()
+    }
+
+    /** 是否为 app 主界面 URL：loopback 主机且路径为根（SPA 挂在 `/`，query 允许，如 `/?cwd=…`）。 */
+    private fun isAppRootUrl(url: String?): Boolean {
+        if (url == null) return false
+        return runCatching {
+            val uri = android.net.Uri.parse(url)
+            val host = uri.host ?: return@runCatching false
+            (host == "127.0.0.1" || host == "localhost") && (uri.path == "/" || uri.path.isNullOrEmpty())
+        }.getOrDefault(false)
     }
 
     /**
