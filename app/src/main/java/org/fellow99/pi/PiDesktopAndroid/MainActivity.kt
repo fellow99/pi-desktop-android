@@ -273,13 +273,16 @@ class MainActivity : Activity() {
     }
 
     override fun onBackPressed() {
-        // 返回键守卫（§5 #11）：WebView 能退就退，否则交给系统默认（退出）
-        if (webAttached && web.canGoBack()) {
-            web.goBack()
-        } else {
-            @Suppress("DEPRECATION")
-            super.onBackPressed()
+        // 返回键守卫（§5 #11）+ 113-system-back：READY（WebView 已挂载）后系统返回不再退出/goBack ——
+        // 改为派发 `pi-back` 事件，由 Web（113-system-back 补丁）按优先级关闭设置页/收回移动端抽屉；
+        // 首页/会话页/无浮层时 no-op，壳也不退出（覆盖更新真机验收，不卸载）。
+        // 未挂载（加载/错误页）仍交系统默认（退出），作为跳出加载/错误页的兜底。
+        if (webAttached) {
+            web.evaluateJavascript("window.dispatchEvent(new Event('pi-back'))", null)
+            return
         }
+        @Suppress("DEPRECATION")
+        super.onBackPressed()
     }
 
     /**
