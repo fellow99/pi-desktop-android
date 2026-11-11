@@ -108,11 +108,18 @@ const row = (g, name, state, detail = '') => {
   row(6, `targetSdk/前台服务 type/通知权限`, okAll ? 'PASS' : 'FAIL', `targetSdk=${sdk} fgsType=${hasFgsType} POST_NOTIFICATIONS=${notif}`);
 }
 
-// G7 明确不申请（红线权限）
+// G7 明确不申请（红线权限）。MANAGE_EXTERNAL_STORAGE 经需求 203 修订为 G7.1 受控特例
+// （docs/000-工程规划.md §17：仅工作区选择器文档/下载根，用户显式授权，不自启不静默），
+// 不再属红线；其余四项仍 fail-closed。
 {
-  const forbidden = ['MANAGE_EXTERNAL_STORAGE', 'QUERY_ALL_PACKAGES', 'REQUEST_INSTALL_PACKAGES', 'SYSTEM_ALERT_WINDOW', 'RECEIVE_BOOT_COMPLETED'];
+  const forbidden = ['QUERY_ALL_PACKAGES', 'REQUEST_INSTALL_PACKAGES', 'SYSTEM_ALERT_WINDOW', 'RECEIVE_BOOT_COMPLETED'];
   const hit = forbidden.filter((p) => xmltree.includes(p));
-  row(7, '红线权限零申请', hit.length === 0 ? 'PASS' : 'FAIL', hit.length ? '命中：' + hit.join(',') : '0 命中');
+  row(7, '红线权限零申请（G7，G7.1 除外）', hit.length === 0 ? 'PASS' : 'FAIL', hit.length ? '命中：' + hit.join(',') : '0 命中');
+}
+{
+  // G7.1 受控特例：MANAGE_EXTERNAL_STORAGE 仅在 203 限定 scope 下允许；登记其存在供审计，非 FAIL。
+  const hasAllFiles = xmltree.includes('MANAGE_EXTERNAL_STORAGE');
+  row('7.1', 'All-files 受控特例（203 工作区根）', hasAllFiles ? 'PASS' : 'PASS', hasAllFiles ? '已声明（G7.1：用户显式授权，scope 见 specs/203）' : '未声明');
 }
 
 // G8 隐私声明可达（外链交系统浏览器；材料项）
