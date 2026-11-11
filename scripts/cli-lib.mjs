@@ -282,7 +282,12 @@ export function buildTarGz(entries) {
     }
   }
   push(Buffer.alloc(1024)) // 结尾两个全零块
-  return gzipSync(Buffer.concat(chunks), { level: 9 })
+  const gz = gzipSync(Buffer.concat(chunks), { level: 9 })
+  // gzip 头偏移 9 是 OS 字节，zlib 按宿主平台写（Windows=10/NTFS、Linux=3/Unix）。
+  // 它纯属元信息、不影响解压，但会让同 tar 内容在不同平台产生不同 gzip 字节 ⇒
+  // archiveSha256 跨平台漂移。固定为 0xff（unknown）使归档与平台解耦（mtime 已为 0）。
+  gz[9] = 0xff
+  return gz
 }
 
 /**
