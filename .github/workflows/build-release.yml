@@ -98,11 +98,19 @@ jobs:
           # pnpm≥10 对含原生 postinstall 的依赖（node-pty/unrs-resolver 等）默认拦截会 ERR_PNPM_IGNORED_BUILDS；
           # node-linker=hoisted 复刻本地平铺布局：pnpm isolated 布局 refractor/all 不可见 ⇒ webpack
           # Can't resolve；hoisted 下顶层为实体目录，运行时零依赖 .pnpm（本地实盘同为平铺）
+          #
+          # 钉版 mdast-util-gfm-autolink-literal@2.0.1：--lockfile=false 非冻结安装会按 remark-gfm→mdast-util-gfm
+          # 的 ^2.0.0 范围解析到最新 2.1.0，其 email 正则改写后不再含 lib/gfm-autolink-email-loader.cjs 要查找的
+          # lookbehind 字面量 ⇒ loader indexOf(...)=-1 主动 throw ⇒ next build webpack 失败。本地 package-lock.json
+          # 钉在 2.0.1 才未暴露。pnpm≥10 已忽略 package.json 的 pnpm.overrides，override 只能写 pnpm-workspace.yaml。
+          # 用 printf 而非 heredoc：YAML block scalar 保留行首缩进，heredoc 内容会带上 10 空格前缀导致解析失败。
+          printf 'overrides:\n  mdast-util-gfm-autolink-literal: 2.0.1\n' \
+            > "$GITHUB_WORKSPACE/../pi-web/pnpm-workspace.yaml"
           pnpm install --dir "$GITHUB_WORKSPACE/../pi-web" --lockfile=false \
             --config.node-linker=hoisted \
             --allow-build node-pty --allow-build @google/genai --allow-build protobufjs --allow-build unrs-resolver
           # 上游不提交 pnpm-lock.yaml/pnpm-workspace.yaml，且 .gitignore 未忽略它们 ⇒
-          # 删掉防 assemble 收尾 pristine 检查误报（pnpm 12 会在无 workspace 时生成 pnpm-workspace.yaml）
+          # 删掉防 assemble 收尾 pristine 检查误报（含上面注入的 override 文件；pnpm 12 无 workspace 时也会生成）
           rm -f "$GITHUB_WORKSPACE/../pi-web/pnpm-lock.yaml" \
                 "$GITHUB_WORKSPACE/../pi-web/pnpm-workspace.yaml"
 
