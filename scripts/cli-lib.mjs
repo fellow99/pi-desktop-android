@@ -254,7 +254,10 @@ function truncateUtf8Bytes(text, maxBytes) {
  * @returns {Buffer} gzip 流（level 9；gzipSync 默认 mtime=0 → 可重复字节）
  */
 export function buildTarGz(entries) {
-  const sorted = [...entries].sort((a, b) => a.name.localeCompare(b.name))
+  // 码点序（UTF-16 code unit）而非 localeCompare：后者依赖运行时 ICU/locale，
+  // Windows 与 Linux CI 的 collation 不同会改变条目顺序 ⇒ 同输入产出不同 tar 字节 ⇒
+  // archiveSha256 跨平台漂移。码点序与平台/locale 无关，保证确定性归档可重复。
+  const sorted = [...entries].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
   const chunks = []
   const push = (b) => chunks.push(b)
   for (const entry of sorted) {
