@@ -68,24 +68,36 @@ function resolveSources(base) {
     for (const c of cands) { if (existsSync(c)) return c }
     return null
   }
+  // 两种源布局并存：
+  //  ① --from 手工 Release 工作区：x-node/、x-python/<ver>/、x-git/<ver>/、x-uv/、x-pnpm/<ver>/
+  //  ② --download 直接解包（tarball 内即真实顶层）：node/uv 平铺在 base 根，
+  //     python/git/pnpm 各自单层 <tool>-cli-v<ver>-android-arm64-v8a/ 目录。
+  // 候选依次回退，保持 ① 既有口径不变，新增对 ② 的兼容（113 轮 CI 首次走 --download 暴露的错配）。
   const src = {
     node: {
-      aar: pick(path.join(base, 'x-node/node-cli-release.aar')),
+      aar: pick(
+        path.join(base, 'x-node/node-cli-release.aar'),
+        path.join(base, 'node-cli-release.aar'),
+      ),
       // 顶层 .so（与 AAR jni/ 内容同源；--from 布局下直接可见）
-      shimDir: pick(path.join(base, 'x-node')),
+      shimDir: pick(path.join(base, 'x-node'), base),
     },
     python: {
-      aar: pick(path.join(base, `x-python/${PY_VER}/python-cli-release.aar`)),
-      shimDir: pick(path.join(base, `x-python/${PY_VER}`)),
+      aar: pick(
+        path.join(base, `x-python/${PY_VER}/python-cli-release.aar`),
+        path.join(base, `${PY_VER}/python-cli-release.aar`),
+      ),
+      shimDir: pick(path.join(base, `x-python/${PY_VER}`), path.join(base, PY_VER)),
     },
     git: {
-      dir: pick(path.join(base, `x-git/${GIT_VER}`)),
+      dir: pick(path.join(base, `x-git/${GIT_VER}`), path.join(base, GIT_VER)),
     },
     uv: {
-      dir: pick(path.join(base, 'x-uv')),
+      // uv tarball 平铺在根（无版本目录、无 AAR）；--from 布局下在 x-uv/
+      dir: pick(path.join(base, 'x-uv'), base),
     },
     pnpm: {
-      dir: pick(path.join(base, `x-pnpm/${PNPM_VER}`)),
+      dir: pick(path.join(base, `x-pnpm/${PNPM_VER}`), path.join(base, PNPM_VER)),
     },
   }
   const missing = []
