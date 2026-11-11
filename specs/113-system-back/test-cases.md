@@ -1,81 +1,51 @@
 # 113-system-back — 测试用例（系统级返回按钮行为改造 · Android）
 
 > 真机：8f155833（M2105K81C，SDK 33 / Android 13）。BACK 键 = `adb shell input keyevent 4`。
-> 部署：`adb install -r <apk>`（覆盖更新，不卸载）。
+> 部署：`adb install -r <apk>`（覆盖更新，**不卸载**，已核验 Success）。
+> 构建：`assemble-payload --apply`（8 补丁）+ `assembleDebug`；WebView DevTools（CDP）驱动/断言 + 真 BACK。
 
-## 一、真机交互
+## 一、真机交互（干净构建最终验收）
 
-### TC-AND-001：设置页关闭
-**优先级** P1 ｜ **类型** Functional
-**前置**：应用处于 READY，进入设置页（顶栏齿轮 / 首页设置按钮）
-**步骤**：1) 打开设置页；2) 发送 BACK
-**期望**：设置页关闭、回到之前的界面（首页或会话页）、应用不退出、进程存活
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-001：设置页关闭 — **PASS** ✅
+**步骤**：CDP 点底栏「设置」→ 面板出现（含「字体与排版」）→ 真 BACK
+**结果**：BACK 后面板消失、恢复首页、进程存活（pid 不变）。webAttached π回 pi-back → AppShell 设置分支生效。
 
-### TC-AND-002：移动端抽屉收回
-**优先级** P1 ｜ **类型** Functional
-**前置**：READY，移动端形态下点击侧边栏按钮打开抽屉
-**步骤**：1) 打开抽屉；2) 发送 BACK
-**期望**：抽屉收回、遮罩消失、应用不退出
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-002：移动端抽屉收回 — **SKIP（设备形态）**
+**步骤**：—（本机关侧栏形态，非移动布局）
+**结果**：真机 `innerWidth=711`（>pi-web 移动断点 640）→ **桌面布局**，无移动抽屉。编译产物静态核对 `isMobile&&sidebarOpen → setSidebarOpen(false)` 分支在位 ✓。桌面侧边栏 BACK 时保持 no-op（与 TC-003 一致，符合设计）。⬜ 需更窄视口/真机复核。
 
-### TC-AND-003：首页 no-op
-**优先级** P1 ｜ **类型** Functional
-**前置**：READY，无会话处于首页（getStarted 占位）
-**步骤**：1) 确认在首页、无浮层；2) 发送 BACK
-**期望**：界面不变、应用不退出、仍在首页
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-003：首页 no-op — **PASS** ✅
+**结果**：首页按 BACK → innerText 逐字一致、进程存活、焦点不变（不退出、不导航）。
 
-### TC-AND-004：会话页 no-op
-**优先级** P1 ｜ **类型** Functional
-**前置**：READY，打开/在某个会话页
-**步骤**：1) 确认在会话页、无浮层；2) 发送 BACK
-**期望**：界面不变、会话保持、应用不退出
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-004：会话页 no-op — **SKIP（无会话可进入）**
+**结果**：真机无会话/无已配模型，「新建」无法进入真实会话页。会话页与首页对补丁同构（无浮层即 no-op），首页已证该路径。⬜ 需配置会话后复核。
 
-### TC-AND-005：加载页兜底退出
-**优先级** P2 ｜ **类型** Edge Case
-**前置**：冷启动加载阶段（WebView 未挂载）或注入制造加载态
-**步骤**：1) 在加载页发送 BACK
-**期望**：按原行为退出（super.onBackPressed）
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-005：加载页兜底退出 — **SKIP（时序不可复现）**
+**结果**：引擎热启动极快，BACK 注入时已 webAttached（→ 派发 pi-back no-op），无法命中 Loading 窗口。代码路径 `webAttached=false → super.onBackPressed()` 已静态核实。
 
-### TC-AND-006：连续返回不退出（回归护栏）
-**优先级** P2 ｜ **类型** Regression
-**前置**：READY 会话页
-**步骤**：1) 连续发送 BACK 5 次
-**期望**：每次均 no-op，应用始终存活，不退出到桌面
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-006：连续返回不退出 — **PASS** ✅
+**结果**：首页连按 5 次 BACK → 进程存活、仍在首页、无退出。
 
-### TC-AND-007：会话导出页返回不困死（评审 I-1 回归护栏）
-**优先级** P1 ｜ **类型** Regression
-**前置**：READY，打开某会话的导出页（经 window.open → 同一 WebView）
-**步骤**：1) 在导出页发送 BACK
-**期望**：回到 SPA 主界面（保留旧 goBack 语义），不被困住；应用不退出
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-007：应用内非 SPA 页返回不困死（I-1 评审修复）— **PASS** ✅
+**结果**：`location.href → /api/home`（loopback 非根，等义于会话导出页），BACK → **goBack 回到根** `/`（两次循环复现稳定），进程存活；`web.url=/api/home root=false canGoBack=true` 日志证实分支命中。
 
-## 二、离线 / 静态核对（无需真机）
+## 二、离线 / 静态核对
 
-### TC-AND-008：补丁幂等与协议
-**优先级** P1 ｜ **类型** Static
-**步骤**：1) `git apply --check patches/v0.15.0/0008-system-back.patch` 通过；2) 事件协议名三平台一致 `'pi-back'`
-**期望**：通过
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-008：补丁幂等与协议 — **PASS** ✅
+**结果**：`git apply --check 0008-system-back.patch` 通过；事件协议名 `'pi-back'` 三平台（android/ark/hos）逐字一致；补丁文件三平台逐字节相同。
 
-### TC-AND-009：载荷补丁往返校验
-**优先级** P2 ｜ **类型** Static
-**步骤**：`assemble-payload --check`（或全量跑）确认 0008 幂等、收尾 pristine
-**期望**：通过
-**实际**：⬜ ｜ **状态**：⬜
+### TC-AND-009：载荷补丁往返校验 — **PASS** ✅
+**结果**：`assemble-payload --apply` 完整跑通（EXIT 0）：8 条补丁应用→重编→裁剪→归档 75.6 MiB→`assets/pi-web.tar.gz`；**收尾还原 pi-web pristine**（核验干净）；tar 内 `.next/.../page-*.js` 含 `addEventListener("pi-back",e)` 编译产物 ✓。
 
 ## 三、验收对照
 
 | AC# | 判据 | 结论 |
 |---|---|---|
-| 1 | 0008 幂等 + 往返校验 | ⬜ |
-| 2 | 设置页关闭 | ⬜ |
-| 3 | 抽屉收回 | ⬜ |
-| 4 | 首页不退出 | ⬜ |
-| 5 | 会话页不退出 | ⬜ |
-| 6 | 加载页可退出 | ⬜ |
-| 7 | 覆盖更新部署（未卸载） | ⬜ |
+| 1 | 0008 幂等 + 往返校验 | ✅ PASS |
+| 2 | 设置页关闭 | ✅ PASS |
+| 3 | 抽屉收回 | ⬜ SKIP（本机无移动形态）· 静态核对通过 |
+| 4 | 首页不退出 | ✅ PASS |
+| 5 | 会话页不退出 | ⬜ SKIP（无会话）· 与首页同构 |
+| 6 | 加载页可退出 | ⬜ SKIP（时序）· 代码路径静态核实 |
+| 7 | 覆盖更新部署（未卸载） | ✅ PASS（install -r Success） |
+| 8 | 导出页返回不困死（I-1） | ✅ PASS |
