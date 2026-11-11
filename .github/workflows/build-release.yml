@@ -53,10 +53,16 @@ jobs:
         run: |
           set -euo pipefail
           python3 --version
-          python3 -c 'import PIL' 2>/dev/null && echo "Pillow 已就绪" || {
-            sudo apt-get update -qq && sudo apt-get install -y -qq python3-pil
+          if python3 -c 'import PIL' 2>/dev/null; then
+            echo "Pillow 已就绪"
+          else
+            # 优先 pip（PyPI 域名），apt（azure.archive.ubuntu.com）作兜底：
+            # 托管 runner 偶发对 Ubuntu apt 镜像 DNS 解析失败（Temporary failure resolving），
+            # pip 走独立主机不受影响。两者都装到同一 python3 环境，brand-assets 仅需 import PIL。
+            python3 -m pip install --quiet Pillow \
+              || { sudo apt-get update -qq && sudo apt-get install -y -qq python3-pil; }
             python3 -c 'import PIL; print("Pillow installed")'
-          }
+          fi
 
       - name: JDK 17（AGP 8.10）+ Gradle 缓存
         uses: actions/setup-java@v4
