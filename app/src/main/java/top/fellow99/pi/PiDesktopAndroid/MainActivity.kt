@@ -1,4 +1,4 @@
-package org.fellow99.pi.PiDesktopAndroid
+package top.fellow99.pi.PiDesktopAndroid
 
 import android.annotation.SuppressLint
 import android.app.Activity
@@ -19,9 +19,9 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import org.fellow99.pi.PiDesktopAndroid.host.HostCapabilities
-import org.fellow99.pi.PiDesktopAndroid.runtime.PiDesktopRuntime
-import org.fellow99.pi.PiDesktopAndroid.runtime.PiDesktopRuntime.ShellState
+import top.fellow99.pi.PiDesktopAndroid.host.HostCapabilities
+import top.fellow99.pi.PiDesktopAndroid.runtime.PiDesktopRuntime
+import top.fellow99.pi.PiDesktopAndroid.runtime.PiDesktopRuntime.ShellState
 
 /**
  * 主入口（singleTask；模块 103 渲染壳）。

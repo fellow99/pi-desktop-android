@@ -1,4 +1,4 @@
-package org.fellow99.pi.PiDesktopAndroid.host
+package top.fellow99.pi.PiDesktopAndroid.host
 
 import android.Manifest
 import android.app.Activity
@@ -14,8 +14,8 @@ import android.os.Environment
 import android.provider.Settings
 import org.fellow99.nodebridge.NodeHostBridge
 import org.fellow99.nodebridge.NodeRuntime
-import org.fellow99.pi.PiDesktopAndroid.MainActivity
-import org.fellow99.pi.PiDesktopAndroid.service.PiForegroundService
+import top.fellow99.pi.PiDesktopAndroid.MainActivity
+import top.fellow99.pi.PiDesktopAndroid.service.PiForegroundService
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -594,7 +594,7 @@ object HostCapabilities {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val notification = android.app.Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(org.fellow99.pi.PiDesktopAndroid.R.drawable.ic_fg_service)
+            .setSmallIcon(top.fellow99.pi.PiDesktopAndroid.R.drawable.ic_fg_service)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(android.app.Notification.BigTextStyle().bigText(body))

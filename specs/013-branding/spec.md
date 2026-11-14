@@ -1,8 +1,9 @@
 # 013 — 品牌化（branding）功能规格
 
-> **Module:** branding ｜ **Status:** Implemented ｜ **Last Updated:** 2026-10-31
+> **Module:** branding ｜ **Status:** Implemented ｜ **Last Updated:** 2026-11-14（R2）
 > **上游基线:** `pi` v1.2.0 / `pi-web` v0.12.1（品牌化实施轮次为 2026-10-30）
-> **应用名 / 包名:** **Pi Desktop** / `org.fellow99.pi.PiDesktopAndroid`
+> **应用名 / 包名:** **Pi Desktop** / `top.fellow99.pi.PiDesktopAndroid`（R2 由 `org.fellow99.pi.PiDesktopAndroid` 变更，见 §R2）
+> **需求编号:** `013-branding-r2` ｜ **日期:** 2026-11-14
 > **物料唯一来源:** 父工程 `../assets/`（`logo.svg`、`logo.png`、`logo-1024-with-bg.png`）
 > **规划依据:** [`../../docs/000-工程规划.md`](../../docs/000-工程规划.md) §头部表、G10、§16.3；[`../../docs/安卓环境能力清单-0.12.1.md`](../../docs/安卓环境能力清单-0.12.1.md) §H
 > **同型参考:** `pi-desktop` 的 `013-branding`、`pi-desktop-hos` 的 `013-branding`（同一物料与判据口径）
@@ -15,7 +16,7 @@
 
 - 应用显示名、launcher / adaptive 图标、通知小图标；
 - 载荷（pi-web 产物副本）中的用户可见 `Pi Web` 文案、页面 Logo、favicon / PWA 图标 / apple-touch-icon；
-- 保持技术标识符（包名、`pi-web`、`PI_WEB_*`、`pi_web_session`、`PiWeb`、路由）不变。
+- 保持技术标识符（`pi-web`、`PI_WEB_*`、`pi_web_session`、`PiWeb`、路由）不变；包名按 §R2 单独变更。
 
 ### 1.2 解决的问题
 
@@ -37,7 +38,7 @@
 **不包含**
 
 - 修改上游 `pi` / `pi-web` 源码。
-- 改包名 `org.fellow99.pi.PiDesktopAndroid`（品牌名与应用名一致，包名保留 Android 标识）。
+- 改包名 `top.fellow99.pi.PiDesktopAndroid`（品牌名与应用名一致，包名保留 Android 标识）——**R2 按产品决策变更**，见 §R2。
 - 换掉 Pi Web UI 的交互设计 / i18n 文案（除品牌名本身）。
 - 官网与发布说明物料（属 `pi-desktop-website`）。
 
@@ -72,7 +73,7 @@
 - **FR-013-011**（MUST）：品牌化后暂存树（`node_modules/` 之外）用户可见 `Pi Web` 必须为 **0 处**；`index` / `login` 预渲染文档必须含 `Pi Desktop`。
 - **FR-013-012**（MUST）：`brand-assets.mjs --check` 必须可在 CI 单独运行，只终检不改写，失败退出非 0。
 - **FR-013-013**（MUST NOT）：不得回归既有能力：启动到首屏、会话可建、真实对话、`bash`/`find`/`grep`、文件上传。
-- **FR-013-014**（MUST）：品牌化不得改变 `versionName` / `versionCode` / 包名。
+- **FR-013-014**（MUST）：品牌化不得改变 `versionName` / `versionCode` / 包名。**R2 例外**：013-branding-r2 已按产品决策变更包名（见 §R2）；`versionName` / `versionCode` 均不变。
 
 ## 4. 关键实体
 
@@ -120,7 +121,21 @@
 
 - 父工程 `assets/` 在 CI 中通过 sparse checkout 获取；本地缺失时可用 `PI_ASSETS_DIR` 指向镜像。
 - Python + Pillow 可用（CI 安装 `python3-pil`）。
-- 品牌名统一为 `Pi Desktop`；包名保留 `PiDesktopAndroid` 以区分渠道。
+- 品牌名统一为 `Pi Desktop`；包名保留 `PiDesktopAndroid` 以区分渠道（R2 起为 `top.fellow99.pi.PiDesktopAndroid`）。
+
+## R2 — 包名变更（013-branding-r2）
+
+> **需求编号:** `013-branding-r2` ｜ **需求名称:** 包名修改 ｜ **Git 分支:** 不改动
+
+包名 / applicationId / namespace 由 `org.fellow99.pi.PiDesktopAndroid` 改为 **`top.fellow99.pi.PiDesktopAndroid`**：
+
+- 源码包目录 `app/src/main/java/org/fellow99/pi/PiDesktopAndroid/` 迁移至 `app/src/main/java/top/fellow99/pi/PiDesktopAndroid/`。
+- `app/build.gradle.kts` 的 `namespace` 与 `applicationId` 同步更新。
+- 8 个 `.kt` 的 `package` 声明与内部 `import`（含 `R` 资源引用）同步更新；`org.fellow99.nodebridge.*` 外部依赖包名保持不变。
+- 版本号（`versionName` / `versionCode`）不变。
+- 编译构建验证通过后回写本规格。
+
+---
 
 ## 8. 依赖
 

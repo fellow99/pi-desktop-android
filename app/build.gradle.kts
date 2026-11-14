@@ -16,12 +16,12 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    // 包名/应用名定稿（docs/000-工程规划.md 头部表，2026-10-24）：org.fellow99.pi.PiDesktopAndroid / Pi Desktop
-    namespace = "org.fellow99.pi.PiDesktopAndroid"
+    // 包名/应用名定稿（docs/000-工程规划.md 头部表，2026-10-24）：top.fellow99.pi.PiDesktopAndroid / Pi Desktop
+    namespace = "top.fellow99.pi.PiDesktopAndroid"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "org.fellow99.pi.PiDesktopAndroid"
+        applicationId = "top.fellow99.pi.PiDesktopAndroid"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 1500

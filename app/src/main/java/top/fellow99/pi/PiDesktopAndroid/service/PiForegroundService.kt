@@ -1,4 +1,4 @@
-package org.fellow99.pi.PiDesktopAndroid.service
+package top.fellow99.pi.PiDesktopAndroid.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,8 +10,8 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import org.fellow99.pi.PiDesktopAndroid.MainActivity
-import org.fellow99.pi.PiDesktopAndroid.R
+import top.fellow99.pi.PiDesktopAndroid.MainActivity
+import top.fellow99.pi.PiDesktopAndroid.R
 
 /**
  * 前台服务（能力清单 §F 第 2 级 #3「后台常驻」——Android 相对 ark 的增量能力）。
