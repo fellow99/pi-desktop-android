@@ -1,0 +1,32 @@
+diff --git a/components/AppShell.tsx b/components/AppShell.tsx
+index 7735875..986593c 100644
+--- a/components/AppShell.tsx
++++ b/components/AppShell.tsx
+@@ -480,6 +480,27 @@ export function AppShell() {
+     setSettingsSection(section);
+   }, []);
+ 
++  // 113-system-back：宿主壳捕获系统返回键后向页面派发 `pi-back` 事件（协议：
++  // window.dispatchEvent(new Event('pi-back'))，三平台一致）。此处按优先级收敛浮层：
++  // 设置页（settingsSection 非空）→ 移动端抽屉（sidebarOpen）→ 其余（首页/会话页/桌面态）no-op，
++  // 壳在 READY 后也不退出应用。监听器随组件卸载清理；重复派发无副作用（幂等）。
++  useEffect(() => {
++    const onSystemBack = () => {
++      if (settingsSection !== null) {
++        setSettingsSection(null);
++        setModelsRefreshKey((key) => key + 1);
++        return;
++      }
++      if (isMobile && sidebarOpen) {
++        setSidebarOpen(false);
++        return;
++      }
++      // 首页 / 会话页 / 无浮层：不做任何操作（返回键由壳消费，不放行退出）。
++    };
++    window.addEventListener("pi-back", onSystemBack);
++    return () => window.removeEventListener("pi-back", onSystemBack);
++  }, [isMobile, settingsSection, sidebarOpen]);
++
+   const handleSidebarToggle = useCallback(() => {
+     if (isMobile) {
+       setActiveTopPanel(null);

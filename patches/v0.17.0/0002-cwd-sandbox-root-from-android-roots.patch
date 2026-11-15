@@ -1,0 +1,146 @@
+diff --git a/app/api/cwd/browse/route.ts b/app/api/cwd/browse/route.ts
+index f63936b..972cbe2 100644
+--- a/app/api/cwd/browse/route.ts
++++ b/app/api/cwd/browse/route.ts
+@@ -3,17 +3,64 @@ import { stat } from "fs/promises";
+ import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
+ import {
+   createDirectory,
++  findWorkspaceRoot,
+   getBrowseStartDirectory,
+   getParentDirectory,
++  getWorkspaceRoots,
+   listDirectories,
+   listWindowsDrives,
+   resolveDirectory,
+   shouldShowWindowsDrivePicker,
+ } from "@/lib/directory-browser";
+ 
++/**
++ * 宿主声明的某个主目录（`?root=<id>`）的入口。
++ *
++ * 为什么需要它：工作区根的**唯一事实源**是宿主应用（`PI_ANDROID_ROOTS`，其 sandbox 项由
++ * `context.filesDir` 派生）。没有这个入口，UI 就只能从 `homedir()` 一层层点进去；而
++ * 「按父级猜一个 workspace」正是真机上拼出 `…/el2/base/files/workspace`（少了
++ * `haps/<module>`，必然 404）的那条路。未知 id 必须报错而不是回退到别的根 —— 静默
++ * 换成另一个目录会让「选中的是哪里」无从判断。
++ */
++async function browseDeclaredRoot(rootId: string): Promise<NextResponse> {
++  const root = findWorkspaceRoot(rootId);
++  if (!root) {
++    return NextResponse.json(
++      { error: "Unknown workspace root", rootId, declared: getWorkspaceRoots().map((entry) => entry.id) },
++      { status: 400 },
++    );
++  }
++  let resolved: string;
++  try {
++    resolved = await resolveDirectory(root.path);
++  } catch {
++    // 已声明但不存在：把「是谁声明的、声明成什么」一起回给调用方（宿主应建它）。
++    return NextResponse.json(
++      { error: "Directory does not exist", code: "ENOENT", rootId: root.id, rootPath: root.path },
++      { status: 404 },
++    );
++  }
++  const rootStat = await stat(resolved);
++  if (!rootStat.isDirectory()) {
++    return NextResponse.json({ error: "Path is not a directory", rootId: root.id, rootPath: resolved }, { status: 400 });
++  }
++  return NextResponse.json({
++    rootId: root.id,
++    rootPath: resolved,
++    path: resolved,
++    parentPath: getParentDirectory(resolved),
++    directories: await listDirectories(resolved),
++  });
++}
++
+ // GET /api/cwd/browse?path=...：列出文件系统中的可读子目录。
++// GET /api/cwd/browse?root=<id>：列出宿主声明的某个工作区主目录（沙箱/桌面/…）。
+ export async function GET(request: NextRequest) {
+   try {
++    const requestedRoot = request.nextUrl.searchParams.get("root")?.trim();
++    if (requestedRoot) {
++      return await browseDeclaredRoot(requestedRoot);
++    }
+     const requested = request.nextUrl.searchParams.get("path")?.trim();
+ 
+     if (shouldShowWindowsDrivePicker(requested)) {
+diff --git a/lib/directory-browser.ts b/lib/directory-browser.ts
+index 41c020e..de37afc 100644
+--- a/lib/directory-browser.ts
++++ b/lib/directory-browser.ts
+@@ -1,3 +1,4 @@
++import { existsSync } from "fs";
+ import { mkdir, readdir, realpath, stat } from "fs/promises";
+ import { homedir } from "os";
+ import path from "path";
+@@ -14,8 +15,66 @@ export function shouldShowWindowsDrivePicker(
+   return platform === "win32" && !directory;
+ }
+ 
++/**
++ * pi-desktop（本工程的宿主应用）声明的沙箱工作区根 id —— 与 ArkTS 侧
++ * `PiDesktopRuntime#declaredRoots()`、`payload/extensions/harmony-workspace-roots.js`
++ * 的 `EXPECTED_IDS[0]` 同一个字面量「sandbox」。
++ */
++export const WORKSPACE_ROOT_ID_SANDBOX = "sandbox";
++
++/**
++ * 宿主应用注入的工作区主目录清单（`{id,label,path,permType}[]` 的 JSON 字符串）。
++ * 唯一事实源是宿主（`context.filesDir` + 选中的用户目录），本模块只**消费**它：
++ * 缺失/非法/空 ⇒ 返回空数组，调用方退回原行为，绝不自己猜一个路径拼出来。
++ */
++export const WORKSPACE_ROOTS_ENV = "PI_ANDROID_ROOTS";
++
++export interface WorkspaceRoot {
++  id: string;
++  label: string;
++  path: string;
++  permType: string | null;
++}
++
++export function getWorkspaceRoots(): WorkspaceRoot[] {
++  const raw = process.env[WORKSPACE_ROOTS_ENV];
++  if (!raw) return [];
++  try {
++    const parsed: unknown = JSON.parse(raw);
++    if (!Array.isArray(parsed)) return [];
++    return parsed
++      .filter((root): root is Record<string, unknown> => Boolean(root) && typeof root === "object")
++      .map((root) => ({
++        id: typeof root.id === "string" ? root.id : "",
++        label: typeof root.label === "string" && root.label ? root.label : String(root.id ?? ""),
++        path: typeof root.path === "string" ? root.path : "",
++        permType: typeof root.permType === "string" && root.permType ? root.permType : null,
++      }))
++      .filter((root) => root.id.length > 0 && root.path.length > 0);
++  } catch {
++    return [];
++  }
++}
++
++/** 按 id 取主目录；未知 id 返回 null（调用方必须报错，不得回退到别的根）。 */
++export function findWorkspaceRoot(rootId: string): WorkspaceRoot | null {
++  return getWorkspaceRoots().find((root) => root.id === rootId) ?? null;
++}
++
++/**
++ * 裸打开（没有 `path`）时的起点。
++ *
++ * 为什么不是 `homedir()`：`homedir()` 是应用沙箱的**父级**（`…/haps/<module>/files`），
++ * 用户还要多点一层才到工作区根；而「按父级再猜一个 `workspace`」正是把
++ * `…/el2/base/files/workspace`（少了 `haps/<module>`，真机 404）拼出来的那条路。
++ * 因此起点只认宿主声明的 `sandbox` 根，且**只在它真实存在时**采用 —— 声明的根
++ * 不存在（宿主启动失败）就退回 `homedir()`，不让选择器停在一个不存在的目录上。
++ */
+ export function getBrowseStartDirectory(directory?: string): string {
+-  return directory || homedir();
++  if (directory) return directory;
++  const sandbox = findWorkspaceRoot(WORKSPACE_ROOT_ID_SANDBOX);
++  if (sandbox && existsSync(sandbox.path)) return sandbox.path;
++  return homedir();
+ }
+ 
+ export function getWindowsDriveCandidates(): BrowsableDirectory[] {
