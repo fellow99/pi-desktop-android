@@ -8,15 +8,15 @@
   "execArgv": [],
   "pid": 15447,
   "ppid": 7554,
-  "home": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge",
-  "tmpdir": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/tmp",
+  "home": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge",
+  "tmpdir": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/tmp",
   "versions": {
     "node": "v24.2.0",
     "v8": "13.6.233.10-node.17",
     "modules": "137"
   },
   "fs": {
-    "dir": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload",
+    "dir": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload",
     "roundTrip": true,
     "error": null
   },

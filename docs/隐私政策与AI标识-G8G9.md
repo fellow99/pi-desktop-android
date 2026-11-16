@@ -2,7 +2,7 @@
 
 > **状态**：合规材料 **D1 草稿（MANUAL）**——本文由工程侧按实际数据流如实起草，供产品/法务在渠道上架前定稿。
 > 不是法律意见；上线前须由责任人确认联系主体、生效日期、各模型服务商条款引用与渠道（小米/国内应用商店）表单口径。
-> 适用应用：**Pi Desktop（Android）** `org.fellow99.pi.PiDesktopAndroid`，版本 0.1.x。
+> 适用应用：**Pi Desktop（Android）** `top.fellow99.pi.PiDesktopAndroid`，版本 0.1.x。
 > 配套机械项：`node scripts/compliance-check.mjs`（G1–G7/G10/G11 自动，G8/G9 = 本文 MANUAL）。
 
 ---

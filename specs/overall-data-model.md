@@ -5,7 +5,7 @@
 ## 目录模型（设备上）
 
 ```
-/data/user/0/org.fellow99.pi.PiDesktopAndroid/          # 应用沙箱（UID 隔离）
+/data/user/0/top.fellow99.pi.PiDesktopAndroid/          # 应用沙箱（UID 隔离）
 ├── files/
 │   ├── node-bridge/                                     # 库 HOME（库契约）
 │   │   ├── node_bridge.log                              # 库日志（fd1/2 管道回读）
@@ -28,7 +28,7 @@
 ├── cache/payload-incoming/pi-web.tar.gz                 # 解包前暂存（PayloadArchive 输入）
 └── shared_prefs/ · cache/                               # 系统标准目录（壳未用）
 
-/storage/emulated/0/Android/data/org.fellow99.pi.PiDesktopAndroid/files/
+/storage/emulated/0/Android/data/top.fellow99.pi.PiDesktopAndroid/files/
 └── workspace/                                           # 默认工作区根（PI_ANDROID_ROOTS sandbox；免权限、用户可见）
 ```
 

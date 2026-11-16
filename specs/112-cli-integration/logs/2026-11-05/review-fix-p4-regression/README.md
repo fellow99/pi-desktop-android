@@ -2,7 +2,7 @@
 
 - 日期：2026-11-05
 - 设备：`emulator-5554`（Android 17 / API37 x86_64 + libndk_translation/berberis，abilist 含 arm64-v8a）
-- 包：`org.fellow99.pi.PiDesktopAndroid`（versionName 0.15.0 / versionCode 1500）
+- 包：`top.fellow99.pi.PiDesktopAndroid`（versionName 0.15.0 / versionCode 1500）
 - 评审基线：`3972ae5` → 评审时 HEAD `d33cb27`（5 commits，68 files +1808/-250527）
 - 修复提交：`87826d9`（fix）、`f465e04`（docs）
 - 重建 APK：`app/build/outputs/apk/debug/app-debug.apk`，490974544 B，sha256 前缀 `138fae4d0de8c654`

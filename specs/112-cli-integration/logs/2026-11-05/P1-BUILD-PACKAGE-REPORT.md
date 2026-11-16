@@ -51,7 +51,7 @@
 安装：`adb -s emulator-5554 install -r -t app-debug.apk` → **Success**。
 manifest 实测：`A: android:extractNativeLibs(0x010104ea)=true`、`debuggable=true`。
 
-`nativeLibraryDir = /data/app/~~U4IrX48AAzcqmS_51OAGlA==/org.fellow99.pi.PiDesktopAndroid-89qR0xa2i9wmea-MQmTd3Q==/lib/arm64`
+`nativeLibraryDir = /data/app/~~U4IrX48AAzcqmS_51OAGlA==/top.fellow99.pi.PiDesktopAndroid-89qR0xa2i9wmea-MQmTd3Q==/lib/arm64`
 
 - 该目录物理落盘 **17 个 `.so`**，权限全为 `-rwxr-xr-x`（可执行），属主 `system:system`。
 - 大小与 jniLibs 源逐字一致（抽样）：`libuv_cli.so` 34,979,336、`libnode_cli.so` 62,155,912、

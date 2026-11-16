@@ -145,7 +145,7 @@ row(9, 'AI 生成内容标识', 'MANUAL', '对标 ark 壳层常驻灰字标识�
   const iconProduced = iconFiles.every((p) => fs.existsSync(p));
   const manifest = fs.readFileSync(path.join(ROOT, 'app', 'src', 'main', 'AndroidManifest.xml'), 'utf8');
   const iconReferenced = /android:icon="@mipmap\/ic_launcher"/.test(manifest) && /android:roundIcon="@mipmap\/ic_launcher_round"/.test(manifest);
-  const okAll = pkg === 'org.fellow99.pi.PiDesktopAndroid' && label === 'Pi Desktop' && typeof vc === 'string' && iconProduced && iconReferenced;
+  const okAll = pkg === 'top.fellow99.pi.PiDesktopAndroid' && label === 'Pi Desktop' && typeof vc === 'string' && iconProduced && iconReferenced;
   row(10, '包名/应用名/图标三一致', okAll ? 'PASS' : 'FAIL',
     `pkg=${pkg} label=${label} versionCode=${vc} 材料=${iconMaterials ? '在' : '缺'} 物化=${iconProduced ? `15 位图+2 XML 在` : '缺，跑 node scripts/generate-icons.mjs'} Manifest引用=${iconReferenced}`);
 }

@@ -1,7 +1,7 @@
 # T2.7 模拟器验证 —— uv venv 与 pnpm lifecycle 平台边界（emulator-5554）
 
 > 日期：2026-11-05 · 设备：`emulator-5554`（Android 17 / API 37，x86_64 + libndk_translation/berberis）
-> 包：`org.fellow99.pi.PiDesktopAndroid` versionCode 1500 · 域：`u:r:untrusted_app_34:s0`（run-as 复现产品 env）
+> 包：`top.fellow99.pi.PiDesktopAndroid` versionCode 1500 · 域：`u:r:untrusted_app_34:s0`（run-as 复现产品 env）
 > 关联：`specs/112-cli-integration/{spec,plan,tasks,test-cases}.md`（TC-112-D-007 / D-008 / D-009）、`../git-commit-segfault/`
 > 方法：全程离线，夹具落 App 私有 `$TMPDIR`，结束 `rm -rf`；每个 CLI 调用放进 `( )` 子 shell 或独立 `sh -l -c`
 > （`.profile` 短名函数以 `exec` 收尾，会替换当前 shell，与产品「每条命令独立 login shell」语义一致）。

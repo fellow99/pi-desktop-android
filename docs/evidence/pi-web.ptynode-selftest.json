@@ -5,7 +5,7 @@
     {
       "step": "vendor-present",
       "ok": true,
-      "detail": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/pi-agent/extensions/android-pty/vendor/node-pty"
+      "detail": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/pi-agent/extensions/android-pty/vendor/node-pty"
     },
     {
       "step": "require-ptynode",

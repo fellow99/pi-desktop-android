@@ -1,7 +1,7 @@
 # 真域 `git commit` 段错误裁决（untrusted_app，API 37 模拟器）
 
 > 日期：2026-11-05 ｜ 设备：`emulator-5554`（Android 17 / API 37，x86_64 内核 + `libndk_translation`/berberis 翻译执行 arm64 ELF）
-> 包：`org.fellow99.pi.PiDesktopAndroid`（versionCode 1500）｜ git：**2.56.0**（`libgit_cli.so`，arm64 PIE）
+> 包：`top.fellow99.pi.PiDesktopAndroid`（versionCode 1500）｜ git：**2.56.0**（`libgit_cli.so`，arm64 PIE）
 > 结论性质：模拟器翻译层裁决；**原生 arm64 真机（小米 MIX，MIUI 门未解）对照保留到 P4**，本结论不能替代原生签收。
 
 ## 1. 一句话结论

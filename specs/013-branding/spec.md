@@ -2,7 +2,7 @@
 
 > **Module:** branding ｜ **Status:** Implemented ｜ **Last Updated:** 2026-11-14（R2）
 > **上游基线:** `pi` v1.2.0 / `pi-web` v0.12.1（品牌化实施轮次为 2026-10-30）
-> **应用名 / 包名:** **Pi Desktop** / `top.fellow99.pi.PiDesktopAndroid`（R2 由 `org.fellow99.pi.PiDesktopAndroid` 变更，见 §R2）
+> **应用名 / 包名:** **Pi Desktop** / `top.fellow99.pi.PiDesktopAndroid`（R2 由 `top.fellow99.pi.PiDesktopAndroid` 变更，见 §R2）
 > **需求编号:** `013-branding-r2` ｜ **日期:** 2026-11-14
 > **物料唯一来源:** 父工程 `../assets/`（`logo.svg`、`logo.png`、`logo-1024-with-bg.png`）
 > **规划依据:** [`../../docs/000-工程规划.md`](../../docs/000-工程规划.md) §头部表、G10、§16.3；[`../../docs/安卓环境能力清单-0.12.1.md`](../../docs/安卓环境能力清单-0.12.1.md) §H
@@ -127,9 +127,9 @@
 
 > **需求编号:** `013-branding-r2` ｜ **需求名称:** 包名修改 ｜ **Git 分支:** 不改动
 
-包名 / applicationId / namespace 由 `org.fellow99.pi.PiDesktopAndroid` 改为 **`top.fellow99.pi.PiDesktopAndroid`**：
+包名 / applicationId / namespace 由 `top.fellow99.pi.PiDesktopAndroid` 改为 **`top.fellow99.pi.PiDesktopAndroid`**：
 
-- 源码包目录 `app/src/main/java/org/fellow99/pi/PiDesktopAndroid/` 迁移至 `app/src/main/java/top/fellow99/pi/PiDesktopAndroid/`。
+- 源码包目录 `app/src/main/java/top/fellow99/pi/PiDesktopAndroid/` 迁移至 `app/src/main/java/top/fellow99/pi/PiDesktopAndroid/`。
 - `app/build.gradle.kts` 的 `namespace` 与 `applicationId` 同步更新。
 - 8 个 `.kt` 的 `package` 声明与内部 `import`（含 `R` 资源引用）同步更新；`org.fellow99.nodebridge.*` 外部依赖包名保持不变。
 - 版本号（`versionName` / `versionCode`）不变。

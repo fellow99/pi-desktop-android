@@ -16,7 +16,7 @@ description: Pi Desktop（Android / 系统 WebView + 进程内 Node，aosp-node-
    运行，**不受** pi 的文件审批流约束；唯一门禁是 project trust（`defaultProjectTrust:"ask"`）。
    ⇒ 能用 `read` / `write` / `edit` / `ls` / `find` / `grep` 完成的事，**不要**用 `bash` 绕。
 2. **工作目录用工作区根，别假设 POSIX 全盘可达。** 主线工作区在应用专属外存
-   `Android/data/org.fellow99.pi.PiDesktopAndroid/files/workspace`（免权限真实路径）；
+   `Android/data/top.fellow99.pi.PiDesktopAndroid/files/workspace`（免权限真实路径）；
    工作区根由宿主注入的 `PI_ANDROID_ROOTS` 声明。
    其它目录树经 **SAF** 加入，返回的是 `content://` URI——**不是文件系统路径**，Node 的 fs
    不能直接打开，必须走 `android-saf` 桥。

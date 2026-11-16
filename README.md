@@ -15,7 +15,7 @@
 | Item | Value |
 | --- | --- |
 | Edition | **Android Edition** (`pi-desktop-android`) |
-| Display name / application ID | **Pi Desktop** / `org.fellow99.pi.PiDesktopAndroid` (finalized 2026-10-24; the display name matches the `pi-desktop` / `…Ark` brand — only the package name carries "Android") |
+| Display name / application ID | **Pi Desktop** / `top.fellow99.pi.PiDesktopAndroid` (finalized 2026-10-24; the display name matches the `pi-desktop` / `…Ark` brand — only the package name carries "Android") |
 | Version / versionCode | **`0.17.0` / `1700`** (v0.17.0 release; debug+release APK built this round; device re-verification pending — the v0.15.0 round was device-verified on MIX / Android 8.0.0: install, launch, WebView UI, version badge `web 0.15.0 · pi 1.5.0`, passwordless loopback auth, DeepSeek key, sandbox workspace, text chat, vision image chat (DeepSeek V4.1 Flash), tool chain — bash `pwd`/write/read/`grep`/`ls` plus built-in git `init`/`add`/`commit`/`log`) |
 | Upstream baseline | `pi` **v1.5.2** + `pi-web` **v0.17.0** (six idempotent, reversible patches under `patches/v0.17.0/`) |
 | Backend | `io.github.fellow99:node-bridge` **0.2.0** (JNI direct-call host bridge) + a **provisioned** aosp-node-runtime engine `libnode.so` **v26.13.0** (`--with-intl=small-icu`; see *Engine note* below), in-process via `dlopen` + `node::Start` |
@@ -88,7 +88,7 @@ pi-desktop-android/
 │       ├── assets/
 │       │   ├── pi-web/pi-web.tar[.gz]       # payload archive (built artifact, not committed)
 │       │   └── webview/polyfill-webview.js  # Chrome 94 (old system WebView) ES2022/dvh polyfills
-│       ├── java/org/fellow99/pi/PiDesktopAndroid/
+│       ├── java/top/fellow99/pi/PiDesktopAndroid/
 │       │   ├── MainActivity.kt              # WebView shell: fence, file chooser, console forwarding, debug switch
 │       │   ├── PiApplication.kt
 │       │   ├── runtime/                     # PiDesktopRuntime, PayloadArchive, EngineFacts
@@ -144,7 +144,7 @@ Output: `app/build/outputs/apk/debug/app-debug.apk` (~181 MB: engine 81.5 MB + p
 ## Branding
 
 The display name is **Pi Desktop** (`res/values/strings.xml`; only the package id
-`org.fellow99.pi.PiDesktopAndroid` carries "Android"). All artwork comes from the
+`top.fellow99.pi.PiDesktopAndroid` carries "Android"). All artwork comes from the
 parent project's `../assets` (`logo.png`, `logo.svg`, `logo-1024-with-bg.png`) — nothing is
 drawn by hand, and a missing/invalid asset is a hard failure.
 
@@ -167,7 +167,7 @@ Note the payload stage is hard-linked for zero-copy speed, so branding replaces 
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n org.fellow99.pi.PiDesktopAndroid/.MainActivity
+adb shell am start -n top.fellow99.pi.PiDesktopAndroid/.MainActivity
 ```
 
 - First launch unpacks the payload (≈18 s measured for an 85 MB / 27k-file archive on the

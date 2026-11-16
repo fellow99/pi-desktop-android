@@ -5,7 +5,7 @@
 ## 分层
 
 ```
-┌─ APK（Pi Desktop / org.fellow99.pi.PiDesktopAndroid）──────────────────────────────┐
+┌─ APK（Pi Desktop / top.fellow99.pi.PiDesktopAndroid）──────────────────────────────┐
 │ app 模块                                                                            │
 │  ┌─ Kotlin 宿主（本工程）─────────────────────────────────────────────┐            │
 │  │ MainActivity（singleTask）                                          │            │

@@ -16,6 +16,6 @@
 | 6 | 优雅关停尽力而为（bridge 0.2.0 无 Node 侧 handle，如实登记） | ✅ |
 
 ## 实现锚点
-- `app/src/main/java/org/fellow99/pi/PiDesktopAndroid/runtime/PiDesktopRuntime.kt`
-- `app/src/main/java/org/fellow99/pi/PiDesktopAndroid/payload/PayloadArchive.kt`
+- `app/src/main/java/top/fellow99/pi/PiDesktopAndroid/runtime/PiDesktopRuntime.kt`
+- `app/src/main/java/top/fellow99/pi/PiDesktopAndroid/payload/PayloadArchive.kt`
 - 证据：`docs/002-真机验证记录.md`、`docs/evidence/`

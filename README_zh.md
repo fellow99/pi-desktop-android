@@ -14,7 +14,7 @@
 | 项 | 值 |
 | --- | --- |
 | 版别 | **Android Edition**（`pi-desktop-android`） |
-| 应用显示名 / 应用 ID | **Pi Desktop** / `org.fellow99.pi.PiDesktopAndroid`（2026-10-24 定稿；显示名与 `pi-desktop` / `…Ark` 品牌口径一致，仅包名带 Android） |
+| 应用显示名 / 应用 ID | **Pi Desktop** / `top.fellow99.pi.PiDesktopAndroid`（2026-10-24 定稿；显示名与 `pi-desktop` / `…Ark` 品牌口径一致，仅包名带 Android） |
 | 版本 / versionCode | **`0.17.0` / `1700`**（v0.17.0 发布版；本轮完成 debug/release APK 构建；设备复验待进行 —— v0.15.0 轮已在 MIX / Android 8.0.0 真机验证：安装、启动、WebView UI、版本徽标、loopback 免密、DeepSeek Key、沙箱工作区、文本对话、视觉图片对话（DeepSeek V4.1 Flash）、工具链 —— bash `pwd`/写/读/`grep`/`ls` 与内置 git `init`/`add`/`commit`/`log`） |
 | 上游基线 | `pi` **v1.5.2** + `pi-web` **v0.17.0**（`patches/v0.17.0/` 下 6 条幂等可反向补丁） |
 | 后端 | `io.github.fellow99:node-bridge` **0.2.0**（JNI 直调宿主桥）+ **投放制** aosp-node-runtime 引擎 `libnode.so` **v26.13.0**（`--with-intl=small-icu`，见下方「引擎说明」），进程内 `dlopen` + `node::Start` |
@@ -83,7 +83,7 @@ pi-desktop-android/
 │       ├── assets/
 │       │   ├── pi-web/pi-web.tar[.gz]       # 载荷归档（构建产物，不入库）
 │       │   └── webview/polyfill-webview.js  # Chrome 94（旧系统 WebView）ES2022/dvh 垫片
-│       ├── java/org/fellow99/pi/PiDesktopAndroid/
+│       ├── java/top/fellow99/pi/PiDesktopAndroid/
 │       │   ├── MainActivity.kt              # WebView 壳：围栏、文件选择、console 转发、调试开关
 │       │   ├── PiApplication.kt
 │       │   ├── runtime/                     # PiDesktopRuntime、PayloadArchive、EngineFacts
@@ -137,7 +137,7 @@ node scripts/assemble-payload.mjs --apply      # -> app/src/main/assets/pi-web/p
 
 ## 品牌化
 
-显示名为 **Pi Desktop**（`res/values/strings.xml`；只有应用 ID `org.fellow99.pi.PiDesktopAndroid`
+显示名为 **Pi Desktop**（`res/values/strings.xml`；只有应用 ID `top.fellow99.pi.PiDesktopAndroid`
 带 “Android”）。所有图标都来自父工程 `../assets`（`logo.png`、`logo.svg`、
 `logo-1024-with-bg.png`），不手绘，物料缺失/不可解析即硬失败。
 
@@ -157,7 +157,7 @@ node scripts/assemble-payload.mjs --apply      # -> app/src/main/assets/pi-web/p
 
 ```bash
 adb install -r app/build/outputs/apk/debug/app-debug.apk
-adb shell am start -n org.fellow99.pi.PiDesktopAndroid/.MainActivity
+adb shell am start -n top.fellow99.pi.PiDesktopAndroid/.MainActivity
 ```
 
 - 首启解包载荷（模拟器上 85 MB / 2.7 万文件实测约 **18 秒**；SHA-256 marker 使之后每次启动

@@ -87,4 +87,4 @@ WebView 历史 goBack 语义（READY 后不再使用）。
 ## 5. 实现锚点
 
 - `patches/v0.15.0/0008-system-back.patch`（pi-web `components/AppShell.tsx`）
-- `app/src/main/java/org/fellow99/pi/PiDesktopAndroid/MainActivity.kt`（`onBackPressed()`）
+- `app/src/main/java/top/fellow99/pi/PiDesktopAndroid/MainActivity.kt`（`onBackPressed()`）

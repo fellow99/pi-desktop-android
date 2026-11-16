@@ -13,7 +13,7 @@ Kotlin 宿主用**系统 WebView** 加载本进程内 Node 跑起的 `pi-web` �
 功能目标与 `pi-desktop-ark` 对齐，能力增量：前台服务（keep-alive）、进程内 pnpm 扩展、SAF 存储访问框架桥。
 上游 `pi-web` 补丁 **6 条**（`patches/v0.13.0/`）。
 
-- 显示名 / application ID：`Pi Desktop` / `org.fellow99.pi.PiDesktopAndroid`
+- 显示名 / application ID：`Pi Desktop` / `top.fellow99.pi.PiDesktopAndroid`
 - ABI：**`arm64-v8a` only**；minSdk / targetSdk / compileSdk = **24 / 36 / 36**
 - 版本：`0.13.0` / `versionCode` `1300`（tag `v0.13.0` 触发 GitHub Actions 构建**签名 APK 并发布 Release**）
 - 上游基线：`pi` **v1.4.0** + `pi-web` **v0.13.0**

@@ -81,7 +81,7 @@
         "atMs": 49
       }
     ],
-    "stdout": "/data/data/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload\ncwd_done",
+    "stdout": "/data/data/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/payload\ncwd_done",
     "stderr": "",
     "elapsedMs": 50,
     "exitCode": 0,

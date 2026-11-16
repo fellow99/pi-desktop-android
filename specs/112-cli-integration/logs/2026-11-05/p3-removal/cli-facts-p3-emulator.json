@@ -2,15 +2,15 @@
   "at": "2026-11-05T04:10:17.951Z",
   "domain": "app-untrusted（常驻 login shell sh -l 自动 source $HOME/.profile 的 CLI 函数 + 哨兵帧；短名经函数 exec 绝对 ELF，与 TERM/PTY/EXEC 同路径）",
   "env": {
-    "PATH": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/bin:/data/app/~~Ju-GzcIfPtklVKunZGwYsw==/org.fellow99.pi.PiDesktopAndroid-byRXAW_VbCk0-KxwnpoZ2w==/lib/arm64:/system/bin:/system/xbin",
-    "HOME": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge",
-    "TMPDIR": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/tmp",
-    "PYTHONHOME": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools",
-    "GIT_EXEC_PATH": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/gitexec",
-    "NODE_HOME": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/node-bridge-tools",
-    "PNPM_HOME": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/.local/share/pnpm",
-    "UV_CACHE_DIR": "/data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/.cache/uv",
-    "LD_LIBRARY_PATH": "/data/app/~~Ju-GzcIfPtklVKunZGwYsw==/org.fellow99.pi.PiDesktopAndroid-byRXAW_VbCk0-KxwnpoZ2w==/lib/arm64"
+    "PATH": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/bin:/data/app/~~Ju-GzcIfPtklVKunZGwYsw==/top.fellow99.pi.PiDesktopAndroid-byRXAW_VbCk0-KxwnpoZ2w==/lib/arm64:/system/bin:/system/xbin",
+    "HOME": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge",
+    "TMPDIR": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/tmp",
+    "PYTHONHOME": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools",
+    "GIT_EXEC_PATH": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/gitexec",
+    "NODE_HOME": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/node-bridge-tools",
+    "PNPM_HOME": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/.local/share/pnpm",
+    "UV_CACHE_DIR": "/data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/.cache/uv",
+    "LD_LIBRARY_PATH": "/data/app/~~Ju-GzcIfPtklVKunZGwYsw==/top.fellow99.pi.PiDesktopAndroid-byRXAW_VbCk0-KxwnpoZ2w==/lib/arm64"
   },
   "pathResolution": [
     {
@@ -121,7 +121,7 @@
       "code": 0,
       "timedOut": false,
       "ms": 3222,
-      "version": "pip 26.2.2 from /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools/lib/python",
+      "version": "pip 26.2.2 from /data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools/lib/python",
       "versionMatch": true,
       "error": null
     },
@@ -131,7 +131,7 @@
       "code": 0,
       "timedOut": false,
       "ms": 3223,
-      "version": "pip 26.2.2 from /data/user/0/org.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools/lib/python",
+      "version": "pip 26.2.2 from /data/user/0/top.fellow99.pi.PiDesktopAndroid/files/node-bridge/cli-tools/python-bridge-tools/lib/python",
       "versionMatch": true,
       "error": null
     },

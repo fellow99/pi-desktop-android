@@ -9,7 +9,7 @@
 |---|---|---|---|
 | S1-1 | Gradle/Kotlin 工程骨架 | `gradlew :app:assembleDebug` exit 0，产出 `app-debug.apk` | ✅（35 tasks BUILD SUCCESSFUL） |
 | S1-2 | 双 AAR 运行时接入 | APK `unzip -l` 含 `lib/arm64-v8a/libnode.so`(84,128,040B) + `libnode_bridge.so` + `libnode_host_client.so` | ✅（脚手架提交时断言） |
-| S1-3 | 身份定稿 | namespace/applicationId=`org.fellow99.pi.PiDesktopAndroid`，应用名 Pi Desktop | ✅ |
+| S1-3 | 身份定稿 | namespace/applicationId=`top.fellow99.pi.PiDesktopAndroid`，应用名 Pi Desktop | ✅ |
 | S1-4 | loopback 明文放行 | `network_security_config.xml` 仅 127.0.0.1/localhost cleartext | ✅（O3 实测页面可加载） |
 | S1-5 | 最小权限面 | Manifest 仅 INTERNET+ACCESS_NETWORK_STATE；无 G7 禁申请权限 | ✅ |
 

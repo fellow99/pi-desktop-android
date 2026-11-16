@@ -1,7 +1,7 @@
 # P3 移除纯 JS 替代 —— 模拟器验证证据（emulator-5554，API37 翻译层）
 
 > 日期：2026-11-05 · 设备：`emulator-5554`（Android 17 / API 37，x86_64 + libndk_translation/berberis）
-> 包：`org.fellow99.pi.PiDesktopAndroid` versionCode 1500 · 域：`u:r:untrusted_app_34:s0`（app-untrusted 真域）
+> 包：`top.fellow99.pi.PiDesktopAndroid` versionCode 1500 · 域：`u:r:untrusted_app_34:s0`（app-untrusted 真域）
 > 关联：`specs/112-cli-integration/{spec,plan,tasks}.md`、`logs/2026-11-05/git-commit-segfault/`
 
 ## 1. 打包契约（APK 解包机械验证）
