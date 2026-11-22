@@ -29,13 +29,26 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { pathToFileURL } = require('node:url');
 
-const HOME = os.homedir();
-const CONFIG_DIR = path.join(HOME, '.pi-desktop');
-const CONFIG_PATH = path.join(CONFIG_DIR, 'sync-daemon.json');
-const STATE_DIR = path.join(CONFIG_DIR, 'sync-daemon');
-const CONTROL_PATH = path.join(STATE_DIR, 'control.json');
-const LOG_PATH = path.join(STATE_DIR, 'logs', 'sync-runtime.log');
-const PLUGIN_ROOT = STATE_DIR;
+// 路径必须**延迟解析**：三端的环境装配（HOME）发生在本模块加载之后；
+// 在 require 时缓存 os.homedir() 会指向宿主默认目录，导致配置写到错误位置。
+function homeDir() {
+  return os.homedir();
+}
+function configPath() {
+  return path.join(homeDir(), '.pi-desktop', 'sync-daemon.json');
+}
+function stateDir() {
+  return path.join(homeDir(), '.pi-desktop', 'sync-daemon');
+}
+function controlPath() {
+  return path.join(stateDir(), 'control.json');
+}
+function logPath() {
+  return path.join(stateDir(), 'logs', 'sync-runtime.log');
+}
+function pluginRoot() {
+  return stateDir();
+}
 const DEFAULT_HOST_NAME = os.hostname() || 'pi-device';
 const SYNC_INTERVAL_MS = 30_000;
 const POLL_INTERVAL_MS = 2_500;
@@ -60,8 +73,8 @@ function log(level, message, detail) {
   const line = `${stamp()} ${level} ${message}${suffix}`;
   console.log(`[sync-runtime] ${message}${suffix}`);
   try {
-    fs.mkdirSync(path.dirname(LOG_PATH), { recursive: true });
-    fs.appendFileSync(LOG_PATH, `${line}\n`, 'utf8');
+    fs.mkdirSync(path.dirname(logPath()), { recursive: true });
+    fs.appendFileSync(logPath(), `${line}\n`, 'utf8');
   } catch {
     /* 日志失败不影响主链路 */
   }
@@ -97,7 +110,7 @@ function settingsFromFile(raw) {
 
 async function readConfig() {
   try {
-    const text = await fsp.readFile(CONFIG_PATH, 'utf8');
+    const text = await fsp.readFile(configPath(), 'utf8');
     const raw = JSON.parse(text);
     const parsed = settingsFromFile(raw);
     if (!parsed) {
@@ -147,7 +160,7 @@ function toFileConfig(input) {
     hub: { url: input.hubUrl, token: input.hubToken },
     host: { name: input.hostName },
     plugins: ['@pi-agent-hub/sync-plugin-pi-web'],
-    pluginRoot: PLUGIN_ROOT,
+    pluginRoot: pluginRoot(),
     pluginInstall: false,
     pluginAllowlist: ['@pi-agent-hub/*'],
     agents: {
@@ -165,7 +178,7 @@ function toFileConfig(input) {
 
 async function writeConfig(next) {
   await fsp.mkdir(CONFIG_DIR, { recursive: true });
-  const tmp = `${CONFIG_PATH}.tmp-${process.pid}`;
+  const tmp = `${configPath()}.tmp-${process.pid}`;
   const text = `${JSON.stringify(toFileConfig(next), null, 2)}\n`;
   await fsp.writeFile(tmp, text, { encoding: 'utf8', mode: 0o600 });
   try {
@@ -173,7 +186,7 @@ async function writeConfig(next) {
   } catch {
     /* Windows/部分沙箱不支持 chmod：文件系统 ACL 兜底 */
   }
-  await fsp.rename(tmp, CONFIG_PATH);
+  await fsp.rename(tmp, configPath());
 }
 
 async function loadPackages(piDistRoot) {
@@ -351,8 +364,8 @@ async function startDaemon(config, piDistRoot) {
     hub: instance.hub,
     manager,
     logger: instance.logger,
-    workDir: PLUGIN_ROOT,
-    stateDir: PLUGIN_ROOT,
+    workDir: pluginRoot(),
+    stateDir: pluginRoot(),
   });
   instance.manager = manager;
   instance.executor = executor;
@@ -489,8 +502,8 @@ function startControlServer() {
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();
       const port = address && typeof address === 'object' ? address.port : 0;
-      void fsp.mkdir(path.dirname(CONTROL_PATH), { recursive: true })
-        .then(() => fsp.writeFile(CONTROL_PATH, `${JSON.stringify({ port, token })}\n`, { encoding: 'utf8', mode: 0o600 }))
+      void fsp.mkdir(path.dirname(controlPath()), { recursive: true })
+        .then(() => fsp.writeFile(controlPath(), `${JSON.stringify({ port, token })}\n`, { encoding: 'utf8', mode: 0o600 }))
         .then(() => {
           controlServer = server;
           log('info', `控制面已就绪（127.0.0.1:${port}）`);
@@ -513,7 +526,7 @@ async function startSyncRuntime(options) {
     agentDir: options.agentDir,
     password: options.password || undefined,
   };
-  await fsp.mkdir(path.dirname(LOG_PATH), { recursive: true });
+  await fsp.mkdir(path.dirname(logPath()), { recursive: true });
   log('info', `同步运行时启动：piDist=${ctx.piDistRoot}｜server=${ctx.serverUrl}｜agentDir=${ctx.agentDir}`);
   try {
     await startControlServer();
@@ -541,7 +554,7 @@ async function stopSyncRuntime() {
       controlServer = null;
     }
     try {
-      await fsp.rm(CONTROL_PATH, { force: true });
+      await fsp.rm(controlPath(), { force: true });
     } catch {
       /* 忽略 */
     }
@@ -558,6 +571,4 @@ module.exports = {
   stopSyncRuntime,
   getSyncRuntimeSnapshot,
   POLL_INTERVAL_MS,
-  CONFIG_PATH,
-  CONTROL_PATH,
 };
