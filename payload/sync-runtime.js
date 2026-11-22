@@ -177,7 +177,7 @@ function toFileConfig(input) {
 }
 
 async function writeConfig(next) {
-  await fsp.mkdir(CONFIG_DIR, { recursive: true });
+  await fsp.mkdir(stateDir(), { recursive: true });
   const tmp = `${configPath()}.tmp-${process.pid}`;
   const text = `${JSON.stringify(toFileConfig(next), null, 2)}\n`;
   await fsp.writeFile(tmp, text, { encoding: 'utf8', mode: 0o600 });
