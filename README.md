@@ -224,8 +224,9 @@ is restored to pristine afterwards):
 | `0002-cwd-sandbox-root-from-android-roots` | Resolve the working directory / browser roots from `PI_ANDROID_ROOTS` |
 | `0003-cwd-adb-path-alias-normalize` | Normalize adb/host-style path aliases to sandbox-relative paths |
 | `0004-session-export-runtime-identity-guard` | Route session export through the in-process fallback when the runtime identity (`app_process`) cannot spawn Node |
-| `0005-directory-picker-contract` | Workspace-root tabs + the directory-picker contract fed by host roots (no hardcoded paths in the UI) |
-| `0006-directory-picker-permission-flow` | Split `EACCES`/`EPERM` from `ENOENT` → HTTP 403 + `canRequest`; `POST /api/host/perm` drives the system permission dialog |
+| `0005-directory-picker` | Workspace-root tabs + the directory-picker contract fed by host roots (no hardcoded paths in the UI); also splits `EACCES`/`EPERM` from `ENOENT` → HTTP 403 + `canRequest`, with `POST /api/host/perm` driving the system permission dialog (`0006` was merged into this file at v0.17.0) |
+| `0007-sync-daemon-settings-tab` | Adds the sync-daemon settings section (in-process control plane + `components/SyncConfig.tsx`) |
+| `0008-system-back` | Forwards the system back gesture to `pi-back` instead of exiting the app |
 
 ## Privacy and compliance
 

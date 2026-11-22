@@ -208,8 +208,9 @@ adb shell am start -n top.fellow99.pi.PiDesktopAndroid/.MainActivity
 | `0002-cwd-sandbox-root-from-android-roots` | 从 `PI_ANDROID_ROOTS` 解析工作目录 / 浏览根 |
 | `0003-cwd-adb-path-alias-normalize` | 把 adb/主机风格路径别名归一为沙箱相对路径 |
 | `0004-session-export-runtime-identity-guard` | 运行时身份为 `app_process`、无法 spawn Node 时，会话导出走进程内回退 |
-| `0005-directory-picker-contract` | 工作区根 Tab + 由宿主 roots 供数的目录选择器契约（前端零路径硬编码） |
-| `0006-directory-picker-permission-flow` | 把 `EACCES`/`EPERM` 与 `ENOENT` 分开 → HTTP 403 + `canRequest`；`POST /api/host/perm` 拉起系统授权窗 |
+| `0005-directory-picker` | 工作区根 Tab + 由宿主 roots 供数的目录选择器契约（前端零路径硬编码）；并把 `EACCES`/`EPERM` 与 `ENOENT` 分开 → HTTP 403 + `canRequest`，`POST /api/host/perm` 拉起系统授权窗（`0006` 已在 v0.17.0 并入本文件） |
+| `0007-sync-daemon-settings-tab` | 新增中枢服务设置分区（进程内控制面 + `components/SyncConfig.tsx`） |
+| `0008-system-back` | 把系统返回手势转发给 `pi-back`，而不是直接退出应用 |
 
 ## 隐私与合规
 
