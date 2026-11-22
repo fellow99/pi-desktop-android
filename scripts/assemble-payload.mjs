@@ -22,9 +22,10 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { createGzip, createGunzip } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { CROP_RULES, ruleMatchesFile, ruleMatchesDir, firstMatchingRule, assertKeepSound, describeRules } from '../scripts/crop-rules.mjs';
 
@@ -39,8 +40,28 @@ const ASSETS_PAYLOAD_DIR = path.join(PROJECT_ROOT, 'app', 'src', 'main', 'assets
 const DEFAULT_TAR = path.join(ASSETS_PAYLOAD_DIR, 'pi-web.tar.gz');
 const DEFAULT_VERSION = path.join(ASSETS_PAYLOAD_DIR, 'pi-web.version');
 const APP_PAYLOAD_DIR = path.join(PROJECT_ROOT, 'payload');
-const APP_PAYLOAD_ENTRIES = ['pi-web-launch.js', 'env.js', 'extensions', 'skills', 'config', 'jitless'];
+const APP_PAYLOAD_ENTRIES = ['pi-web-launch.js', 'sync-runtime.js', 'env.js', 'extensions', 'skills', 'config', 'jitless'];
 const TAR_ROOT = 'pi-web';
+/** 301：进程内中枢服务同步依赖（固定版本；随载荷 node_modules 分发）。 */
+const SYNC_DEP_PACKAGES = ['@pi-agent-hub/sync-daemon@0.1.2', '@pi-agent-hub/sync-plugin-pi-web@0.1.2'];
+
+function installSyncPackages(targetRoot) {
+  const dest = path.join(targetRoot, 'node_modules', '@pi-agent-hub');
+  if (fs.existsSync(path.join(dest, 'sync-plugin-pi-web', 'dist', 'plugin.js'))) return;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-sync-deps-'));
+  try {
+    execSync(`npm install --prefix "${tmp}" --no-save --no-package-lock --ignore-scripts --omit=dev ${SYNC_DEP_PACKAGES.join(' ')}`, {
+      stdio: 'inherit',
+      cwd: PROJECT_ROOT,
+      env: process.env,
+    });
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.cpSync(path.join(tmp, 'node_modules', '@pi-agent-hub'), dest, { recursive: true, force: true, dereference: true });
+    console.log('同步依赖    : 已注入 @pi-agent-hub（sync-daemon + sync-plugin-pi-web 0.1.2）');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
 
 /** 载荷里必须出现的补丁标记（编译产物是 webpack 产物；源码补丁必须重编才生效）。 */
 const PI_WEB_PATCH_MARKERS = [
@@ -49,7 +70,8 @@ const PI_WEB_PATCH_MARKERS = [
   { rel: '.next/server/app/api/cwd/validate/route.js', marker: 'pi-android-sandbox-alias' },
   { rel: '.next/server/app/api/sessions/[id]/export/route.js', marker: 'pi-hos-export-runtime-guard' },
   { rel: '.next/server/app/api/cwd/browse/route.js', marker: 'pi-hos-picker-contract' },
-  { rel: '.next/server/app/api/host/perm/route.js', marker: 'pi-hos-perm-manual' }
+  { rel: '.next/server/app/api/host/perm/route.js', marker: 'pi-hos-perm-manual' },
+  { rel: '.next/server/app/api/sync-daemon/route.js', marker: 'pi-sync-daemon-route-v1' }
 ];
 
 function human(bytes) {
@@ -529,6 +551,7 @@ async function main() {
       if (!fs.existsSync(from)) throw new AssembleError(`壳资产缺失：${from}`);
       await fsp.cp(from, path.join(stageRoot, entry), { recursive: true, force: true });
     }
+    installSyncPackages(stageRoot);
     console.log(`壳资产      : ${APP_PAYLOAD_ENTRIES.join(', ')} → stage`);
 
     // ⑤a 运行期配置 next.config.js（真机根因，2026-10-29）：载荷内不含 @next/swc-* 原生

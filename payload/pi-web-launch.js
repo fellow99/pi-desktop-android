@@ -81,6 +81,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const envContract = require('./env.js');
+const syncRuntime = require('./sync-runtime.js');
 
 // ── 常量（与旧壳同口径的部分标注出处）─────────────────────────────────────────
 const TAG = '[pi-web]';
@@ -519,7 +520,13 @@ function registerShutdownHook(payloadRoot) {
 async function closeServer(reason) {
   if (shuttingDown) return;
   shuttingDown = true;
-  log(`收到关停请求（reason=${reason}）：调用 server.close() …`);
+  log(`收到关停请求（reason=${reason}）：先停止中枢服务同步，再调用 server.close() …`);
+  try {
+    await syncRuntime.stopSyncRuntime();
+    log('中枢服务同步已停止');
+  } catch (err) {
+    logWarn(`停止中枢服务同步失败：${describeError(err)}`);
+  }
   if (typeof closer !== 'function') {
     logWarn('没有可用的 server 句柄：无法优雅关闭监听（已知限制；监听端口随进程退出释放）');
     return;
@@ -1509,6 +1516,18 @@ async function main() {
   await waitForReady(hostname, port);
   readyPort = port;
   writeReadyMarker(port, hostname, payloadRoot);
+
+  // 301：pi-web 就绪后非阻塞启动中枢服务同步（同进程 daemon + 插件；失败不影响首屏）。
+  try {
+    void syncRuntime.startSyncRuntime({
+      piDistRoot: payloadRoot,
+      serverUrl: `http://${hostname}:${port}`,
+      agentDir: process.env.PI_CODING_AGENT_DIR || path.join(homeDir(), 'agent'),
+      password: process.env.PI_WEB_PASSWORD,
+    });
+  } catch (err) {
+    logWarn(`中枢服务同步启动失败（不影响首屏）：${describeError(err)}`);
+  }
   log(`本进程已就绪：http://${hostname}:${port}/（同源 HTTP + SSE；ArkWeb 侧 loadUrl 目标）`);
   log(`日志读回：ArkTS 诊断面板用 Logger.tail(logPath)，或 hdc fport 后 curl /log（node.log ↔ app.log 双通道）`);
 
