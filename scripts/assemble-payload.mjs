@@ -313,7 +313,48 @@ async function copyCropped(fromDir, toDir, label, matchPrefix) {
   return { copiedFiles, croppedFiles, counts };
 }
 /** 用打了补丁的源码重编 pi-web，并把 .next 镜像进 PI_DIST（先清空再镜像）。 */
+/**
+ * 依赖树与 lock 的口径是否一致（构建前置门禁）。
+ *
+ * 为什么需要：本脚本会直接用 `../pi-web/node_modules` 里的 next 编译 `.next`。
+ * 上游 tag 一升（0.17.0 → 0.18.0 带 next 16.4.4 → 16.4.6、pi 1.5.2 → 1.6.0），
+ * 旧 node_modules 会让整轮「升级」静默落空：构建成功、产物仍是上一版依赖。
+ * 桌面端与 hos 端已在各自的 prepare-next 里加了同一道门禁，这里补齐鸿蒙/安卓两条路径。
+ */
+function assertDependencyTreeMatchesLock(piWebRoot) {
+  const lockPath = path.join(piWebRoot, 'package-lock.json');
+  if (!fs.existsSync(lockPath)) return;
+  let locked;
+  try {
+    locked = JSON.parse(fs.readFileSync(lockPath, 'utf8')).packages || {};
+  } catch {
+    return;
+  }
+  const stale = [];
+  for (const name of Object.keys(locked)) {
+    if (!name.startsWith('node_modules/')) continue;
+    const installedPkg = path.join(piWebRoot, name, 'package.json');
+    if (!fs.existsSync(installedPkg)) continue;
+    let actual;
+    try {
+      actual = JSON.parse(fs.readFileSync(installedPkg, 'utf8')).version;
+    } catch {
+      continue;
+    }
+    const want = locked[name] ? locked[name].version : undefined;
+    if (want && actual !== want) stale.push(`${name} 已装 ${actual}，lock 为 ${want}`);
+  }
+  if (stale.length > 0) {
+    throw new Error(
+      `../pi-web 依赖树与 package-lock.json 不一致，拒绝用旧依赖编译：\n  ${stale.slice(0, 8).join('\n  ')}\n` +
+      '    → 先在 ../pi-web 跑 `npm ci`，再重跑本脚本',
+    );
+  }
+  console.log(`依赖门禁    : ../pi-web 安装树与 package-lock.json 一致 ✔`);
+}
+
 async function rebuildPiWebInto(opts) {
+  assertDependencyTreeMatchesLock(opts.piWeb);
   const nextBin = path.join(opts.piWeb, 'node_modules', 'next', 'dist', 'bin', 'next');
   if (!fs.existsSync(nextBin)) throw new AssembleError(`找不到 next 入口：${nextBin}`);
   console.log(`载荷刷新    : PI_DIST 缺少补丁标记 ⇒ 用打了补丁的源码重新编译`);
