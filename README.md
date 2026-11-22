@@ -16,8 +16,8 @@
 | --- | --- |
 | Edition | **Android Edition** (`pi-desktop-android`) |
 | Display name / application ID | **Pi Desktop** / `top.fellow99.pi.PiDesktopAndroid` (finalized 2026-10-24; the display name matches the `pi-desktop` / `…Ark` brand — only the package name carries "Android") |
-| Version / versionCode | **`0.17.0` / `1700`** (v0.17.0 release; debug+release APK built this round; device re-verification pending — the v0.15.0 round was device-verified on MIX / Android 8.0.0: install, launch, WebView UI, version badge `web 0.15.0 · pi 1.5.0`, passwordless loopback auth, DeepSeek key, sandbox workspace, text chat, vision image chat (DeepSeek V4.1 Flash), tool chain — bash `pwd`/write/read/`grep`/`ls` plus built-in git `init`/`add`/`commit`/`log`) |
-| Upstream baseline | `pi` **v1.5.2** + `pi-web` **v0.17.0** (six idempotent, reversible patches under `patches/v0.17.0/`) |
+| Version / versionCode | **`0.18.0` / `1800`** (v0.18.0 release; debug+release APK built this round; device re-verification pending — the v0.15.0 round was device-verified on MIX / Android 8.0.0: install, launch, WebView UI, version badge `web 0.15.0 · pi 1.5.0`, passwordless loopback auth, DeepSeek key, sandbox workspace, text chat, vision image chat (DeepSeek V4.1 Flash), tool chain — bash `pwd`/write/read/`grep`/`ls` plus built-in git `init`/`add`/`commit`/`log`) |
+| Upstream baseline | `pi` **v1.6.0** + `pi-web` **v0.18.0** (seven idempotent, reversible patches under `patches/v0.18.0/`) |
 | Backend | `io.github.fellow99:node-bridge` **0.2.0** (JNI direct-call host bridge) + a **provisioned** aosp-node-runtime engine `libnode.so` **v26.13.0** (`--with-intl=small-icu`; see *Engine note* below), in-process via `dlopen` + `node::Start` |
 | Frontend | System WebView loading `http://127.0.0.1:<random-port>/` (same-origin HTTP + SSE; loopback is a secure context) |
 | ABI | **`arm64-v8a` only** (the engine ships a single ABI) |
@@ -110,7 +110,7 @@ pi-desktop-android/
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # pure-JS compatibility layer, activated only if WebAssembly is absent
-├── patches/v0.17.0/                         # six idempotent pi-web patches (0001–0006)
+├── patches/v0.18.0/                         # seven idempotent pi-web patches (0001–0008; 0006 merged into 0005)
 ├── scripts/                                 # assemble-payload · crop-rules · provision-engine/pty · devtest · sync
 ├── docs/                                    # 000 plan · capability inventory · device records · privacy draft
 ├── specs/                                   # 1NN module specs
@@ -215,7 +215,7 @@ See [`skills/android-runtime-capabilities/SKILL.md`](payload/skills/android-runt
 
 ## Patches to upstream pi-web
 
-Six idempotent, reversible patches (auto-applied during payload assembly; the pi-web working tree
+Seven idempotent, reversible patches (auto-applied during payload assembly; the pi-web working tree
 is restored to pristine afterwards):
 
 | Patch | Purpose |
