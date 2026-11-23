@@ -46,6 +46,23 @@ Kotlin 宿主用**系统 WebView** 加载本进程内 Node 跑起的 `pi-web` �
 
 > 具体命令与 SDK/签名环境参 see README 与 `docs/000-工程规划.md`。
 
+## 三之二、CI 依赖安装口径与「依赖版本门禁」铁律
+
+> 来源：0.18.0 轮 CI **run #26 失败**（`assemble-payload` 在 `rebuildPiWebInto` 处 FATAL）。
+
+| 事实 | 说明 |
+|---|---|
+| CI 装 pi-web 依赖的方式 | **`pnpm install --dir ../pi-web --lockfile=false`**（见 `.github/workflows/build-release.yml`）—— 上游 pi-web **不带 pnpm lock**，所以是非冻结安装 |
+| 后果 | `^` 范围包会合法浮动（例：`@alloc/quick-lru` `^5.2.0` → 实装 **5.3.0**，而 `package-lock.json` 记 **5.2.0**） |
+| 本地装依赖的方式 | `npm ci`（与 `package-lock.json` 逐条一致） |
+
+**铁律：任何"依赖版本门禁"只允许校验 `pi-web/package.json` 里「精确钉住」的直连依赖**
+（spec 无 `^` / `~` / `*`，当前 **19 项**：`next@16.4.6`、`@earendil-works/*@1.6.0`、`node-pty`、`undici`、`semver`、`typebox` 等）。
+
+- ❌ **禁止**拿 `package-lock.json` 逐条比对整棵安装树，也禁止比对 `node_modules/**` 全量 —— 在 CI 的 pnpm 路径上必然误报，把可用构建判成失败。
+- ✅ 判据意义：精确钉住项在 `npm ci` 与 `pnpm --lockfile=false` 下**都**落到同一版本，正好等价于「装的是当前上游 tag 那套基线」—— 这才是门禁真正要保证的东西。
+- 实现见 `scripts/assemble-payload.mjs` 的 `assertDependencyTreeMatchesLock()`；**改这条门禁前先读它的注释**，那里写了完整失败史。
+
 ## 四、规格文档（specs）
 
 - 编号：`0XX` 公共模块（011 版本 / 012 构建工作流 / 013 品牌化）· `1XX` 基础模块·
