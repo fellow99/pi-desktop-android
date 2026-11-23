@@ -314,26 +314,33 @@ async function copyCropped(fromDir, toDir, label, matchPrefix) {
 }
 /** 用打了补丁的源码重编 pi-web，并把 .next 镜像进 PI_DIST（先清空再镜像）。 */
 /**
- * 依赖树与 lock 的口径是否一致（构建前置门禁）。
+ * 依赖树是否来自「正确的上游版本」（构建前置门禁）。
  *
- * 为什么需要：本脚本会直接用 `../pi-web/node_modules` 里的 next 编译 `.next`。
+ * 为什么需要：本脚本直接用 `../pi-web/node_modules` 里的 next 编译 `.next`。
  * 上游 tag 一升（0.17.0 → 0.18.0 带 next 16.4.4 → 16.4.6、pi 1.5.2 → 1.6.0），
  * 旧 node_modules 会让整轮「升级」静默落空：构建成功、产物仍是上一版依赖。
- * 桌面端与 hos 端已在各自的 prepare-next 里加了同一道门禁，这里补齐鸿蒙/安卓两条路径。
+ *
+ * 判据只取 pi-web **精确钉住**的直连依赖（`next`、`@earendil-works/*` 等，spec 无 `^`/`~`）。
+ * 为什么不是整棵 lock：安装方式不同，浮动范围包必然版本不同 ——
+ * CI 用 `pnpm install --lockfile=false`（上游无 pnpm lock），`^5.2.0` 会装到 5.3.0，
+ * 与 npm 的 `package-lock.json`（5.2.0）不同**且合法**。早期版本拿整棵 lock 逐条比对，
+ * 在 CI 上直接把可用构建判成失败（0.18.0 轮踩中）。精确钉住的包则两种安装方式都落到同一版本。
  */
 function assertDependencyTreeMatchesLock(piWebRoot) {
-  const lockPath = path.join(piWebRoot, 'package-lock.json');
-  if (!fs.existsSync(lockPath)) return;
-  let locked;
+  const pkgPath = path.join(piWebRoot, 'package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  let pkg;
   try {
-    locked = JSON.parse(fs.readFileSync(lockPath, 'utf8')).packages || {};
+    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
   } catch {
     return;
   }
+  const pinned = { ...(pkg.dependencies || {}), ...(pkg.devDependencies || {}) };
   const stale = [];
-  for (const name of Object.keys(locked)) {
-    if (!name.startsWith('node_modules/')) continue;
-    const installedPkg = path.join(piWebRoot, name, 'package.json');
+  let checked = 0;
+  for (const [name, spec] of Object.entries(pinned)) {
+    if (typeof spec !== 'string' || !/^\d+\.\d+\.\d+([-+].*)?$/.test(spec)) continue;
+    const installedPkg = path.join(piWebRoot, 'node_modules', name, 'package.json');
     if (!fs.existsSync(installedPkg)) continue;
     let actual;
     try {
@@ -341,16 +348,18 @@ function assertDependencyTreeMatchesLock(piWebRoot) {
     } catch {
       continue;
     }
-    const want = locked[name] ? locked[name].version : undefined;
-    if (want && actual !== want) stale.push(`${name} 已装 ${actual}，lock 为 ${want}`);
+    checked += 1;
+    if (actual !== spec) stale.push(`${name} 已装 ${actual}，要求 ${spec}`);
   }
   if (stale.length > 0) {
     throw new Error(
-      `../pi-web 依赖树与 package-lock.json 不一致，拒绝用旧依赖编译：\n  ${stale.slice(0, 8).join('\n  ')}\n` +
-      '    → 先在 ../pi-web 跑 `npm ci`，再重跑本脚本',
+      `../pi-web 安装的依赖与精确钉住的基线不一致，拒绝用错版本编译：
+  ${stale.slice(0, 8).join('\n  ')}
+` +
+      '    → 先在 ../pi-web 重装依赖（`npm ci`，或 CI 上的 pnpm 流程），再重跑本脚本',
     );
   }
-  console.log(`依赖门禁    : ../pi-web 安装树与 package-lock.json 一致 ✔`);
+  console.log(`依赖门禁    : ../pi-web 精确钉住的 ${checked} 项依赖与基线一致 ✔`);
 }
 
 async function rebuildPiWebInto(opts) {
