@@ -20,19 +20,6 @@
 | `0003-cwd-adb-path-alias-normalize` | 无冲突，重新生成 |
 | `0004-session-export-runtime-identity-guard` | **删除冗余 hunk 片段**：上游 #1695 已自行加 `/* webpackIgnore: true */`，本轮保留首 hunk 与 `console.warn` 诊断块，删去重复的 import 行改写与 4 行中文说明 |
 | `0005-directory-picker` | 无冲突，重新生成 |
-| `0007-sync-daemon-settings-tab` | 无冲突，重新生成 |
 | `0008-system-back` | 无冲突，重新生成 |
 
-## 附录：P301-A1 — 中枢服务设置分区（2026-11-22）
-
-| 项 | 内容 |
-|---|---|
-| 文件 | `patches/v0.18.0/0007-sync-daemon-settings-tab.patch` |
-| 全局编号 | `P301-A1` |
-| 打补丁的上游 | `pi-web` tag `v0.18.0` |
-| 内容 | `lib/settings-navigation.ts`（加 `sync`）、`components/SettingsPanel.tsx`（分区项/渲染）、新增 `components/SyncConfig.tsx`（fetch `/api/sync-daemon`）、新增 `app/api/sync-daemon/route.ts`（代理进程内控制面）、三套 `lib/i18n/messages/*.ts` |
-| 触发条件 | 301 第三轮：pi-desktop-android 无可用子进程，sync-daemon 与插件改为**进程内**运行；设置入口统一到 pi-web 设置对话框 |
-| 实施时机 | `assemble-payload.mjs` / `collect-pi.mjs` 构建期幂等应用，构建后回退（`../pi-web` 保持 pristine） |
-| 替代方案 | 原生设置页（重复建设，否决）；运行时 DOM 注入（依赖上游结构、升级静默失效，否决） |
-| 回退方式 | `git -C ../pi-web apply --reverse patches/v0.18.0/0007-sync-daemon-settings-tab.patch` |
-| 规格 | `specs/301-sync-daemon/{spec,plan}.md` |
+> **301 退场（2026-11-24）**：`0007-sync-daemon-settings-tab` 已移除 —— 中枢服务（`301-sync-daemon`）对接由 `pi-desktop` 单独提供，本工程不再内嵌 sync-daemon、不再随载荷分发 `@pi-agent-hub/*`；补丁目录保留编号空洞（0006 早已并入 0005，0007 本轮退役），既有编号不复用。

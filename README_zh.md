@@ -16,7 +16,7 @@
 | 版别 | **Android Edition**（`pi-desktop-android`） |
 | 应用显示名 / 应用 ID | **Pi Desktop** / `top.fellow99.pi.PiDesktopAndroid`（2026-10-24 定稿；显示名与 `pi-desktop` / `…Ark` 品牌口径一致，仅包名带 Android） |
 | 版本 / versionCode | **`0.18.0` / `1800`**（v0.18.0 发布版；本轮完成 debug/release APK 构建；设备复验待进行 —— v0.15.0 轮已在 MIX / Android 8.0.0 真机验证：安装、启动、WebView UI、版本徽标、loopback 免密、DeepSeek Key、沙箱工作区、文本对话、视觉图片对话（DeepSeek V4.1 Flash）、工具链 —— bash `pwd`/写/读/`grep`/`ls` 与内置 git `init`/`add`/`commit`/`log`） |
-| 上游基线 | `pi` **v1.6.0** + `pi-web` **v0.18.0**（`patches/v0.18.0/` 下 7 条幂等可反向补丁） |
+| 上游基线 | `pi` **v1.6.0** + `pi-web` **v0.18.0**（`patches/v0.18.0/` 下 6 条幂等可反向补丁） |
 | 后端 | `io.github.fellow99:node-bridge` **0.2.0**（JNI 直调宿主桥）+ **投放制** aosp-node-runtime 引擎 `libnode.so` **v26.13.0**（`--with-intl=small-icu`，见下方「引擎说明」），进程内 `dlopen` + `node::Start` |
 | 前端 | 系统 WebView 加载 `http://127.0.0.1:<随机端口>/`（同源 HTTP + SSE；loopback 即安全上下文） |
 | ABI | **仅 `arm64-v8a`**（引擎只出单 ABI） |
@@ -105,7 +105,7 @@ pi-desktop-android/
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # 纯 JS 兼容层，仅当 WebAssembly 不存在时启用
-├── patches/v0.18.0/                         # 7 条幂等 pi-web 补丁（0001–0008；0006 已并入 0005）
+├── patches/v0.18.0/                         # 6 条幂等 pi-web 补丁（0001–0008；0006 已并入 0005、0007 已退役）
 ├── scripts/                                 # assemble-payload · crop-rules · provision-engine/pty · devtest · sync
 ├── docs/                                    # 000 规划 · 能力清单 · 真机记录 · 隐私草稿
 ├── specs/                                   # 1NN 模块规格
@@ -209,7 +209,6 @@ adb shell am start -n top.fellow99.pi.PiDesktopAndroid/.MainActivity
 | `0003-cwd-adb-path-alias-normalize` | 把 adb/主机风格路径别名归一为沙箱相对路径 |
 | `0004-session-export-runtime-identity-guard` | 运行时身份为 `app_process`、无法 spawn Node 时，会话导出走进程内回退 |
 | `0005-directory-picker` | 工作区根 Tab + 由宿主 roots 供数的目录选择器契约（前端零路径硬编码）；并把 `EACCES`/`EPERM` 与 `ENOENT` 分开 → HTTP 403 + `canRequest`，`POST /api/host/perm` 拉起系统授权窗（`0006` 已在 v0.17.0 并入本文件） |
-| `0007-sync-daemon-settings-tab` | 新增中枢服务设置分区（进程内控制面 + `components/SyncConfig.tsx`） |
 | `0008-system-back` | 把系统返回手势转发给 `pi-back`，而不是直接退出应用 |
 
 ## 隐私与合规
