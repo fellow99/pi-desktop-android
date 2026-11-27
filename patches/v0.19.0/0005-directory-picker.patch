@@ -1,0 +1,969 @@
+diff --git a/app/api/cwd/browse/route.ts b/app/api/cwd/browse/route.ts
+index dea1362a..c7a637b4 100644
+--- a/app/api/cwd/browse/route.ts
++++ b/app/api/cwd/browse/route.ts
+@@ -3,17 +3,35 @@ import { stat } from "fs/promises";
+ import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
+ import { describePathForms, normalizeAndroidSandboxPath } from "@/lib/android-sandbox-path";
+ import {
+-  createDirectory,
++  createDirectoryAuto,
++  findEnclosingPickerRoot,
+   findWorkspaceRoot,
+   getBrowseStartDirectory,
+   getParentDirectory,
++  getPickerRoots,
+   getWorkspaceRoots,
+-  listDirectories,
++  listDirectoriesLimited,
+   listWindowsDrives,
++  MAX_DIRECTORY_ENTRIES,
++  PICKER_CONTRACT_MARKER,
+   resolveDirectory,
+   shouldShowWindowsDrivePicker,
+ } from "@/lib/directory-browser";
+ 
++/**
++ * 每次 `GET` 都带回的「选择器契约」头（FR-203-005/009）：Tab 根清单 + 条目上限 + 契约标记。
++ *
++ * 根清单只在这里出现 —— 前端不得硬编码任何路径，Tab 就是 `roots` 的渲染；条目上限也
++ * 只由服务端给，提示文案里的「500」不必在客户端再写一遍。
++ */
++function pickerContract() {
++  return {
++    contract: PICKER_CONTRACT_MARKER,
++    roots: getPickerRoots().map((root) => ({ id: root.id, label: root.label })),
++    entryLimit: MAX_DIRECTORY_ENTRIES,
++  };
++}
++
+ /**
+  * 宿主声明的某个主目录（`?root=<id>`）的入口。
+  *
+@@ -23,34 +41,99 @@ import {
+  * `haps/<module>`，必然 404）的那条路。未知 id 必须报错而不是回退到别的根 —— 静默
+  * 换成另一个目录会让「选中的是哪里」无从判断。
+  */
++/**
++ * 主目录 → 需要的存储权限（Android 需求 203 方案 A：All-files 一个门覆盖文档/下载）。
++ *
++ * 由**服务端**给出权限名：前端只认 `permission` 字段，不硬编码任何权限字面量
++ * （与「前端零路径硬编码」同一条纪律）。
++ */
++function permissionForRoot(rootId: string): string | null {
++  // Android（需求 203 方案 A）：文档/下载共享存储根共用一个授权门（API30+ All-files / API24-29 运行时存储权限）。
++  if (rootId === "documents" || rootId === "download") return "android.permission.MANAGE_EXTERNAL_STORAGE";
++  return null;
++}
++
++/** 无权限时回 403：带 `permission` + `canRequest`，前端据此显示「请求权限 / 刷新」。 */
++function permissionDenied(rootId: string, rootPath: string): NextResponse {
++  const permission = permissionForRoot(rootId);
++  return NextResponse.json(
++    {
++      error: "Permission denied",
++      code: "EACCES",
++      rootId,
++      rootPath,
++      permission,
++      canRequest: permission !== null,
++      ...pickerContract(),
++    },
++    { status: 403 },
++  );
++}
++
+ async function browseDeclaredRoot(rootId: string): Promise<NextResponse> {
+   const root = findWorkspaceRoot(rootId);
+   if (!root) {
+     return NextResponse.json(
+-      { error: "Unknown workspace root", rootId, declared: getWorkspaceRoots().map((entry) => entry.id) },
++      {
++        error: "Unknown workspace root",
++        rootId,
++        declared: getWorkspaceRoots().map((entry) => entry.id),
++        ...pickerContract(),
++      },
+       { status: 400 },
+     );
+   }
+   let resolved: string;
+   try {
+     resolved = await resolveDirectory(root.path);
+-  } catch {
++  } catch (error) {
++    // 共享存储未授权（EACCES/EPERM）与「真的不存在」必须分开：前者回 403 + permission。
++    const code = (error as NodeJS.ErrnoException)?.code ?? "";
++    if (code === "EACCES" || code === "EPERM") {
++      return permissionDenied(root.id, root.path);
++    }
+     // 已声明但不存在：把「是谁声明的、声明成什么」一起回给调用方（宿主应建它）。
++    // Tab 清单照旧带回 —— 否则某个根（如尚未授权的「桌面」）一 404，整行 Tab 就没了。
+     return NextResponse.json(
+-      { error: "Directory does not exist", code: "ENOENT", rootId: root.id, rootPath: root.path },
++      {
++        error: "Directory does not exist",
++        code: "ENOENT",
++        rootId: root.id,
++        rootPath: root.path,
++        ...pickerContract(),
++      },
+       { status: 404 },
+     );
+   }
+   const rootStat = await stat(resolved);
+   if (!rootStat.isDirectory()) {
+-    return NextResponse.json({ error: "Path is not a directory", rootId: root.id, rootPath: resolved }, { status: 400 });
++    return NextResponse.json(
++      { error: "Path is not a directory", rootId: root.id, rootPath: resolved, ...pickerContract() },
++      { status: 400 },
++    );
++  }
++  // 目录存在但「不可列举」同样按无权限处理（真机上 documents/download 正是这种形态）。
++  let listing: Awaited<ReturnType<typeof listDirectoriesLimited>>;
++  try {
++    listing = await listDirectoriesLimited(resolved);
++  } catch (error) {
++    const code = (error as NodeJS.ErrnoException)?.code ?? "";
++    if (code === "EACCES" || code === "EPERM") {
++      return permissionDenied(root.id, root.path);
++    }
++    throw error;
+   }
+   return NextResponse.json({
+     rootId: root.id,
+     rootPath: resolved,
+     path: resolved,
+-    parentPath: getParentDirectory(resolved),
+-    directories: await listDirectories(resolved),
++    // 主目录根就是围栏的底（FR-203-008）：到根时父目录为 null，且由**服务端**给出，
++    // 前端只是照着渲染，不靠藏按钮。
++    parentPath: null,
++    directories: listing.directories,
++    truncated: listing.truncated,
++    total: listing.total,
++    ...pickerContract(),
+   });
+ }
+ 
+@@ -70,6 +153,7 @@ export async function GET(request: NextRequest) {
+         parentPath: null,
+         drives: await listWindowsDrives(),
+         directories: [],
++        ...pickerContract(),
+       });
+     }
+ 
+@@ -90,12 +174,22 @@ export async function GET(request: NextRequest) {
+       return NextResponse.json({ error: "Path is not a directory" }, { status: 400 });
+     }
+ 
+-    const directories = await listDirectories(resolved);
++    const listing = await listDirectoriesLimited(resolved);
++
++    // 围栏（FR-203-008）：这个路径若落在某个主目录根之内，父目录不许越过该根；
++    // 正好停在根上时父目录为 null。判断在服务端做，前端只渲染 `parentPath`。
++    const fence = await findEnclosingPickerRoot(resolved);
++    const parentPath = fence?.exact ? null : getParentDirectory(resolved);
+ 
+     return NextResponse.json({
+       path: resolved,
+-      parentPath: getParentDirectory(resolved),
+-      directories,
++      parentPath,
++      directories: listing.directories,
++      truncated: listing.truncated,
++      total: listing.total,
++      rootId: fence?.id ?? null,
++      rootPath: fence?.path ?? null,
++      ...pickerContract(),
+     });
+   } catch (error) {
+     return NextResponse.json({ error: String(error) }, { status: 500 });
+@@ -126,7 +220,9 @@ export async function POST(request: Request) {
+       return NextResponse.json({ error: "Directory name is required" }, { status: 400 });
+     }
+ 
+-    const createdPath = await createDirectory(parentPath, name);
++    // FR-203-011/012：默认名（`未命名文件夹` / `Untitled folder`）同级重名时自动去重为
++    // `… 2`、`… 3`…；其它名字保持上游语义（重名 → EEXIST → 409，前端在 Modal 内提示并保留输入态）。
++    const createdPath = await createDirectoryAuto(parentPath, name);
+     return NextResponse.json({ success: true, path: createdPath });
+   } catch (error) {
+     const code = error && typeof error === "object" && "code" in error
+diff --git a/app/api/host/perm/route.ts b/app/api/host/perm/route.ts
+new file mode 100644
+index 00000000..ac1ed081
+--- /dev/null
++++ b/app/api/host/perm/route.ts
+@@ -0,0 +1,115 @@
++import { NextResponse } from "next/server";
++import { join } from "path";
++import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
++
++/**
++ * POST /api/host/perm — 让**页面**触发一次存储授权（需求 203：文档/下载根，FR-AND-203-006）。
++ *
++ * 为什么需要这条路由：授权动作只能由 Kotlin 宿主（`HostCapabilities.perm.request`）发起
++ * （API30+ 跳 All-files 设置页 / API24-29 弹系统运行时权限），而"用户点了『请求权限』按钮"
++ * 这件事发生在浏览器里。两侧的唯一通道是库的文件信箱（`host.js` 的 `invoke`，E18），
++ * 因此这条路由只做「转发 + 白名单」两件事，不引入任何新的传输实现。
++ *
++ * 允许清单是**白名单**：只放存储类权限（G7.1 特例）。任何人都不能借这条路由去请求
++ * 别的权限 —— 那会变成"随便给任意权限弹窗"的后门。
++ */
++export const dynamic = "force-dynamic";
++
++/** 产物标记：`assemble-payload` 用它判断载荷里的 .next 是否已包含本补丁。 */
++const PERM_FLOW_MARKER = "pi-hos-perm-manual";
++
++const ALLOWED_PERMISSIONS = new Set([
++  // Android 需求 203 方案 A：一条存储权限门（Kotlin 侧按 SDK 分派 All-files 设置页 / 运行时权限）。
++  "android.permission.MANAGE_EXTERNAL_STORAGE",
++]);
++
++type PermRequestResult = {
++  requested?: number;
++  granted?: number;
++  denied?: number;
++  results?: Array<{ permission?: string; authResult?: number; granted?: boolean }>;
++};
++
++export async function POST(request: Request) {
++  if (!isApiRequestAllowed(request) || !hasJsonContentType(request)) {
++    return NextResponse.json({ error: "Permission request is not allowed" }, { status: 403 });
++  }
++
++  let permission = "";
++  try {
++    const body = (await request.json()) as { permission?: unknown };
++    permission = typeof body.permission === "string" ? body.permission : "";
++  } catch {
++    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
++  }
++  if (!ALLOWED_PERMISSIONS.has(permission)) {
++    return NextResponse.json({ error: "Unsupported permission", permission }, { status: 400 });
++  }
++
++  // 宿主垫片：与 pi-web 同目录（`<payload>/pi-web/host.js`）。用 eval("require") 让打包器
++  // 不要静态分析这个路径（它是运行期才存在的文件）。
++  type HostShim = {
++    invoke: (name: string, payload?: unknown, opts?: { timeoutMs?: number }) => Promise<unknown>;
++    useFileMailbox?: (dir: string) => { ok?: boolean; error?: string; detail?: string };
++  };
++  let host: HostShim;
++  try {
++    // eslint-disable-next-line no-eval
++    const nodeRequire = eval("require") as NodeRequire;
++    // Android（bridge 0.2.0）：host.js 由 AAR 内建，位于载荷 pi-web 目录或载荷根（与
++    // pi-web-launch 的候选清单同序）。先试 process.cwd()/host.js，再兜底父目录。
++    let hostResolved: HostShim | null = null;
++    let lastRequireError: unknown = null;
++    for (const candidate of [join(process.cwd(), "host.js"), join(process.cwd(), "..", "host.js")]) {
++      try {
++        hostResolved = nodeRequire(candidate) as HostShim;
++        break;
++      } catch (err) {
++        lastRequireError = err;
++      }
++    }
++    if (!hostResolved) throw lastRequireError ?? new Error("host.js not found");
++    host = hostResolved;
++    /*
++     * bridge 0.2.0（Android）的 host.js 没有 useFileMailbox —— 此块是 ark 兼容守卫，
++     * Android 上恒为 no-op；保留它以免改动上游补丁的公共形状。
++     */
++    const mailboxDir = process.env.PI_HOST_MAILBOX ?? "";
++    if (mailboxDir.length > 0 && typeof host.useFileMailbox === "function") {
++      const wired = host.useFileMailbox(mailboxDir);
++      if (wired?.ok !== true) {
++        return NextResponse.json(
++          { error: "mailbox-unavailable", detail: wired?.detail ?? wired?.error ?? "unknown" },
++          { status: 503 },
++        );
++      }
++    }
++  } catch (error) {
++    return NextResponse.json(
++      { error: "host bridge unavailable", detail: String((error as Error)?.message ?? error) },
++      { status: 503 },
++    );
++  }
++
++  try {
++    // 用户在系统弹窗上点按的时间不可控 ⇒ 超时给足（库侧默认远小于此）。
++    const result = (await host.invoke(
++      "perm.request",
++      { permissions: [permission] },
++      { timeoutMs: 120000 },
++    )) as PermRequestResult;
++    const granted = typeof result?.granted === "number" ? result.granted : 0;
++    return NextResponse.json({ ok: true, marker: PERM_FLOW_MARKER, permission, granted: granted > 0, result });
++  } catch (error) {
++    const err = error as { error?: string; detail?: string; message?: string };
++    return NextResponse.json(
++      {
++        ok: false,
++        permission,
++        error: err?.error ?? "perm-request-failed",
++        detail: err?.detail ?? err?.message ?? String(error),
++      },
++      { status: 502 },
++    );
++  }
++}
+diff --git a/components/DirectoryPicker.tsx b/components/DirectoryPicker.tsx
+index d6c0dc1f..1abdc1ac 100644
+--- a/components/DirectoryPicker.tsx
++++ b/components/DirectoryPicker.tsx
+@@ -1,6 +1,6 @@
+ "use client";
+ 
+-import { type CSSProperties, type FormEvent, useCallback, useEffect, useRef, useState } from "react";
++import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+ import { createPortal } from "react-dom";
+ import { useI18n } from "@/hooks/useI18n";
+ import { readJsonOrThrow } from "@/lib/fetch-json";
+@@ -11,12 +11,31 @@ interface DirectoryEntry {
+   path: string;
+ }
+ 
++interface DirectoryRoot {
++  id: string;
++  label: string;
++}
++
+ interface BrowseResponse {
+   path?: string;
+   parentPath?: string | null;
+   directories?: DirectoryEntry[];
+   drives?: DirectoryEntry[];
++  /** 主目录 Tab 的根清单（服务端下发；前端不硬编码任何路径）。 */
++  roots?: DirectoryRoot[];
++  /** 当前目录落在哪个主目录根里（服务端围栏的结果；不在任何根内为 null）。 */
++  rootId?: string | null;
++  rootPath?: string | null;
++  /** 条目超过服务端上限被截断（FR-203-009）。 */
++  truncated?: boolean;
++  entryLimit?: number;
++  total?: number;
+   error?: string;
++  /** 403 时服务端给出的 OS 权限名（`ohos.permission.*`）；前端不硬编码。 */
++  permission?: string | null;
++  /** 403 且该权限可由用户点按授予（user_grant）时为 true。 */
++  canRequest?: boolean;
++  code?: string;
+ }
+ 
+ interface CreateDirectoryResponse {
+@@ -66,13 +85,83 @@ const secondaryActionStyle: CSSProperties = {
+   color: "var(--text-muted)",
+ };
+ 
+-async function loadDirectories(directory?: string): Promise<BrowseResponse> {
+-  const query = directory ? `?path=${encodeURIComponent(directory)}` : "";
+-  const response = await fetch(`/api/cwd/browse${query}`);
+-  const data = await readJsonOrThrow<BrowseResponse>(response);
++/**
++ * 读一次目录。
++ * `path` 与 `root` 二选一：带 `root` 时列宿主声明的主目录（Tab），否则按路径浏览。
++ */
++async function loadDirectories(directory?: string, rootId?: string): Promise<BrowseResponse> {
++  const params = new URLSearchParams();
++  if (directory) params.set("path", directory);
++  else if (rootId) params.set("root", rootId);
++  const query = params.toString();
++  const response = await fetch(`/api/cwd/browse${query ? `?${query}` : ""}`);
++  const data = await response.json() as BrowseResponse;
++  if (!response.ok || data.error) {
++    throw new BrowseError(
++      data.error ?? `HTTP ${response.status}`,
++      data.code ?? null,
++      data.permission ?? null,
++      data.canRequest === true,
++    );
++  }
+   return data;
+ }
+ 
++/**
++ * 浏览失败。带 `permission`/`canRequest` 的 403 表示"目录本身存在、只是还没授权"，
++ * 调用方据此显示「请求权限 / 刷新」两个按钮 —— 与"目录真的不存在"（404/ENOENT）必须分开。
++ */
++class BrowseError extends Error {
++  readonly code: string | null;
++  readonly permission: string | null;
++  readonly canRequest: boolean;
++
++  constructor(message: string, code: string | null, permission: string | null, canRequest: boolean) {
++    super(message);
++    this.name = "BrowseError";
++    this.code = code;
++    this.permission = permission;
++    this.canRequest = canRequest;
++  }
++}
++
++/** 触发一次 OS 授权窗（经 `/api/host/perm` → 文件信箱 → ArkTS `perm.request`）。 */
++async function requestHostPermission(permission: string): Promise<boolean> {
++  try {
++    const response = await fetch("/api/host/perm", {
++      method: "POST",
++      headers: { "Content-Type": "application/json" },
++      body: JSON.stringify({ permission }),
++    });
++    if (!response.ok) return false;
++    const data = await response.json() as { ok?: boolean; granted?: boolean };
++    return data.ok === true && data.granted === true;
++  } catch {
++    return false;
++  }
++}
++
++/** 主目录 Tab 的持久化 key：只存根 **id**（FR-203-018）—— 路径由宿主每次启动重算。 */
++const ROOT_STORAGE_KEY = "pi-hos-picker-root";
++
++function readStoredRootId(): string | null {
++  try {
++    const stored = window.localStorage.getItem(ROOT_STORAGE_KEY);
++    return stored && stored.length > 0 ? stored : null;
++  } catch {
++    return null;   // 存储不可用（隐私模式）：当作没记过，不阻塞选择器
++  }
++}
++
++function writeStoredRootId(rootId: string | null): void {
++  try {
++    if (rootId) window.localStorage.setItem(ROOT_STORAGE_KEY, rootId);
++    else window.localStorage.removeItem(ROOT_STORAGE_KEY);
++  } catch {
++    // 写不进去只影响下次恢复，不影响本次选择。
++  }
++}
++
+ async function createDirectory(parentPath: string, name: string): Promise<string> {
+   const response = await fetch("/api/cwd/browse", {
+     method: "POST",
+@@ -119,7 +208,6 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+   const [currentPath, setCurrentPath] = useState("");
+   const [parentDirectory, setParentDirectory] = useState<string | null>(null);
+-  const [pathInput, setPathInput] = useState(initialPath ?? "");
+   const [directories, setDirectories] = useState<DirectoryEntry[]>([]);
+   const [drives, setDrives] = useState<DirectoryEntry[] | null>(null);
+   const [loadError, setLoadError] = useState<string | null>(null);
+@@ -130,25 +218,41 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+   const [creating, setCreating] = useState(false);
+   const backdropPressRef = useRef(false);
+   const createBackdropPressRef = useRef(false);
+-  const pathInputRef = useRef<HTMLInputElement>(null);
+-  const mountedRef = useRef(false);
++  const [roots, setRoots] = useState<DirectoryRoot[]>([]);
++  const [activeRootId, setActiveRootId] = useState<string | null>(null);
++  const [permissionPrompt, setPermissionPrompt] = useState<{ permission: string; directory?: string; rootId?: string } | null>(null);
++  const [truncated, setTruncated] = useState(false);
++  const [entryLimit, setEntryLimit] = useState<number | null>(null);
+ 
+-  // Resolves to the listed folder's path, or null when it could not be listed.
+-  const navigateTo = useCallback(async (directory?: string): Promise<string | null> => {
++  const navigateTo = useCallback(async (directory?: string, rootId?: string): Promise<boolean> => {
+     setLoading(true);
+     setLoadError(null);
++    setPermissionPrompt(null);
+     try {
+-      const data = await loadDirectories(directory);
++      const data = await loadDirectories(directory, rootId);
+       const nextPath = data.path ?? directory ?? "/";
+       setCurrentPath(nextPath);
+       setParentDirectory(data.parentPath ?? null);
+-      setPathInput(nextPath);
+       setDirectories(data.directories ?? []);
+       setDrives(data.drives ?? null);
+-      return nextPath;
++      setRoots(data.roots ?? []);
++      setActiveRootId(data.rootId ?? null);
++      setEntryLimit(data.entryLimit ?? null);
++      setTruncated(data.truncated === true);
++      return true;
+     } catch (cause) {
++      /*
++       * FR-203-017（手动形态）：点「文档 / 下载」时**不自动申请权限**，只记下"这个根需要哪条权限"，
++       * 由界面上的「请求权限 / 刷新」两个按钮决定下一步。沙箱根永不走这条路（`permission` 为 null）。
++       */
++      if (cause instanceof BrowseError && cause.canRequest && cause.permission) {
++        setPermissionPrompt({ permission: cause.permission, directory, rootId });
++        setDirectories([]);
++        setDrives(null);
++        return false;
++      }
+       setLoadError(errorMessage(cause));
+-      return null;
++      return false;
+     } finally {
+       setLoading(false);
+     }
+@@ -156,27 +260,20 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+ 
+   useEffect(() => {
+     setPortalTarget(document.body);
+-    void navigateTo(initialPath || undefined);
++    void (async () => {
++      if (initialPath) {
++        await navigateTo(initialPath);
++        return;
++      }
++      // FR-203-018：刷新后回到上次的主目录 Tab（只记 id；根清单仍由服务端核对）。
++      const storedRootId = readStoredRootId();
++      if (storedRootId && await navigateTo(undefined, storedRootId)) return;
++      // 记下的 id 已不在宿主声明的清单里（升级 / 卸载授权）：清掉脏值，回落默认起点。
++      if (storedRootId) writeStoredRootId(null);
++      await navigateTo();
++    })();
+   }, [initialPath, navigateTo]);
+ 
+-  useEffect(() => {
+-    mountedRef.current = true;
+-    return () => { mountedRef.current = false; };
+-  }, []);
+-
+-  // Select and Go are disabled while they check, which drops focus to the page,
+-  // where Escape stops the running agent instead of closing the picker. A
+-  // refusal puts focus back in the field, to retype or dismiss.
+-  useEffect(() => {
+-    if (loadError || error) pathInputRef.current?.focus();
+-  }, [loadError, error]);
+-
+-  const handlePathSubmit = (event: FormEvent<HTMLFormElement>) => {
+-    event.preventDefault();
+-    const candidate = pathInput.trim();
+-    if (candidate) void navigateTo(candidate);
+-  };
+-
+   const closeCreateDialog = () => {
+     if (creating) return;
+     setCreateOpen(false);
+@@ -204,23 +301,15 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+     }
+   };
+ 
+-  // A typed path that is not the listed folder needs no Go first: Select browses
+-  // it, as Go does, and selects the browse route's realpath, so one folder is
+-  // one cwd however it was typed (case, a link, `..`, a trailing slash), like
+-  // pi's process.cwd(). A path that cannot be listed shows Go's error here.
+-  // "New directory" still waits for the list, which is where it creates.
+-  const typedPath = pathInput.trim();
+-  const hasUncommittedPath = typedPath !== currentPath;
+-  const canSelect = Boolean(typedPath) && !busy && !loading;
+-  const canCreate = Boolean(currentPath) && !hasUncommittedPath && !busy && !loading;
+-  const canNavigateUp = Boolean(parentDirectory) || isWindowsDriveRoot(currentPath);
+-
+-  const handleSelect = async () => {
+-    const path = hasUncommittedPath ? await navigateTo(typedPath) : currentPath;
+-    // Cancelled while it browsed: nothing is selected.
+-    if (path && mountedRef.current) onSelect(path);
++  // FR-203-018：切 Tab 时只把根 **id** 写进 localStorage，路径一律由服务端重算。
++  const selectRoot = (rootId: string) => {
++    writeStoredRootId(rootId);
++    void navigateTo(undefined, rootId);
+   };
+ 
++  const canSelect = Boolean(currentPath) && !busy && !loading;
++  const canNavigateUp = Boolean(parentDirectory) || isWindowsDriveRoot(currentPath);
++
+   if (!portalTarget) return null;
+ 
+   return createPortal(
+@@ -267,41 +356,40 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+           </button>
+         </div>
+ 
+-        <form onSubmit={handlePathSubmit} style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
++        {roots.length > 0 && (
++          <div className="directory-picker-roots" role="tablist" aria-label={t("directoryPicker.rootsLabel")} style={{ display: "flex", flexWrap: "wrap", gap: 6, flexShrink: 0, padding: "10px 14px 0" }}>
++            {roots.map((root) => {
++              const active = root.id === activeRootId;
++              return (
++                <button
++                  key={root.id}
++                  className="directory-picker-root"
++                  type="button"
++                  role="tab"
++                  aria-selected={active}
++                  data-root-id={root.id}
++                  onClick={() => selectRoot(root.id)}
++                  disabled={loading}
++                  style={{ padding: "5px 12px", border: "1px solid var(--border)", borderRadius: 999, background: active ? "var(--accent)" : "none", color: active ? "var(--accent-contrast)" : "var(--text-muted)", fontSize: 12, fontWeight: active ? 600 : 500, cursor: loading ? "default" : "pointer", opacity: loading ? 0.7 : 1 }}
++                >
++                  {root.label}
++                </button>
++              );
++            })}
++          </div>
++        )}
++
++        {/* 根围栏（FR-203-007）：此处**没有**手动路径输入。只保留「返回上级」——
++          * 服务端已把 parentPath 截断到主目录根（browseDeclaredRoot 到根时返回 null），
++          * 故返回按钮不可能越过当前主目录根。 */}
++        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+           <button className="directory-picker-back" type="button" onClick={() => void navigateTo(parentDirectory ?? undefined)} disabled={loading || !canNavigateUp} title={t("directoryPicker.goToParent")} aria-label={t("directoryPicker.goToParent")} style={{ width: 36, height: 36, padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-hover)", color: "var(--text-muted)", cursor: canNavigateUp ? "pointer" : "default", opacity: canNavigateUp ? 1 : 0.45 }}>
+             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+               <path d="m18 15-6-6-6 6" />
+             </svg>
+           </button>
+-          <label htmlFor="directory-path" style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 }}>
+-            {t("directoryPicker.directoryPath")}
+-          </label>
+-          <input
+-            ref={pathInputRef}
+-            className="directory-picker-path"
+-            id="directory-path"
+-            type="text"
+-            value={pathInput}
+-            placeholder={t("directoryPicker.pathPlaceholder")}
+-            autoFocus
+-            autoComplete="off"
+-            spellCheck={false}
+-            onChange={(event) => {
+-              setPathInput(event.target.value);
+-              setLoadError(null);
+-            }}
+-            style={{ ...textInputStyle, minWidth: 0, flex: 1 }}
+-          />
+-          <button
+-            className="directory-picker-action"
+-            type="submit"
+-            disabled={loading || !pathInput.trim()}
+-            title={t("directoryPicker.goToDirectory")}
+-            style={{ minWidth: 58, height: 36, padding: "0 12px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-hover)", color: "var(--text-muted)", cursor: loading || !pathInput.trim() ? "default" : "pointer", opacity: loading || !pathInput.trim() ? 0.6 : 1 }}
+-          >
+-            {t("directoryPicker.go")}
+-          </button>
+-        </form>
++          <span style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>{currentPath}</span>
++        </div>
+ 
+         <div className="directory-picker-list" style={{ flex: 1, minHeight: 0, overflow: "auto", padding: "8px 10px" }}>
+           {loading ? (
+@@ -326,6 +414,39 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+                 <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 11 }}>{t("directoryPicker.noDrives")}</div>
+               )}
+             </>
++          ) : permissionPrompt ? (
++            <div style={{ padding: "10px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
++              <div style={{ color: "var(--text-muted)", fontSize: 12 }}>{t("directoryPicker.permissionNeededTitle")}</div>
++              <div style={{ color: "var(--text-dim)", fontSize: 11, fontFamily: "var(--font-mono)", wordBreak: "break-all" }}>
++                {permissionPrompt.permission}
++              </div>
++              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
++                <button
++                  type="button"
++                  onClick={async () => {
++                    const target = permissionPrompt;
++                    const granted = await requestHostPermission(target.permission);
++                    if (!granted) return;
++                    setPermissionPrompt(null);
++                    void navigateTo(target.directory, target.rootId);
++                  }}
++                  style={{ padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 6, background: "var(--bg-hover)", color: "var(--text)", cursor: "pointer", fontSize: 12 }}
++                >
++                  {t("directoryPicker.requestPermission")}
++                </button>
++                <button
++                  type="button"
++                  onClick={() => {
++                    const target = permissionPrompt;
++                    setPermissionPrompt(null);
++                    void navigateTo(target.directory, target.rootId);
++                  }}
++                  style={{ padding: "6px 10px", border: "1px solid var(--border)", borderRadius: 6, background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 12 }}
++                >
++                  {t("directoryPicker.refreshList")}
++                </button>
++              </div>
++            </div>
+           ) : directories.length > 0 ? (
+             directories.map((entry) => (
+               <button
+@@ -343,6 +464,11 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+           ) : (
+             <div style={{ padding: 8, color: "var(--text-dim)", fontSize: 11 }}>{t("directoryPicker.noSubdirectories")}</div>
+           )}
++          {truncated && entryLimit !== null && drives === null && (
++            <div className="directory-picker-truncated" style={{ padding: "6px 8px", color: "var(--text-dim)", fontSize: 11 }}>
++              {t("directoryPicker.truncatedNotice", { count: entryLimit })}
++            </div>
++          )}
+           {(loadError || error) && <div style={{ padding: "8px", color: "#dc2626", fontSize: 11 }}>{loadError ?? error}</div>}
+         </div>
+ 
+@@ -353,9 +479,12 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+             onClick={() => {
+               setCreateOpen(true);
+               setCreateError(null);
++              // FR-203-011：默认名走 i18n（zh = 未命名文件夹，en = Untitled folder），可改名；
++              // 同级重名由服务端追加序号（未命名文件夹 2、3…）。
++              setDirectoryName(t("directoryPicker.defaultDirectoryName"));
+             }}
+-            disabled={!canCreate}
+-            style={{ ...secondaryActionStyle, marginRight: "auto", opacity: canCreate ? 1 : 0.6, cursor: canCreate ? "pointer" : "default" }}
++            disabled={!canSelect}
++            style={{ ...secondaryActionStyle, marginRight: "auto", opacity: canSelect ? 1 : 0.6, cursor: canSelect ? "pointer" : "default" }}
+           >
+             {t("directoryPicker.newDirectory")}
+           </button>
+@@ -363,9 +492,9 @@ export function DirectoryPicker({ onCancel, onSelect, initialPath, busy = false,
+           <button
+             className="directory-picker-action"
+             type="button"
+-            onClick={() => void handleSelect()}
++            onClick={() => onSelect(currentPath)}
+             disabled={!canSelect}
+-            title={hasUncommittedPath && typedPath ? t("directoryPicker.selectTypedPath", { path: typedPath }) : t("directoryPicker.selectCurrentDirectory")}
++            title={t("directoryPicker.selectCurrentDirectory")}
+             style={{ ...primaryActionStyle, opacity: canSelect ? 1 : 0.6, cursor: canSelect ? "pointer" : "default" }}
+           >
+             {busy ? t("i18n.checking") : t("directoryPicker.selectThisFolder")}
+diff --git a/lib/directory-browser.ts b/lib/directory-browser.ts
+index 7c549872..644c88f7 100644
+--- a/lib/directory-browser.ts
++++ b/lib/directory-browser.ts
+@@ -61,6 +61,101 @@ export function findWorkspaceRoot(rootId: string): WorkspaceRoot | null {
+   return getWorkspaceRoots().find((root) => root.id === rootId) ?? null;
+ }
+ 
++/**
++ * 编译产物里的稳定标记（E14 选择器交互契约）。`scripts/assemble-payload.mjs` 的
++ * `PI_WEB_PATCH_MARKERS` 用它断言这条补丁真的进了
++ * `.next/server/app/api/cwd/browse/route.js` —— 本模块被 Next 内联进该 bundle，
++ * 所以字面量随路由一起编译；前端组件里的字面量**不进**这个 bundle，故标记放这里。
++ */
++export const PICKER_CONTRACT_MARKER = "pi-hos-picker-contract";
++
++/**
++ * 选择器顶部 Tab 的契约：**恰好四个**主目录，顺序即 Tab 顺序（FR-203-005）。
++ * 与 `payload/extensions/harmony-workspace-roots.js#EXPECTED_IDS` 同一张表。
++ */
++export const PICKER_ROOT_IDS = ["sandbox", "desktop", "documents", "download"] as const;
++
++/** 四个契约 id 的标签（宿主声明了 label 就用宿主的；缺省或与 id 等值时用这张表）。 */
++const PICKER_ROOT_LABELS: Record<(typeof PICKER_ROOT_IDS)[number], string> = {
++  sandbox: "沙箱",
++  desktop: "桌面",
++  documents: "文档",
++  download: "下载",
++};
++
++/** 目录条目上限：超过即截断并给 `truncated`（FR-203-009）。 */
++export const MAX_DIRECTORY_ENTRIES = 500;
++
++export interface PickerRoot {
++  id: string;
++  label: string;
++  path: string;
++}
++
++/**
++ * Tab 根清单的**服务端**唯一出口。
++ *
++ * 只消费宿主声明的根（`PI_ANDROID_ROOTS`）：未声明的不补（不猜路径），未知 id 不显示
++ * （Tab 恰好四个）。顺序固定为 `PICKER_ROOT_IDS`，与宿主声明顺序无关 —— 否则
++ * Tab 顺序会随宿主实现漂移。
++ */
++export function getPickerRoots(): PickerRoot[] {
++  const declared = getWorkspaceRoots();
++  const roots: PickerRoot[] = [];
++  for (const id of PICKER_ROOT_IDS) {
++    const root = declared.find((entry) => entry.id === id);
++    if (!root) continue;
++    const label = root.label && root.label !== id ? root.label : PICKER_ROOT_LABELS[id];
++    roots.push({ id, label, path: root.path });
++  }
++  return roots;
++}
++
++/** 两个路径是否指同一目录（Windows 盘符形态大小写不敏感，其余逐字节比较）。 */
++function samePath(left: string, right: string): boolean {
++  if (/^[a-zA-Z]:[\\/]/.test(left)) return left.toLowerCase() === right.toLowerCase();
++  return left === right;
++}
++
++/** `parent` 是否就是 `child` 或它的祖先（按路径段比较，不是裸字符串前缀）。 */
++function isSameOrAncestorPath(parent: string, child: string): boolean {
++  const base = parent.replace(/[\\/]+$/, "");
++  if (base.length === 0) return false;
++  if (samePath(base, child)) return true;
++  return child.startsWith(`${base}/`) || child.startsWith(`${base}\\`);
++}
++
++export interface EnclosingPickerRoot {
++  id: string;
++  /** 该根 realpath 后的路径（与 GET 响应里的 `path` 同口径，可直接比较）。 */
++  path: string;
++  /** 目标是否正好停在这个根上（此时父目录必须为 null）。 */
++  exact: boolean;
++}
++
++/**
++ * 找出已经把 `resolvedPath` 围住的主目录根（FR-203-008 的**服务端**一半）。
++ *
++ * 为什么围栏必须在服务端：前端只负责渲染响应里的 `parentPath`。一旦服务端把
++ * `…/Desktop` 的父目录回成 `…/currentUser`，面包屑就能越过主目录根去浏览整个
++ * 用户区 —— 既是权限面的错位，也让「我在哪个根里」无从判断；靠前端藏按钮既
++ * 不可靠，也没法被别的客户端复用。
++ */
++export async function findEnclosingPickerRoot(resolvedPath: string): Promise<EnclosingPickerRoot | null> {
++  for (const root of getPickerRoots()) {
++    let rootPath: string;
++    try {
++      rootPath = await resolveDirectory(root.path);
++    } catch {
++      continue;   /* 声明了但不存在：围不住任何东西 */
++    }
++    if (isSameOrAncestorPath(rootPath, resolvedPath)) {
++      return { id: root.id, path: rootPath, exact: samePath(rootPath, resolvedPath) };
++    }
++  }
++  return null;
++}
++
+ /**
+  * 裸打开（没有 `path`）时的起点。
+  *
+@@ -135,6 +230,56 @@ export async function createDirectory(parentDirectory: string, name: string): Pr
+   return realpath(createdPath);
+ }
+ 
++/**
++ * 新建文件夹的**默认名家族**（FR-203-011/012）：简体「未命名文件夹」、繁体
++ * 「未命名文件夾」、英文「Untitled folder」—— 与三套 i18n 的
++ * `directoryPicker.defaultDirectoryName` 同一份词表（服务端去重要认得出前端给的默认名）。
++ */
++export const UNTITLED_DIRECTORY_NAMES = ["未命名文件夹", "未命名文件夾", "Untitled folder"] as const;
++
++/** 默认名 + 可选序号（`未命名文件夹 2`）。只有这一族名字参与自动去重。 */
++const UNTITLED_DIRECTORY_PATTERN = /^(?:未命名文件夹|未命名文件夾|Untitled folder)(?: \d+)?$/;
++
++async function pathPresent(target: string): Promise<boolean> {
++  try {
++    await stat(target);
++    return true;
++  } catch {
++    return false;
++  }
++}
++
++/**
++ * 建目录 + 默认名自动去重（FR-203-012）。
++ *
++ * 规则刻意**只覆盖默认名家族**：用户自己打了 `project` 而同级已有同名，仍走上游的
++ * EEXIST → 409（「重名要在 Modal 内提示、保留输入态」，FR-203-013）；只有「用户没改名，
++ * 就用默认名」这一种才悄悄换成 `未命名文件夹 2`、`未命名文件夹 3`…
++ * 序号从 2 起、跳过已存在者 ⇒ 同一目录状态下可复现（同样的调用得到同样的名字）。
++ */
++export async function createDirectoryAuto(parentDirectory: string, name: string): Promise<string> {
++  const requested = name.trim() || UNTITLED_DIRECTORY_NAMES[0];
++  if (!UNTITLED_DIRECTORY_PATTERN.test(requested)) return createDirectory(parentDirectory, requested);
++
++  const resolvedParent = await resolveDirectory(parentDirectory);
++  const parentStat = await stat(resolvedParent);
++  if (!parentStat.isDirectory()) throw new Error("Parent path is not a directory");
++
++  const base = UNTITLED_DIRECTORY_NAMES.find((candidate) => requested.startsWith(candidate)) ?? UNTITLED_DIRECTORY_NAMES[0];
++  for (let index = 1; index <= MAX_DIRECTORY_ENTRIES; index += 1) {
++    const candidate = index === 1 ? base : `${base} ${index}`;
++    if (await pathPresent(path.join(resolvedParent, candidate))) continue;
++    try {
++      return await createDirectory(resolvedParent, candidate);
++    } catch (error) {
++      // 并发建同名：换个序号再来，不让一次竞态变成 500。
++      if (error && typeof error === "object" && "code" in error && error.code === "EEXIST") continue;
++      throw error;
++    }
++  }
++  throw new Error("Untitled directory name exhausted");
++}
++
+ export async function listDirectories(directory: string): Promise<BrowsableDirectory[]> {
+   const entries = await readdir(directory, { withFileTypes: true });
+   // 忽略损坏、不可访问或不指向目录的符号链接。
+@@ -159,3 +304,26 @@ export async function listDirectories(directory: string): Promise<BrowsableDirec
+     .filter((entry): entry is BrowsableDirectory => entry !== null)
+     .sort((left, right) => left.name.localeCompare(right.name));
+ }
++
++export interface DirectoryListing {
++  directories: BrowsableDirectory[];
++  /** 条目总数超过 `MAX_DIRECTORY_ENTRIES` ⇒ true（FR-203-009）。 */
++  truncated: boolean;
++  /** 截断前的真实条目数（提示文案里的数字由服务端给，前端不硬编码）。 */
++  total: number;
++}
++
++/**
++ * 列目录 + 截断信息。
++ *
++ * 先按既有规则排序、再取前 `limit` 项 ⇒ 截断结果永远是**确定性前缀**（同一目录状态
++ * 永远得到同一批名字），不会因为 `readdir` 的返回顺序而漂移。
++ */
++export async function listDirectoriesLimited(
++  directory: string,
++  limit: number = MAX_DIRECTORY_ENTRIES,
++): Promise<DirectoryListing> {
++  const all = await listDirectories(directory);
++  if (all.length <= limit) return { directories: all, truncated: false, total: all.length };
++  return { directories: all.slice(0, limit), truncated: true, total: all.length };
++}
+diff --git a/lib/i18n/messages/en.ts b/lib/i18n/messages/en.ts
+index f5794fbf..68adf958 100644
+--- a/lib/i18n/messages/en.ts
++++ b/lib/i18n/messages/en.ts
+@@ -534,6 +534,13 @@ export const enLocale: LocalePlugin = {
+     "directoryPicker.directoryNamePlaceholder": "Enter a directory name",
+     "directoryPicker.create": "Create",
+     "directoryPicker.creating": "Creating…",
++    "directoryPicker.rootsLabel": "Root folders",
++    "directoryPicker.truncatedNotice": "Showing the first {count} entries only",
++    "directoryPicker.defaultDirectoryName": "Untitled folder",
++    "directoryPicker.permissionNeededTitle": "This folder needs permission before its contents can be shown:",
++    "directoryPicker.requestPermission": "Request permission",
++    "directoryPicker.refreshList": "Refresh",
++
+     "sidebar.checking": "Checking…",
+     "sidebar.open": "Open",
+     "sidebar.cancel": "Cancel",
+diff --git a/lib/i18n/messages/zh-CN.ts b/lib/i18n/messages/zh-CN.ts
+index 16edf0e0..c23e0a30 100644
+--- a/lib/i18n/messages/zh-CN.ts
++++ b/lib/i18n/messages/zh-CN.ts
+@@ -534,6 +534,13 @@ export const zhCNLocale: LocalePlugin = {
+     "directoryPicker.directoryNamePlaceholder": "请输入目录名",
+     "directoryPicker.create": "创建",
+     "directoryPicker.creating": "正在创建…",
++    "directoryPicker.rootsLabel": "主目录",
++    "directoryPicker.truncatedNotice": "仅显示前 {count} 项",
++    "directoryPicker.defaultDirectoryName": "未命名文件夹",
++    "directoryPicker.permissionNeededTitle": "该目录需要授权后才能显示内容：",
++    "directoryPicker.requestPermission": "请求权限",
++    "directoryPicker.refreshList": "刷新",
++
+     "sidebar.checking": "检查中…",
+     "sidebar.open": "打开",
+     "sidebar.cancel": "取消",
+diff --git a/lib/i18n/messages/zh-TW.ts b/lib/i18n/messages/zh-TW.ts
+index a43ba67c..8cb551d9 100644
+--- a/lib/i18n/messages/zh-TW.ts
++++ b/lib/i18n/messages/zh-TW.ts
+@@ -534,6 +534,13 @@ export const zhTWLocale: LocalePlugin = {
+     "directoryPicker.directoryNamePlaceholder": "請輸入目錄名稱",
+     "directoryPicker.create": "建立",
+     "directoryPicker.creating": "正在建立…",
++    "directoryPicker.rootsLabel": "主目錄",
++    "directoryPicker.truncatedNotice": "僅顯示前 {count} 項",
++    "directoryPicker.defaultDirectoryName": "未命名文件夾",
++    "directoryPicker.permissionNeededTitle": "該目錄需要授權後才能顯示內容：",
++    "directoryPicker.requestPermission": "請求權限",
++    "directoryPicker.refreshList": "重新整理",
++
+     "sidebar.checking": "檢查中…",
+     "sidebar.open": "開啟",
+     "sidebar.cancel": "取消",

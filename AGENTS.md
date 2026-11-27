@@ -11,12 +11,12 @@
 Kotlin 宿主用**系统 WebView** 加载本进程内 Node 跑起的 `pi-web` 服务（`aosp-node-bridge` + Maven Central
 `node-runtime`，`dlopen` + `node::Start`，Node **26.13.0** small-ICU），**无 Termux、无子进程 Node**。
 功能目标与 `pi-desktop-ark` 对齐，能力增量：前台服务（keep-alive）、进程内 pnpm 扩展、SAF 存储访问框架桥。
-上游 `pi-web` 补丁 **6 条**（`patches/v0.18.0/`）。
+上游 `pi-web` 补丁 **6 条**（`patches/v0.19.0/`）。
 
 - 显示名 / application ID：`Pi Desktop` / `top.fellow99.pi.PiDesktopAndroid`
 - ABI：**`arm64-v8a` only**；minSdk / targetSdk / compileSdk = **24 / 36 / 36**
-- 版本：`0.18.0` / `versionCode` `1800`（tag `v0.18.0` 触发 GitHub Actions 构建**签名 APK 并发布 Release**）
-- 上游基线：`pi` **v1.6.0** + `pi-web` **v0.18.0**
+- 版本：`0.19.0` / `versionCode` `1900`（tag `v0.19.0` 触发 GitHub Actions 构建**签名 APK 并发布 Release**；**本轮本机安装被 MIUI「USB 安装」限制拦下，未完成真机复验**）
+- 上游基线：`pi` **v1.6.1** + `pi-web` **v0.19.0**
 
 > **引擎说明**：Maven `node-runtime:24.2.0` 为 `--with-intl=none`（无 Intl，Next 16 编译产物会解析失败）；
 > 本工程通过 `scripts/provision-engine.mjs` 提供 **aosp-node-runtime v26.13.0（small-ICU）** 到 `app/src/main/jniLibs/`，
@@ -30,7 +30,7 @@ Kotlin 宿主用**系统 WebView** 加载本进程内 Node 跑起的 `pi-web` �
 | `app/src/main/assets/pi-web/` | 载荷落点（**gitignored**，组装脚本生成） |
 | `app/build.gradle.kts` | applicationId / ABI / 签名（keystore 不入库） |
 | `scripts/` | 载荷流水线（patch→build→crop→tar.gz）、`provision-engine.mjs`、验证 `verify-runtime.mjs` |
-| `patches/v0.18.0/` | 上游 6 条幂等可逆补丁 |
+| `patches/v0.19.0/` | 上游 6 条幂等可逆补丁 |
 | `specs/` | 规格文档集（`011/012/013` 公共 + `1XX` 基础） |
 | `docs/` | 工程规划、安卓能力清单、真机验证记录、`evidence/` |
 | `.github/workflows/` | 标签触发构建/发布（`build-release.yml`） |

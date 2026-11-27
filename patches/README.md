@@ -1,8 +1,29 @@
 # patches/ — 上游补丁集
 
-> 当前上游基线：`pi-web` tag **`v0.18.0`**（commit `2daa0d1`）。
+> 当前上游基线：`pi-web` tag **`v0.19.0`**（commit `7b77aa1a`）。
 
-## 0.0 v0.18.0 rebase 记录（2026-11-22）
+## 0.0 v0.19.0 rebase 记录（2026-11-27）
+
+| 项 | 内容 |
+|---|---|
+| 上游基线 | `pi-web` tag **`v0.19.0`**（`7b77aa1a01a74597280dd5bbc9221195411bddf4`，annotated tag `e5192a7557f73dadea42a76aab785f65597f2197`，`Release v0.19.0`）· `pi` tag **`v1.6.1`**（`ef4a1cfcca62b77ad3558337ff3e1c7f6beeadfe`） |
+| 生成方式 | 独立 detached worktree `git worktree add --detach ../.tmp/wt-019 v0.19.0`；逐条 `git apply`（冲突条目手工重放）→ `git add` → `git commit` → `git diff HEAD^ HEAD > patches/v0.19.0/<同名>.patch`；**未经 PowerShell 重定向**，全目录 **UTF-8 / LF** |
+| 上游变更（v0.18.0→v0.19.0） | 284 文件，+8976/−2383，44 提交 |
+| 冲突与处置 | 见下「本轮变更」 |
+| 验证 | ① pristine v0.19.0 上按文件名排序逐条 `git apply --check` + `git apply` 全绿（6/6）；② 反序 `git apply --reverse` 后 `git status --porcelain` 为空 |
+
+### 本轮变更
+
+| 补丁 | 变更 |
+|---|---|
+| `0001-terminal-capability-unsupported` | **导入重定位**：上游给 `app/api/terminal/route.ts` 加了 `import { errorMessage } from "@/lib/errors"`，正好落在本补丁插入 `terminalCapability` 导入的位置。本轮改为插在 `errorMessage` 之后。`lib/terminal-capability.ts` 的 Android PTY 分支（`globalThis.__piWebPty`）不变 |
+| `0002-cwd-sandbox-root-from-android-roots` | 无冲突，逐字节沿用 |
+| `0003-cwd-adb-path-alias-normalize` | 无冲突，逐字节沿用 |
+| `0004-session-export-runtime-identity-guard` | 无冲突，逐字节沿用 |
+| `0005-directory-picker` | **1 处上下文冲突**：同 Ark，上游 `createDirectory` 改用 `readJsonOrThrow` + 两处 `errorMessage(cause)`。处置：`--exclude=components/DirectoryPicker.tsx` 应用其余文件后在 v0.19.0 上重放该文件（上游 4 处改动逐一采纳；`loadDirectories` 保留 `BrowseError`）。补丁 44093 B |
+| `0008-system-back` | 无冲突，逐字节沿用 |
+
+## 0.0b v0.18.0 rebase 记录（2026-11-22）
 
 | 项 | 内容 |
 |---|---|

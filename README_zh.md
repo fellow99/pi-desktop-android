@@ -15,8 +15,8 @@
 | --- | --- |
 | 版别 | **Android Edition**（`pi-desktop-android`） |
 | 应用显示名 / 应用 ID | **Pi Desktop** / `top.fellow99.pi.PiDesktopAndroid`（2026-10-24 定稿；显示名与 `pi-desktop` / `…Ark` 品牌口径一致，仅包名带 Android） |
-| 版本 / versionCode | **`0.18.0` / `1800`**（v0.18.0 发布版；本轮完成 debug/release APK 构建；设备复验待进行 —— v0.15.0 轮已在 MIX / Android 8.0.0 真机验证：安装、启动、WebView UI、版本徽标、loopback 免密、DeepSeek Key、沙箱工作区、文本对话、视觉图片对话（DeepSeek V4.1 Flash）、工具链 —— bash `pwd`/写/读/`grep`/`ls` 与内置 git `init`/`add`/`commit`/`log`） |
-| 上游基线 | `pi` **v1.6.0** + `pi-web` **v0.18.0**（`patches/v0.18.0/` 下 6 条幂等可反向补丁） |
+| 版本 / versionCode | **`0.19.0` / `1900`**（本轮完成 debug 482,106,993 B / release 473,074,747 B APK 构建，载荷 `pi-web 0.19.0` / `next 16.4.6` / `pi 1.6.1`；**设备安装本轮被 MIUI「USB 安装」限制拦下（`INSTALL_FAILED_USER_RESTRICTED`），未完成真机复验** —— v0.15.0 轮曾在 MIX / Android 8.0.0 真机验证：安装、启动、WebView UI、版本徽标、loopback 免密、DeepSeek Key、沙箱工作区、文本对话、视觉图片对话（DeepSeek V4.1 Flash）、工具链 —— bash `pwd`/写/读/`grep`/`ls` 与内置 git `init`/`add`/`commit`/`log`） |
+| 上游基线 | `pi` **v1.6.1** + `pi-web` **v0.19.0**（`patches/v0.19.0/` 下 6 条幂等可反向补丁） |
 | 后端 | `io.github.fellow99:node-bridge` **0.2.0**（JNI 直调宿主桥）+ **投放制** aosp-node-runtime 引擎 `libnode.so` **v26.13.0**（`--with-intl=small-icu`，见下方「引擎说明」），进程内 `dlopen` + `node::Start` |
 | 前端 | 系统 WebView 加载 `http://127.0.0.1:<随机端口>/`（同源 HTTP + SSE；loopback 即安全上下文） |
 | ABI | **仅 `arm64-v8a`**（引擎只出单 ABI） |
@@ -105,7 +105,7 @@ pi-desktop-android/
 │   ├── skills/android-runtime-capabilities/
 │   ├── config/{settings.json,mcp.json}
 │   └── jitless/                             # 纯 JS 兼容层，仅当 WebAssembly 不存在时启用
-├── patches/v0.18.0/                         # 6 条幂等 pi-web 补丁（0001–0008；0006 已并入 0005、0007 已退役）
+├── patches/v0.19.0/                         # 6 条幂等 pi-web 补丁（0001–0008；0006 已并入 0005、0007 已退役）
 ├── scripts/                                 # assemble-payload · crop-rules · provision-engine/pty · devtest · sync
 ├── docs/                                    # 000 规划 · 能力清单 · 真机记录 · 隐私草稿
 ├── specs/                                   # 1NN 模块规格
