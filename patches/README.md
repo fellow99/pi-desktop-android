@@ -18,10 +18,10 @@
 |---|---|
 | `0001-terminal-capability-unsupported` | **导入重定位**：上游给 `app/api/terminal/route.ts` 加了 `import { errorMessage } from "@/lib/errors"`，正好落在本补丁插入 `terminalCapability` 导入的位置。本轮改为插在 `errorMessage` 之后。`lib/terminal-capability.ts` 的 Android PTY 分支（`globalThis.__piWebPty`）不变 |
 | `0002-cwd-sandbox-root-from-android-roots` | 无冲突，逐字节沿用 |
-| `0003-cwd-adb-path-alias-normalize` | 无冲突，逐字节沿用 |
-| `0004-session-export-runtime-identity-guard` | 无冲突，逐字节沿用 |
-| `0005-directory-picker` | **1 处上下文冲突**：同 Ark，上游 `createDirectory` 改用 `readJsonOrThrow` + 两处 `errorMessage(cause)`。处置：`--exclude=components/DirectoryPicker.tsx` 应用其余文件后在 v0.19.0 上重放该文件（上游 4 处改动逐一采纳；`loadDirectories` 保留 `BrowseError`）。补丁 44093 B |
-| `0008-system-back` | 无冲突，逐字节沿用 |
+| `0003-cwd-adb-path-alias-normalize` | 无冲突，（**重生成**：hunk 内容逐字不变，`index` 哈希与 hunk 行号随上游重排） |
+| `0004-session-export-runtime-identity-guard` | 无冲突，（**重生成**：hunk 内容逐字不变，`index` 哈希与 hunk 行号随上游重排） |
+| `0005-directory-picker` | **1 处上下文冲突**：同 Ark，上游 `createDirectory` 改用 `readJsonOrThrow` + 两处 `errorMessage(cause)`。处置：`--exclude=components/DirectoryPicker.tsx` 应用其余文件后在 v0.19.0 上重放该文件（上游 5 处改动逐一采纳：2 条 import + `createDirectory` + 2 处 `errorMessage(cause)`；`loadDirectories` 保留 `BrowseError`）。补丁 44093 B |
+| `0008-system-back` | 无冲突，（**重生成**：hunk 内容逐字不变，`index` 哈希与 hunk 行号随上游重排） |
 
 ## 0.0b v0.18.0 rebase 记录（2026-11-22）
 

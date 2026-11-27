@@ -57,7 +57,7 @@ Kotlin 宿主用**系统 WebView** 加载本进程内 Node 跑起的 `pi-web` �
 | 本地装依赖的方式 | `npm ci`（与 `package-lock.json` 逐条一致） |
 
 **铁律：任何"依赖版本门禁"只允许校验 `pi-web/package.json` 里「精确钉住」的直连依赖**
-（spec 无 `^` / `~` / `*`，当前 **19 项**：`next@16.4.6`、`@earendil-works/*@1.6.0`、`node-pty`、`undici`、`semver`、`typebox` 等）。
+（spec 无 `^` / `~` / `*`，当前 **19 项**：`next@16.4.6`、`@earendil-works/*@1.6.1`、`node-pty`、`undici`、`semver`、`typebox` 等）。
 
 - ❌ **禁止**拿 `package-lock.json` 逐条比对整棵安装树，也禁止比对 `node_modules/**` 全量 —— 在 CI 的 pnpm 路径上必然误报，把可用构建判成失败。
 - ✅ 判据意义：精确钉住项在 `npm ci` 与 `pnpm --lockfile=false` 下**都**落到同一版本，正好等价于「装的是当前上游 tag 那套基线」—— 这才是门禁真正要保证的东西。
